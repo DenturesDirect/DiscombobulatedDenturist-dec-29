@@ -36,11 +36,15 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const [match, params] = useRoute("/patient/:id");
   const patientId = params?.id || '1';
+  const { toast } = useToast();
   
   const [isDark, setIsDark] = useState(false);
   const [generatedDocument, setGeneratedDocument] = useState("");
   const [showShadeReminder, setShowShadeReminder] = useState(false);
   const [toothShade, setToothShade] = useState({ current: 'A2', requested: 'B1' });
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [followUpPrompt, setFollowUpPrompt] = useState<string>("");
+  const [currentClinicalNote, setCurrentClinicalNote] = useState("");
 
   const handleThemeToggle = () => {
     setIsDark(!isDark);
@@ -52,6 +56,76 @@ export default function Dashboard() {
       setLocation('/');
     } else if (page === 'todos') {
       setLocation('/todos');
+    }
+  };
+
+  const handleClinicalNoteSubmit = async (plainText: string) => {
+    setIsProcessing(true);
+    try {
+      const response = await apiRequest('/api/clinical-notes/process', {
+        method: 'POST',
+        body: JSON.stringify({
+          plainTextNote: plainText,
+          patientName: 'Sarah Johnson' // TODO: get from patient data
+        }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await response.json();
+      setGeneratedDocument(data.formattedNote);
+      setCurrentClinicalNote(data.formattedNote);
+      
+      if (data.followUpPrompt) {
+        setFollowUpPrompt(data.followUpPrompt);
+      }
+
+      if (data.suggestedTasks && data.suggestedTasks.length > 0) {
+        toast({
+          title: "Tasks Created",
+          description: `${data.suggestedTasks.length} task(s) have been assigned to staff.`
+        });
+      }
+
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to process clinical note",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleGenerateReferralLetter = async () => {
+    setIsProcessing(true);
+    try {
+      const response = await apiRequest('/api/referral-letters/generate', {
+        method: 'POST',
+        body: JSON.stringify({
+          patientName: 'Sarah Johnson',
+          clinicalNote: currentClinicalNote
+        }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await response.json();
+      setGeneratedDocument(prev => `${prev}\n\n---\n\nREFERRAL LETTER\n\n${data.letter}`);
+      setFollowUpPrompt("");
+      
+      toast({
+        title: "Referral Letter Generated",
+        description: "The letter has been added to the document."
+      });
+
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate referral letter",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -83,8 +157,38 @@ export default function Dashboard() {
               </div>
 
               <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Add New Clinical Note</h2>
-                <VoicePromptInput onSubmit={(text) => console.log('Clinical note:', text)} />
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold">Add New Clinical Note</h2>
+                  {isProcessing && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
+                </div>
+                <VoicePromptInput 
+                  onSubmit={handleClinicalNoteSubmit}
+                  disabled={isProcessing}
+                />
+                {followUpPrompt && (
+                  <div className="mt-4 p-4 bg-muted rounded-lg">
+                    <p className="text-sm mb-3">{followUpPrompt}</p>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        onClick={handleGenerateReferralLetter}
+                        disabled={isProcessing}
+                        data-testid="button-accept-followup"
+                      >
+                        Yes, Generate
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => setFollowUpPrompt("")}
+                        disabled={isProcessing}
+                        data-testid="button-decline-followup"
+                      >
+                        No, Thanks
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </Card>
 
               <Card className="p-6">
