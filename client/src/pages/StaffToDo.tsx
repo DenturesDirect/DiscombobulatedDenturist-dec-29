@@ -79,9 +79,11 @@ export default function StaffToDo() {
     document.documentElement.classList.toggle('dark');
   };
 
-  const handleNavigate = (page: 'dashboard' | 'todos') => {
-    if (page === 'dashboard') {
+  const handleNavigate = (page: 'patients' | 'canvas' | 'todos') => {
+    if (page === 'patients') {
       setLocation('/');
+    } else if (page === 'canvas') {
+      setLocation('/patient/1');
     }
   };
 

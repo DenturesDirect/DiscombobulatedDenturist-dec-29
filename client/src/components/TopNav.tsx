@@ -11,11 +11,11 @@ interface TopNavProps {
   isDark?: boolean;
   onThemeToggle?: () => void;
   onLogout?: () => void;
-  onNavigate?: (page: 'dashboard' | 'todos') => void;
-  currentPage?: 'dashboard' | 'todos';
+  onNavigate?: (page: 'patients' | 'canvas' | 'todos') => void;
+  currentPage?: 'patients' | 'canvas' | 'todos';
 }
 
-export default function TopNav({ userName, userRole, notificationCount = 0, isDark, onThemeToggle, onLogout, onNavigate, currentPage = 'dashboard' }: TopNavProps) {
+export default function TopNav({ userName, userRole, notificationCount = 0, isDark, onThemeToggle, onLogout, onNavigate, currentPage = 'patients' }: TopNavProps) {
   const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase();
 
   return (
@@ -24,10 +24,18 @@ export default function TopNav({ userName, userRole, notificationCount = 0, isDa
         <div className="text-lg font-semibold">The Discombobulated Denturist</div>
         <div className="flex gap-1">
           <Button
-            variant={currentPage === 'dashboard' ? 'default' : 'ghost'}
+            variant={currentPage === 'patients' ? 'default' : 'ghost'}
             size="sm"
-            onClick={() => onNavigate?.('dashboard')}
-            data-testid="nav-dashboard"
+            onClick={() => onNavigate?.('patients')}
+            data-testid="nav-patients"
+          >
+            Active Patients
+          </Button>
+          <Button
+            variant={currentPage === 'canvas' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => onNavigate?.('canvas')}
+            data-testid="nav-canvas"
           >
             Patient Canvas
           </Button>
