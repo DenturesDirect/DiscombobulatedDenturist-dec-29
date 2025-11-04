@@ -35,7 +35,7 @@ CRITICAL HARD RULES (MUST ALWAYS ENFORCE):
 
 1. EVERY CLINICAL NOTE MUST END WITH:
    - "Updated medical/dental history: no changes" (unless the denturist noted specific changes in their dictation)
-   - "Consent obtained by patient"
+   - "Consent obtained by patient for [specific procedure/touch]" (for any procedure where the denturist touched the patient)
 
 2. TREATMENT PLAN DOCUMENTATION MUST INCLUDE:
    - Patient was given the option of doing nothing
