@@ -62,13 +62,9 @@ export default function Dashboard() {
   const handleClinicalNoteSubmit = async (plainText: string) => {
     setIsProcessing(true);
     try {
-      const response = await apiRequest('/api/clinical-notes/process', {
-        method: 'POST',
-        body: JSON.stringify({
-          plainTextNote: plainText,
-          patientName: 'Sarah Johnson' // TODO: get from patient data
-        }),
-        headers: { 'Content-Type': 'application/json' }
+      const response = await apiRequest('POST', '/api/clinical-notes/process', {
+        plainTextNote: plainText,
+        patientId: patientId
       });
 
       const data = await response.json();
@@ -100,13 +96,9 @@ export default function Dashboard() {
   const handleGenerateReferralLetter = async () => {
     setIsProcessing(true);
     try {
-      const response = await apiRequest('/api/referral-letters/generate', {
-        method: 'POST',
-        body: JSON.stringify({
-          patientName: 'Sarah Johnson',
-          clinicalNote: currentClinicalNote
-        }),
-        headers: { 'Content-Type': 'application/json' }
+      const response = await apiRequest('POST', '/api/referral-letters/generate', {
+        patientName: 'Sarah Johnson',
+        clinicalNote: currentClinicalNote
       });
 
       const data = await response.json();
