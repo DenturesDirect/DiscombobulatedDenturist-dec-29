@@ -11,15 +11,35 @@ interface TopNavProps {
   isDark?: boolean;
   onThemeToggle?: () => void;
   onLogout?: () => void;
+  onNavigate?: (page: 'dashboard' | 'todos') => void;
+  currentPage?: 'dashboard' | 'todos';
 }
 
-export default function TopNav({ userName, userRole, notificationCount = 0, isDark, onThemeToggle, onLogout }: TopNavProps) {
+export default function TopNav({ userName, userRole, notificationCount = 0, isDark, onThemeToggle, onLogout, onNavigate, currentPage = 'dashboard' }: TopNavProps) {
   const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase();
 
   return (
     <div className="h-16 border-b bg-background px-6 flex items-center justify-between sticky top-0 z-50">
-      <div className="flex items-center gap-4">
-        <div className="text-lg font-semibold">Denture Clinic</div>
+      <div className="flex items-center gap-6">
+        <div className="text-lg font-semibold">The Discombobulated Denturist</div>
+        <div className="flex gap-1">
+          <Button
+            variant={currentPage === 'dashboard' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => onNavigate?.('dashboard')}
+            data-testid="nav-dashboard"
+          >
+            Patient Canvas
+          </Button>
+          <Button
+            variant={currentPage === 'todos' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => onNavigate?.('todos')}
+            data-testid="nav-todos"
+          >
+            Staff To-Do
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center gap-3">
