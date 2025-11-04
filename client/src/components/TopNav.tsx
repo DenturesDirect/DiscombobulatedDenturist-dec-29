@@ -3,6 +3,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Bell, Moon, Sun } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import logoUrl from "@assets/DenturesDirect Logo Design_1762294635743.png";
 
 interface TopNavProps {
   userName: string;
@@ -21,7 +22,7 @@ export default function TopNav({ userName, userRole, notificationCount = 0, isDa
   return (
     <div className="h-16 border-b bg-background px-6 flex items-center justify-between sticky top-0 z-50">
       <div className="flex items-center gap-6">
-        <div className="text-lg font-semibold">The Discombobulated Denturist</div>
+        <img src={logoUrl} alt="Dentures Direct" className="h-12" data-testid="img-logo" />
         <div className="flex gap-1">
           <Button
             variant={currentPage === 'patients' ? 'default' : 'ghost'}
