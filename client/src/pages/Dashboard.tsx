@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import TopNav from "@/components/TopNav";
 import ToothShadeCard from "@/components/ToothShadeCard";
 import VoicePromptInput from "@/components/VoicePromptInput";
@@ -10,7 +11,9 @@ import DocumentPreview from "@/components/DocumentPreview";
 import TreatmentMilestoneTimeline from "@/components/TreatmentMilestoneTimeline";
 import ClinicalPhotoGrid from "@/components/ClinicalPhotoGrid";
 import ShadeReminderModal from "@/components/ShadeReminderModal";
-import { FileText, Camera, Clock } from "lucide-react";
+import { FileText, Camera, Clock, Loader2 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 //todo: remove mock functionality
 
