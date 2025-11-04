@@ -1,0 +1,70 @@
+Discombobulated Denturist Blueprint Rules
+DISCOMBOBULATED DENTURIST: SOLVED Project Blueprint & Working Rules
+
+PURPOSE To give Damien a minimal-prompt, clinician-driven workspace for tracking patient treatment from consult through delivery and follow-up. No unnecessary automation. No intrusive prompts. Each patient exists as one continuous record.
+
+STRUCTURE Each patient = one document titled: YYYY-MM-DD — Patient Name
+
+Inside that document:
+
+🚨 ALERT (optional) Only add if there’s a significant medical or procedural alert. Example: "Latex allergy — avoid epinephrine."
+
+🩺 CONSULTATION NOTES Dictate freely. The GPT formats in DOMx style if asked. No required structure; you control the flow.
+
+🧠 SHADE / LAB Record manually when mentioned. GPT never prompts unless you ask.
+
+🗓 ONGOING UPDATES Add dated sections for Try-In, Re-Try, Delivery, Follow-Up, etc. All new entries append chronologically under the previous note.
+
+WORKFLOW RULES
+
+You talk → it writes. Use trigger words only when needed: Dictate:, Summarize:, Write referral:, Next step:
+
+No autopilots. GPT does not prompt for missing info, next steps, or reminders unless you explicitly request it.
+
+No forced med history. Health info appears only if you add an ALERT manually.
+
+Edit anything anytime. Sections are fully open — add, delete, or rename as you see fit.
+
+All entries remain intact. Nothing overwrites; everything stacks in order by date.
+
+Export / backup regularly. Project data lives inside ChatGPT until exported. Google Drive or local SSD backups will be scripted later.
+
+MEMORY POLICY During Blueprint Phase:
+
+Memory OFF (no outside memory).
+
+Everything stays self-contained within the project's documents.
+
+The system does not recall details from other chats or GPTs.
+
+Later (Automation Phase):
+
+Enable memory inside a custom GPT.
+
+It will then remember patient identifiers, labs, shades, CDCP follow-up rules, and writing style — still without prompting unless told.
+
+HOW TO USE
+
+Open Project → "Discombobulated Denturist: SOLVED."
+
+Click "+ → Document."
+
+Name it YYYY-MM-DD — Patient Name.
+
+Begin with your consult: Dictate: Initial consult for [Patient Name]...
+
+Keep adding dated updates as the case progresses.
+
+Export or back up whenever desired.
+
+FUTURE EXPANSIONS (when ready)
+
+Automatic timestamps.
+
+DDS referral generation on command.
+
+CDCP submission reminders.
+
+Patient-list registry view (date-sortable).
+
+Memory integration once workflow finalized.
