@@ -11,6 +11,14 @@ export default {
         sm: ".1875rem", /* 3px */
       },
       colors: {
+        success: {
+          DEFAULT: "hsl(142 71% 45% / <alpha-value>)",
+          foreground: "hsl(142 70% 98% / <alpha-value>)",
+        },
+        warning: {
+          DEFAULT: "hsl(38 92% 50% / <alpha-value>)",
+          foreground: "hsl(38 90% 10% / <alpha-value>)",
+        },
         // Flat / base colors (regular buttons)
         background: "hsl(var(--background) / <alpha-value>)",
         foreground: "hsl(var(--foreground) / <alpha-value>)",
