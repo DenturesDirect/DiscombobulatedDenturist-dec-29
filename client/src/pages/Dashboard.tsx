@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation, useRoute } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import ShadeReminderModal from "@/components/ShadeReminderModal";
 import { FileText, Camera, Clock, Loader2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import type { Patient, ClinicalNote } from "@shared/schema";
 
 //todo: remove mock functionality
 
@@ -35,16 +37,25 @@ const mockPhotos = [
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const [match, params] = useRoute("/patient/:id");
-  const patientId = params?.id || '1';
+  const patientId = params?.id || '';
   const { toast } = useToast();
   
   const [isDark, setIsDark] = useState(false);
   const [generatedDocument, setGeneratedDocument] = useState("");
   const [showShadeReminder, setShowShadeReminder] = useState(false);
-  const [toothShade, setToothShade] = useState({ current: 'A2', requested: 'B1' });
   const [isProcessing, setIsProcessing] = useState(false);
   const [followUpPrompt, setFollowUpPrompt] = useState<string>("");
   const [currentClinicalNote, setCurrentClinicalNote] = useState("");
+
+  const { data: patient, isLoading: isLoadingPatient } = useQuery<Patient>({
+    queryKey: ['/api/patients', patientId],
+    enabled: !!patientId
+  });
+
+  const { data: clinicalNotes = [], isLoading: isLoadingNotes } = useQuery<ClinicalNote[]>({
+    queryKey: ['/api/clinical-notes', patientId],
+    enabled: !!patientId
+  });
 
   const handleThemeToggle = () => {
     setIsDark(!isDark);
@@ -121,6 +132,30 @@ export default function Dashboard() {
     }
   };
 
+  if (!patientId) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-muted-foreground">No patient selected</p>
+      </div>
+    );
+  }
+
+  if (isLoadingPatient) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!patient) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-muted-foreground">Patient not found</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen bg-background">
       <TopNav 
@@ -138,13 +173,19 @@ export default function Dashboard() {
           <div className="flex-1 min-w-[500px] max-w-2xl p-6 overflow-y-auto border-r">
             <div className="space-y-6">
               <div>
-                <h1 className="text-3xl font-semibold mb-2">Sarah Johnson</h1>
+                <h1 className="text-3xl font-semibold mb-2">{patient.name}</h1>
                 <div className="text-sm text-muted-foreground mb-4">
-                  DOB: 05/12/1968 • Phone: (555) 123-4567
+                  {patient.dateOfBirth && `DOB: ${new Date(patient.dateOfBirth).toLocaleDateString()}`}
+                  {patient.phone && ` • Phone: ${patient.phone}`}
+                  {patient.isCDCP && (
+                    <span className="ml-2 px-2 py-0.5 bg-destructive/10 text-destructive rounded text-xs font-medium">
+                      CDCP {!patient.copayDiscussed && '- Copay Not Discussed'}
+                    </span>
+                  )}
                 </div>
                 <ToothShadeCard 
-                  currentShade={toothShade.current}
-                  requestedShade={toothShade.requested}
+                  currentShade={patient.currentToothShade || 'Not Set'}
+                  requestedShade={patient.requestedToothShade || 'Not Set'}
                 />
               </div>
 
@@ -208,10 +249,16 @@ export default function Dashboard() {
               </TabsList>
 
               <TabsContent value="document" className="flex-1 overflow-y-auto">
-                <DocumentPreview 
-                  content={generatedDocument}
-                  onRewrite={(text) => console.log('Rewrite:', text)}
-                />
+                {isLoadingNotes ? (
+                  <div className="flex items-center justify-center h-64">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <DocumentPreview 
+                    content={generatedDocument || clinicalNotes.map(note => note.content).join('\n\n---\n\n') || 'No clinical notes yet. Add one using the form on the left.'}
+                    onRewrite={(text) => console.log('Rewrite:', text)}
+                  />
+                )}
               </TabsContent>
 
               <TabsContent value="photos" className="flex-1 overflow-y-auto">
@@ -232,10 +279,9 @@ export default function Dashboard() {
         open={showShadeReminder}
         onClose={() => setShowShadeReminder(false)}
         onSave={(current, requested) => {
-          setToothShade({ current, requested });
           console.log('Shades saved:', { current, requested });
         }}
-        patientName="Sarah Johnson"
+        patientName={patient.name}
       />
     </div>
   );

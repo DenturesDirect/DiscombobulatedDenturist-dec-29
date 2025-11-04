@@ -1,69 +1,22 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import TopNav from "@/components/TopNav";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
 import PatientTimelineCard from "@/components/PatientTimelineCard";
-
-const mockPatientsTimeline = [
-  { 
-    id: '1', 
-    name: 'Sarah Johnson', 
-    date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    currentStep: 'Setup Assigned',
-    lastAction: 'Metal ETA received',
-    nextStep: 'Setup Complete',
-    assignee: 'Michael',
-    eta: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
-  },
-  { 
-    id: '2', 
-    name: 'Michael Chen', 
-    date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-    currentStep: 'Insurance Estimate',
-    lastAction: 'CDCP estimate sent',
-    nextStep: 'Insurance Answer',
-    assignee: 'Caroline',
-    eta: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-  },
-  { 
-    id: '3', 
-    name: 'Emily Rodriguez', 
-    date: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
-    currentStep: 'Processing',
-    lastAction: 'Setup completed',
-    nextStep: 'Processing Complete',
-    assignee: 'Luisa',
-    eta: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000)
-  },
-  { 
-    id: '4', 
-    name: 'David Thompson', 
-    date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-    currentStep: 'Scan Import',
-    lastAction: 'Initial consultation',
-    nextStep: 'Metal Design',
-    assignee: 'Luisa',
-    eta: new Date(Date.now() + 6 * 60 * 60 * 1000)
-  },
-  { 
-    id: '5', 
-    name: 'Amanda Martinez', 
-    date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-    currentStep: 'Biteblock',
-    lastAction: 'Impressions taken',
-    nextStep: 'Biteblock Complete',
-    assignee: 'Damien',
-    eta: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)
-  },
-];
+import type { Patient } from "@shared/schema";
 
 export default function ActivePatients() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDark, setIsDark] = useState(false);
 
-  const filteredPatients = mockPatientsTimeline.filter(p =>
+  const { data: patients = [], isLoading } = useQuery<Patient[]>({
+    queryKey: ['/api/patients']
+  });
+
+  const filteredPatients = patients.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -78,7 +31,10 @@ export default function ActivePatients() {
 
   const handleNavigate = (page: 'patients' | 'canvas' | 'todos') => {
     if (page === 'canvas') {
-      setLocation('/patient/1');
+      const firstPatient = patients[0];
+      if (firstPatient) {
+        setLocation(`/patient/${firstPatient.id}`);
+      }
     } else if (page === 'todos') {
       setLocation('/todos');
     }
@@ -113,15 +69,34 @@ export default function ActivePatients() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="space-y-3 max-w-7xl">
-          {filteredPatients.map(patient => (
-            <PatientTimelineCard
-              key={patient.id}
-              {...patient}
-              onClick={() => handlePatientClick(patient.id)}
-            />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <div className="space-y-3 max-w-7xl">
+            {filteredPatients.length === 0 ? (
+              <div className="text-center text-muted-foreground py-12">
+                {searchQuery ? "No patients match your search" : "No active patients"}
+              </div>
+            ) : (
+              filteredPatients.map(patient => (
+                <PatientTimelineCard
+                  key={patient.id}
+                  id={patient.id}
+                  name={patient.name}
+                  date={new Date(patient.createdAt)}
+                  currentStep={patient.isCDCP && !patient.copayDiscussed ? 'CDCP Copay Discussion' : 'Active Treatment'}
+                  lastAction={`Created ${new Date(patient.createdAt).toLocaleDateString()}`}
+                  nextStep="Clinical Note"
+                  assignee={patient.isCDCP && !patient.copayDiscussed ? 'Damien' : 'TBD'}
+                  eta={new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)}
+                  onClick={() => handlePatientClick(patient.id)}
+                />
+              ))
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

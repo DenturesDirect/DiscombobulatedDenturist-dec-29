@@ -29,8 +29,8 @@ export default function PatientTimelineCard({
   isActive,
   onClick
 }: PatientTimelineCardProps) {
-  const assigneeInitials = assignee.split(' ').map(n => n[0]).join('').toUpperCase();
-  const nameInitials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const assigneeInitials = assignee?.split(' ').map(n => n[0]).join('').toUpperCase() || 'NA';
+  const nameInitials = name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'NA';
 
   return (
     <Card
