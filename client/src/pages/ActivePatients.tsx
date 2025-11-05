@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
 import TopNav from "@/components/TopNav";
 import { Input } from "@/components/ui/input";
 import { Search, Loader2 } from "lucide-react";
@@ -11,6 +12,7 @@ export default function ActivePatients() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDark, setIsDark] = useState(false);
+  const { user } = useAuth();
 
   const { data: patients = [], isLoading } = useQuery<Patient[]>({
     queryKey: ['/api/patients']
@@ -40,15 +42,17 @@ export default function ActivePatients() {
     }
   };
 
+  const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'User' : 'User';
+
   return (
     <div className="h-screen flex flex-col bg-background">
       <TopNav 
-        userName="Damien"
+        userName={userName}
         userRole="Denturist"
         notificationCount={3}
         isDark={isDark}
         onThemeToggle={handleThemeToggle}
-        onLogout={() => console.log('Logout')}
+        onLogout={() => window.location.href = '/api/logout'}
         onNavigate={handleNavigate}
         currentPage="patients"
       />

@@ -99,7 +99,7 @@ export default function TopNav({ userName, userRole, notificationCount = 0, isDa
               My Tasks
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onLogout}>
+            <DropdownMenuItem onClick={onLogout} data-testid="button-logout">
               Logout
             </DropdownMenuItem>
           </DropdownMenuContent>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ export default function Dashboard() {
   const [match, params] = useRoute("/patient/:id");
   const patientId = params?.id || '';
   const { toast } = useToast();
+  const { user } = useAuth();
   
   const [isDark, setIsDark] = useState(false);
   const [generatedDocument, setGeneratedDocument] = useState("");
@@ -159,12 +161,12 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col h-screen bg-background">
       <TopNav 
-        userName="Damien"
+        userName={user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'User' : 'User'}
         userRole="Denturist"
         notificationCount={3}
         isDark={isDark}
         onThemeToggle={handleThemeToggle}
-        onLogout={() => console.log('Logout')}
+        onLogout={() => window.location.href = '/api/logout'}
         onNavigate={handleNavigate}
         currentPage="canvas"
       />

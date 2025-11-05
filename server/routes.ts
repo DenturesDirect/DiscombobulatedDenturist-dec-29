@@ -3,10 +3,26 @@ import { createServer, type Server } from "http";
 import { processClinicalNote, generateReferralLetter } from "./openai";
 import { storage } from "./storage";
 import { insertPatientSchema, insertClinicalNoteSchema, insertTaskSchema } from "@shared/schema";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // PATIENTS
-  app.post("/api/patients", async (req, res) => {
+  // Setup authentication
+  await setupAuth(app);
+
+  // Auth route
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // PATIENTS (Protected)
+  app.post("/api/patients", isAuthenticated, async (req, res) => {
     try {
       const validatedData = insertPatientSchema.parse(req.body);
       const patient = await storage.createPatient(validatedData);
@@ -16,7 +32,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/patients", async (req, res) => {
+  app.get("/api/patients", isAuthenticated, async (req, res) => {
     try {
       const patients = await storage.listPatients();
       res.json(patients);
@@ -25,7 +41,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/patients/:id", async (req, res) => {
+  app.get("/api/patients/:id", isAuthenticated, async (req, res) => {
     try {
       const patient = await storage.getPatient(req.params.id);
       if (!patient) {
@@ -37,7 +53,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/patients/:id", async (req, res) => {
+  app.patch("/api/patients/:id", isAuthenticated, async (req, res) => {
     try {
       const patient = await storage.updatePatient(req.params.id, req.body);
       if (!patient) {
@@ -49,8 +65,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // CLINICAL NOTES
-  app.post("/api/clinical-notes/process", async (req, res) => {
+  // CLINICAL NOTES (Protected)
+  app.post("/api/clinical-notes/process", isAuthenticated, async (req: any, res) => {
     try {
       const { plainTextNote, patientId } = req.body;
       
@@ -65,12 +81,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await processClinicalNote(plainTextNote, patient.name);
       
-      // Save the formatted note to database
+      // Save the formatted note to database with authenticated user
+      const userName = `${req.user.claims.first_name || ''} ${req.user.claims.last_name || ''}`.trim() || req.user.claims.email || 'Unknown';
       const savedNote = await storage.createClinicalNote({
         patientId,
         appointmentId: null,
         content: result.formattedNote,
-        createdBy: "Damien"
+        createdBy: userName
       });
 
       // Save any suggested tasks
@@ -95,7 +112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/clinical-notes/:patientId", async (req, res) => {
+  app.get("/api/clinical-notes/:patientId", isAuthenticated, async (req, res) => {
     try {
       const notes = await storage.listClinicalNotes(req.params.patientId);
       res.json(notes);
@@ -104,8 +121,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // TASKS
-  app.get("/api/tasks", async (req, res) => {
+  // TASKS (Protected)
+  app.get("/api/tasks", isAuthenticated, async (req, res) => {
     try {
       const { assignee } = req.query;
       const tasks = await storage.listTasks(assignee as string);
@@ -115,7 +132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/tasks/:id", async (req, res) => {
+  app.patch("/api/tasks/:id", isAuthenticated, async (req, res) => {
     try {
       const { status } = req.body;
       const task = await storage.updateTaskStatus(req.params.id, status);

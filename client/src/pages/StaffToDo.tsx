@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -17,6 +18,7 @@ export default function StaffToDo() {
   const [, setLocation] = useLocation();
   const [selectedStaff, setSelectedStaff] = useState('All');
   const [isDark, setIsDark] = useState(false);
+  const { user } = useAuth();
 
   const { data: tasks = [], isLoading } = useQuery<Task[]>({
     queryKey: ['/api/tasks']
@@ -76,12 +78,12 @@ export default function StaffToDo() {
   return (
     <div className="h-screen flex flex-col bg-background">
       <TopNav 
-        userName="Damien"
+        userName={user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'User' : 'User'}
         userRole="Denturist"
         notificationCount={3}
         isDark={isDark}
         onThemeToggle={handleThemeToggle}
-        onLogout={() => console.log('Logout')}
+        onLogout={() => window.location.href = '/api/logout'}
         onNavigate={handleNavigate}
         currentPage="todos"
       />
