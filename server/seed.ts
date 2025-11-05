@@ -1,6 +1,12 @@
 import { storage } from "./storage";
 
 export async function seedData() {
+  const existingPatients = await storage.listPatients();
+  if (existingPatients.length > 0) {
+    console.log("✅ Database already has data, skipping seed");
+    return;
+  }
+
   const patient1 = await storage.createPatient({
     name: "Sarah Johnson",
     dateOfBirth: "1968-05-12",
