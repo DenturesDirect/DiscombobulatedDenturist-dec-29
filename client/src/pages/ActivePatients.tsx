@@ -4,14 +4,17 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import TopNav from "@/components/TopNav";
 import { Input } from "@/components/ui/input";
-import { Search, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, Loader2, Plus } from "lucide-react";
 import PatientTimelineCard from "@/components/PatientTimelineCard";
+import NewPatientDialog from "@/components/NewPatientDialog";
 import type { Patient } from "@shared/schema";
 
 export default function ActivePatients() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDark, setIsDark] = useState(false);
+  const [isNewPatientDialogOpen, setIsNewPatientDialogOpen] = useState(false);
   const { user } = useAuth();
 
   const { data: patients = [], isLoading } = useQuery<Patient[]>({
@@ -59,15 +62,24 @@ export default function ActivePatients() {
       <div className="p-6 border-b bg-background">
         <div className="flex items-center justify-between gap-4 mb-4">
           <h1 className="text-3xl font-semibold">Active Patients</h1>
-          <div className="relative w-80">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search patients..."
-              className="pl-9"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              data-testid="input-search-patients"
-            />
+          <div className="flex items-center gap-3">
+            <div className="relative w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search patients..."
+                className="pl-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                data-testid="input-search-patients"
+              />
+            </div>
+            <Button
+              onClick={() => setIsNewPatientDialogOpen(true)}
+              data-testid="button-new-patient"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Patient
+            </Button>
           </div>
         </div>
       </div>
@@ -102,6 +114,12 @@ export default function ActivePatients() {
           </div>
         )}
       </div>
+
+      <NewPatientDialog
+        open={isNewPatientDialogOpen}
+        onOpenChange={setIsNewPatientDialogOpen}
+        onSuccess={(patientId) => setLocation(`/patient/${patientId}`)}
+      />
     </div>
   );
 }

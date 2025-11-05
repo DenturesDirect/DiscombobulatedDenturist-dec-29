@@ -3,9 +3,12 @@ import {
   type Patient, type InsertPatient,
   type ClinicalNote, type InsertClinicalNote,
   type Task, type InsertTask,
-  type PatientFile, type InsertPatientFile
+  type PatientFile, type InsertPatientFile,
+  users, patients, clinicalNotes, tasks, patientFiles
 } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
   // Users (Replit Auth)
@@ -171,4 +174,102 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DbStorage implements IStorage {
+  async getUser(id: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.id, id));
+    return result[0];
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const result = await db.insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          profileImageUrl: userData.profileImageUrl,
+          updatedAt: new Date()
+        }
+      })
+      .returning();
+    return result[0];
+  }
+
+  async createPatient(insertPatient: InsertPatient): Promise<Patient> {
+    const result = await db.insert(patients)
+      .values(insertPatient)
+      .returning();
+    return result[0];
+  }
+
+  async getPatient(id: string): Promise<Patient | undefined> {
+    const result = await db.select().from(patients).where(eq(patients.id, id));
+    return result[0];
+  }
+
+  async listPatients(): Promise<Patient[]> {
+    return await db.select().from(patients).orderBy(desc(patients.createdAt));
+  }
+
+  async updatePatient(id: string, updates: Partial<InsertPatient>): Promise<Patient | undefined> {
+    const result = await db.update(patients)
+      .set(updates)
+      .where(eq(patients.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async createClinicalNote(insertNote: InsertClinicalNote): Promise<ClinicalNote> {
+    const result = await db.insert(clinicalNotes)
+      .values(insertNote)
+      .returning();
+    return result[0];
+  }
+
+  async listClinicalNotes(patientId: string): Promise<ClinicalNote[]> {
+    return await db.select().from(clinicalNotes)
+      .where(eq(clinicalNotes.patientId, patientId))
+      .orderBy(desc(clinicalNotes.createdAt));
+  }
+
+  async createTask(insertTask: InsertTask): Promise<Task> {
+    const result = await db.insert(tasks)
+      .values(insertTask)
+      .returning();
+    return result[0];
+  }
+
+  async listTasks(assignee?: string): Promise<Task[]> {
+    if (assignee) {
+      return await db.select().from(tasks)
+        .where(eq(tasks.assignee, assignee))
+        .orderBy(desc(tasks.createdAt));
+    }
+    return await db.select().from(tasks).orderBy(desc(tasks.createdAt));
+  }
+
+  async updateTaskStatus(id: string, status: string): Promise<Task | undefined> {
+    const result = await db.update(tasks)
+      .set({ status })
+      .where(eq(tasks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async createPatientFile(insertFile: InsertPatientFile): Promise<PatientFile> {
+    const result = await db.insert(patientFiles)
+      .values(insertFile)
+      .returning();
+    return result[0];
+  }
+
+  async listPatientFiles(patientId: string): Promise<PatientFile[]> {
+    return await db.select().from(patientFiles)
+      .where(eq(patientFiles.patientId, patientId))
+      .orderBy(desc(patientFiles.uploadedAt));
+  }
+}
+
+export const storage = new DbStorage();
