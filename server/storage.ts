@@ -7,8 +7,9 @@ import {
   users, patients, clinicalNotes, tasks, patientFiles
 } from "@shared/schema";
 import { randomUUID } from "crypto";
-import { db } from "./db";
+import { ensureDb } from "./db";
 import { eq, desc } from "drizzle-orm";
+import { USE_MEM_STORAGE } from "./config";
 
 export interface IStorage {
   // Users (Replit Auth)
@@ -81,6 +82,13 @@ export class MemStorage implements IStorage {
       copayDiscussed: insertPatient.copayDiscussed ?? false,
       currentToothShade: insertPatient.currentToothShade ?? null,
       requestedToothShade: insertPatient.requestedToothShade ?? null,
+      photoUrl: insertPatient.photoUrl ?? null,
+      dentureType: insertPatient.dentureType ?? null,
+      lastStepCompleted: insertPatient.lastStepCompleted ?? null,
+      lastStepDate: insertPatient.lastStepDate ?? null,
+      nextStep: insertPatient.nextStep ?? null,
+      assignedTo: insertPatient.assignedTo ?? null,
+      dueDate: insertPatient.dueDate ?? null,
       createdAt: new Date()
     };
     this.patients.set(id, patient);
@@ -92,7 +100,9 @@ export class MemStorage implements IStorage {
   }
 
   async listPatients(): Promise<Patient[]> {
-    return Array.from(this.patients.values());
+    return Array.from(this.patients.values()).sort((a, b) => 
+      b.createdAt.getTime() - a.createdAt.getTime()
+    );
   }
 
   async updatePatient(id: string, updates: Partial<InsertPatient>): Promise<Patient | undefined> {
@@ -176,12 +186,12 @@ export class MemStorage implements IStorage {
 
 export class DbStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.id, id));
+    const result = await ensureDb().select().from(users).where(eq(users.id, id));
     return result[0];
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
-    const result = await db.insert(users)
+    const result = await ensureDb().insert(users)
       .values(userData)
       .onConflictDoUpdate({
         target: users.id,
@@ -198,23 +208,23 @@ export class DbStorage implements IStorage {
   }
 
   async createPatient(insertPatient: InsertPatient): Promise<Patient> {
-    const result = await db.insert(patients)
+    const result = await ensureDb().insert(patients)
       .values(insertPatient)
       .returning();
     return result[0];
   }
 
   async getPatient(id: string): Promise<Patient | undefined> {
-    const result = await db.select().from(patients).where(eq(patients.id, id));
+    const result = await ensureDb().select().from(patients).where(eq(patients.id, id));
     return result[0];
   }
 
   async listPatients(): Promise<Patient[]> {
-    return await db.select().from(patients).orderBy(desc(patients.createdAt));
+    return await ensureDb().select().from(patients).orderBy(desc(patients.createdAt));
   }
 
   async updatePatient(id: string, updates: Partial<InsertPatient>): Promise<Patient | undefined> {
-    const result = await db.update(patients)
+    const result = await ensureDb().update(patients)
       .set(updates)
       .where(eq(patients.id, id))
       .returning();
@@ -222,20 +232,20 @@ export class DbStorage implements IStorage {
   }
 
   async createClinicalNote(insertNote: InsertClinicalNote): Promise<ClinicalNote> {
-    const result = await db.insert(clinicalNotes)
+    const result = await ensureDb().insert(clinicalNotes)
       .values(insertNote)
       .returning();
     return result[0];
   }
 
   async listClinicalNotes(patientId: string): Promise<ClinicalNote[]> {
-    return await db.select().from(clinicalNotes)
+    return await ensureDb().select().from(clinicalNotes)
       .where(eq(clinicalNotes.patientId, patientId))
       .orderBy(desc(clinicalNotes.createdAt));
   }
 
   async createTask(insertTask: InsertTask): Promise<Task> {
-    const result = await db.insert(tasks)
+    const result = await ensureDb().insert(tasks)
       .values(insertTask)
       .returning();
     return result[0];
@@ -243,15 +253,15 @@ export class DbStorage implements IStorage {
 
   async listTasks(assignee?: string): Promise<Task[]> {
     if (assignee) {
-      return await db.select().from(tasks)
+      return await ensureDb().select().from(tasks)
         .where(eq(tasks.assignee, assignee))
         .orderBy(desc(tasks.createdAt));
     }
-    return await db.select().from(tasks).orderBy(desc(tasks.createdAt));
+    return await ensureDb().select().from(tasks).orderBy(desc(tasks.createdAt));
   }
 
   async updateTaskStatus(id: string, status: string): Promise<Task | undefined> {
-    const result = await db.update(tasks)
+    const result = await ensureDb().update(tasks)
       .set({ status })
       .where(eq(tasks.id, id))
       .returning();
@@ -259,17 +269,32 @@ export class DbStorage implements IStorage {
   }
 
   async createPatientFile(insertFile: InsertPatientFile): Promise<PatientFile> {
-    const result = await db.insert(patientFiles)
+    const result = await ensureDb().insert(patientFiles)
       .values(insertFile)
       .returning();
     return result[0];
   }
 
   async listPatientFiles(patientId: string): Promise<PatientFile[]> {
-    return await db.select().from(patientFiles)
+    return await ensureDb().select().from(patientFiles)
       .where(eq(patientFiles.patientId, patientId))
       .orderBy(desc(patientFiles.uploadedAt));
   }
 }
 
-export const storage = new DbStorage();
+function createStorage(): IStorage {
+  if (USE_MEM_STORAGE) {
+    console.log('🧠 Using in-memory storage');
+    return new MemStorage();
+  }
+  
+  try {
+    console.log('💾 Using database storage');
+    return new DbStorage();
+  } catch (error) {
+    console.warn('⚠️  Database connection failed, falling back to in-memory storage');
+    return new MemStorage();
+  }
+}
+
+export const storage = createStorage();
