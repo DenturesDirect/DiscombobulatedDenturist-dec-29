@@ -16,6 +16,36 @@ The core philosophy is "clinician-driven" with minimal prompts, no unnecessary a
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### November 6, 2025: Patient Photo Upload and Workflow Tracking
+
+**Patient Photo Management**:
+- Implemented patient photo upload using Replit Object Storage integration
+- ObjectUploader component using Uppy Dashboard with drag-and-drop interface
+- Secure signed URL generation for photo storage in `.private/patient-photos/` directory
+- ACL-protected endpoints for photo retrieval (only authenticated users can access)
+- PatientAvatar component displays photos with graceful fallback to initials
+- Photo uploads integrated into NewPatientDialog with post-creation upload flow
+
+**Workflow Tracking System**:
+- Enhanced patient schema with workflow fields:
+  - `dentureType`: 13 options (CUD, APUD, CPUD, CLD, APLD, CPLD, Repair, Tooth Addition, Reline, Rebase, Implant CUD)
+  - `assignedTo`: Staff assignment (Damien, Caroline, Michael, Luisa)
+  - `nextStep`: Upcoming task description
+  - `dueDate`: Deadline tracking with date validation and transformation
+  - `lastStepCompleted`: Treatment milestone tracking
+  - `lastStepDate`: Timestamp of last completed step
+- NewPatientDialog now includes all workflow fields with proper validation
+- Active Patients page displays workflow data in PatientTimelineCard component
+- Date field validation fixed: schema accepts both Date objects and ISO strings, automatically transforming strings to Date
+
+**Technical Improvements**:
+- Centralized storage configuration in `server/config.ts` for easy MemStorage/DbStorage switching
+- Enhanced Zod schema with `.extend()` and `.transform()` for date field coercion
+- ACL metadata system for secure photo access control
+- End-to-end testing verified all features working correctly
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -52,7 +82,7 @@ Preferred communication style: Simple, everyday language.
 
 **Core Data Models**:
 - **Users**: Authentication and staff member accounts
-- **Patients**: Core patient records with CDCP status, tooth shade tracking, contact information
+- **Patients**: Core patient records with CDCP status, tooth shade tracking, contact information, patient photos, and workflow tracking (denture type, assigned staff, next step, due dates, treatment milestones)
 - **Clinical Notes**: Timestamped clinical documentation linked to patients
 - **Tasks**: Staff task assignments with priority levels, due dates, and status tracking
 - **Patient Files**: File attachments and clinical photos
@@ -138,6 +168,12 @@ Preferred communication style: Simple, everyday language.
 - **PostgreSQL**: Primary data store
 - **Neon Serverless**: PostgreSQL connection via @neondatabase/serverless with WebSocket support
 - **Drizzle ORM**: Type-safe database queries and migrations
+
+### Object Storage
+- **Replit Object Storage**: Patient photo storage using @google-cloud/storage
+- **Uppy**: File upload UI (@uppy/core, @uppy/dashboard, @uppy/aws-s3, @uppy/react)
+- Secure signed URL generation for upload/download
+- ACL-based access control for private patient photos
 
 ### AI Services
 - **OpenAI API**: Clinical note processing, document generation, task assignment (accessed via Replit AI Integrations)
