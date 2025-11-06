@@ -36,6 +36,13 @@ export const patients = pgTable("patients", {
   copayDiscussed: boolean("copay_discussed").default(false).notNull(),
   currentToothShade: text("current_tooth_shade"),
   requestedToothShade: text("requested_tooth_shade"),
+  photoUrl: text("photo_url"),
+  dentureType: text("denture_type"),
+  lastStepCompleted: text("last_step_completed"),
+  lastStepDate: timestamp("last_step_date"),
+  nextStep: text("next_step"),
+  assignedTo: text("assigned_to"),
+  dueDate: timestamp("due_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
