@@ -49,6 +49,13 @@ export const patients = pgTable("patients", {
 export const insertPatientSchema = createInsertSchema(patients).omit({
   id: true,
   createdAt: true,
+}).extend({
+  dueDate: z.union([z.date(), z.string()]).transform((val) => 
+    typeof val === 'string' && val.length > 0 ? new Date(val) : val
+  ).optional(),
+  lastStepDate: z.union([z.date(), z.string()]).transform((val) => 
+    typeof val === 'string' && val.length > 0 ? new Date(val) : val
+  ).optional(),
 });
 
 export type InsertPatient = z.infer<typeof insertPatientSchema>;

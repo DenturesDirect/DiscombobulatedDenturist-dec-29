@@ -1,13 +1,16 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { PatientAvatar } from "./PatientAvatar";
 import { format } from "date-fns";
 import { ChevronRight } from "lucide-react";
 
 interface PatientTimelineCardProps {
   id: string;
   name: string;
+  photoUrl?: string | null;
   date: Date;
+  dentureType?: string | null;
   currentStep: string;
   lastAction: string;
   nextStep: string;
@@ -20,7 +23,9 @@ interface PatientTimelineCardProps {
 export default function PatientTimelineCard({
   id,
   name,
+  photoUrl,
   date,
+  dentureType,
   currentStep,
   lastAction,
   nextStep,
@@ -30,7 +35,6 @@ export default function PatientTimelineCard({
   onClick
 }: PatientTimelineCardProps) {
   const assigneeInitials = assignee?.split(' ').map(n => n[0]).join('').toUpperCase() || 'NA';
-  const nameInitials = name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'NA';
 
   return (
     <Card
@@ -39,12 +43,17 @@ export default function PatientTimelineCard({
       data-testid={`card-patient-timeline-${id}`}
     >
       <div className="flex items-center gap-3 flex-wrap">
-        <Avatar className="w-9 h-9 flex-shrink-0">
-          <AvatarFallback className="text-xs font-medium">{nameInitials}</AvatarFallback>
-        </Avatar>
+        <PatientAvatar name={name} photoUrl={photoUrl} className="w-9 h-9 flex-shrink-0" />
 
         <div className="flex-1 min-w-[140px]">
-          <div className="font-medium text-sm" data-testid={`text-name-${id}`}>{name}</div>
+          <div className="flex items-center gap-2">
+            <div className="font-medium text-sm" data-testid={`text-name-${id}`}>{name}</div>
+            {dentureType && (
+              <Badge variant="outline" className="text-xs" data-testid={`badge-denture-type-${id}`}>
+                {dentureType}
+              </Badge>
+            )}
+          </div>
           <div className="text-xs text-muted-foreground">{format(date, 'MMM d')}</div>
         </div>
 

@@ -59,8 +59,12 @@ Preferred communication style: Simple, everyday language.
 - **Appointments**: Scheduling and appointment tracking
 
 **Storage Strategy**: 
-- In-memory storage implementation (MemStorage class) for development
-- Database storage ready to be activated via connection pooling
+- **TEMPORARY**: Currently using in-memory storage due to disabled database endpoint
+- Set in `server/config.ts` via `USE_MEM_STORAGE = true`
+- All data and sessions reset on server restart
+- Will switch back to PostgreSQL once Replit support re-enables the database endpoint
+- In-memory implementation (MemStorage class) fully functional with all features
+- Database storage (DbStorage class) ready to be reactivated by setting `USE_MEM_STORAGE = false`
 
 **Middleware**:
 - JSON body parsing with raw body preservation for webhooks

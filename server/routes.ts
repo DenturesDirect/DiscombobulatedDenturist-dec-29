@@ -4,6 +4,7 @@ import { processClinicalNote, generateReferralLetter } from "./openai";
 import { storage } from "./storage";
 import { insertPatientSchema, insertClinicalNoteSchema, insertTaskSchema } from "@shared/schema";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication
@@ -62,6 +63,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(patient);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // OBJECT STORAGE - Patient Photos (Protected)
+  app.post("/api/objects/upload", isAuthenticated, async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error: any) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ error: "Failed to generate upload URL" });
+    }
+  });
+
+  app.patch("/api/patients/:id/photo", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!req.body.photoUrl) {
+        return res.status(400).json({ error: "photoUrl is required" });
+      }
+
+      const userId = req.user.claims.sub;
+      const objectStorageService = new ObjectStorageService();
+      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
+        req.body.photoUrl,
+        {
+          owner: userId,
+          visibility: "public",
+        },
+      );
+
+      const patient = await storage.updatePatient(req.params.id, { 
+        photoUrl: objectPath 
+      });
+
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+
+      res.json(patient);
+    } catch (error: any) {
+      console.error("Error updating patient photo:", error);
+      res.status(500).json({ error: "Failed to update patient photo" });
+    }
+  });
+
+  app.get("/objects/:objectPath(*)", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const objectStorageService = new ObjectStorageService();
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      const canAccess = await objectStorageService.canAccessObjectEntity({
+        objectFile,
+        userId,
+      });
+      if (!canAccess) {
+        return res.sendStatus(401);
+      }
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error accessing object:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
     }
   });
 

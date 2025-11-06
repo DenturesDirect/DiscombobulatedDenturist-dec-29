@@ -20,12 +20,21 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { insertPatientSchema } from "@shared/schema";
 import type { InsertPatient } from "@shared/schema";
-import { Loader2 } from "lucide-react";
+import { Loader2, Camera } from "lucide-react";
 import { z } from "zod";
+import { ObjectUploader } from "./ObjectUploader";
+import type { UploadResult } from "@uppy/core";
 
 interface NewPatientDialogProps {
   open: boolean;
@@ -33,8 +42,17 @@ interface NewPatientDialogProps {
   onSuccess?: (patientId: string) => void;
 }
 
+const DENTURE_TYPES = [
+  "CUD", "APUD", "CPUD", "CLD", "APLD", "CPLD",
+  "Repair", "Tooth Addition", "Reline", "Rebase", "Implant CUD"
+];
+
+const STAFF_MEMBERS = ["Damien", "Caroline", "Michael", "Luisa"];
+
 export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewPatientDialogProps) {
   const { toast } = useToast();
+  const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined);
+  const [uploadedPatientId, setUploadedPatientId] = useState<string | undefined>(undefined);
 
   const form = useForm<InsertPatient>({
     resolver: zodResolver(insertPatientSchema.extend({
@@ -43,6 +61,10 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
       email: z.string().optional(),
       currentToothShade: z.string().optional(),
       requestedToothShade: z.string().optional(),
+      dentureType: z.string().optional(),
+      assignedTo: z.string().optional(),
+      nextStep: z.string().optional(),
+      dueDate: z.string().optional(),
     })),
     defaultValues: {
       name: "",
@@ -53,6 +75,10 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
       copayDiscussed: false,
       currentToothShade: undefined,
       requestedToothShade: undefined,
+      dentureType: undefined,
+      assignedTo: undefined,
+      nextStep: undefined,
+      dueDate: undefined,
     },
   });
 
@@ -72,14 +98,20 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/patients'] });
-      toast({
-        title: "Patient Created",
-        description: `${data.name} has been added to your patient list.`,
-      });
-      form.reset();
-      onOpenChange(false);
-      if (onSuccess) {
-        onSuccess(data.id);
+      
+      if (photoUrl) {
+        setUploadedPatientId(data.id);
+      } else {
+        toast({
+          title: "Patient Created",
+          description: `${data.name} has been added to your patient list.`,
+        });
+        form.reset();
+        setPhotoUrl(undefined);
+        onOpenChange(false);
+        if (onSuccess) {
+          onSuccess(data.id);
+        }
       }
     },
     onError: (error: any) => {
@@ -91,16 +123,58 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
     },
   });
 
+  const updatePhotoMutation = useMutation({
+    mutationFn: async ({ patientId, photoUrl }: { patientId: string; photoUrl: string }) => {
+      const response = await apiRequest('PATCH', `/api/patients/${patientId}/photo`, { photoUrl });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/patients'] });
+      toast({
+        title: "Patient Created",
+        description: `${data.name} has been added with photo.`,
+      });
+      form.reset();
+      setPhotoUrl(undefined);
+      setUploadedPatientId(undefined);
+      onOpenChange(false);
+      if (onSuccess) {
+        onSuccess(data.id);
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Warning",
+        description: "Patient created but photo upload failed.",
+        variant: "destructive",
+      });
+      form.reset();
+      setPhotoUrl(undefined);
+      setUploadedPatientId(undefined);
+      onOpenChange(false);
+    },
+  });
+
+  useEffect(() => {
+    if (uploadedPatientId && photoUrl) {
+      updatePhotoMutation.mutate({ patientId: uploadedPatientId, photoUrl });
+    }
+  }, [uploadedPatientId, photoUrl]);
+
   const onSubmit = (data: InsertPatient) => {
     const submissionData: InsertPatient = {
       name: data.name,
-      dateOfBirth: data.dateOfBirth?.trim() || undefined,
-      phone: data.phone?.trim() || undefined,
-      email: data.email?.trim() || undefined,
+      dateOfBirth: data.dateOfBirth && typeof data.dateOfBirth === 'string' ? data.dateOfBirth.trim() : undefined,
+      phone: data.phone && typeof data.phone === 'string' ? data.phone.trim() : undefined,
+      email: data.email && typeof data.email === 'string' ? data.email.trim() : undefined,
       isCDCP: data.isCDCP,
       copayDiscussed: data.isCDCP ? data.copayDiscussed : false,
-      currentToothShade: data.currentToothShade?.trim() || undefined,
-      requestedToothShade: data.requestedToothShade?.trim() || undefined,
+      currentToothShade: data.currentToothShade && typeof data.currentToothShade === 'string' ? data.currentToothShade.trim() : undefined,
+      requestedToothShade: data.requestedToothShade && typeof data.requestedToothShade === 'string' ? data.requestedToothShade.trim() : undefined,
+      dentureType: data.dentureType || undefined,
+      assignedTo: data.assignedTo || undefined,
+      nextStep: data.nextStep && typeof data.nextStep === 'string' ? data.nextStep.trim() : undefined,
+      dueDate: data.dueDate && typeof data.dueDate === 'string' && data.dueDate.trim() ? new Date(data.dueDate.trim()) : data.dueDate,
     };
     createPatientMutation.mutate(submissionData);
   };
@@ -279,6 +353,142 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
                   </FormItem>
                 )}
               />
+            </div>
+
+            <div className="pt-4 border-t">
+              <h3 className="text-sm font-medium mb-4">Workflow Tracking</h3>
+              
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="dentureType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Denture Type</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-denture-type">
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {DENTURE_TYPES.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="assignedTo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Assigned To</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-assigned-to">
+                              <SelectValue placeholder="Select staff" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {STAFF_MEMBERS.map((staff) => (
+                              <SelectItem key={staff} value={staff}>
+                                {staff}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="nextStep"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Next Step</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="e.g., Initial impressions" 
+                            {...field}
+                            value={field.value || ""}
+                            data-testid="input-next-step"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="dueDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Due Date</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="date" 
+                            {...field}
+                            value={typeof field.value === 'string' ? field.value : field.value?.toISOString().split('T')[0] || ""}
+                            data-testid="input-due-date"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div>
+                  <FormLabel>Patient Photo</FormLabel>
+                  <div className="mt-2">
+                    <ObjectUploader
+                      maxNumberOfFiles={1}
+                      maxFileSize={10485760}
+                      onGetUploadParameters={async () => {
+                        const response = await apiRequest('POST', '/api/objects/upload', {});
+                        const data = await response.json();
+                        return {
+                          method: "PUT" as const,
+                          url: data.uploadURL,
+                        };
+                      }}
+                      onComplete={(result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+                        if (result.successful && result.successful.length > 0) {
+                          const uploadedFile = result.successful[0];
+                          const url = (uploadedFile.uploadURL as string).split('?')[0];
+                          setPhotoUrl(url);
+                          toast({
+                            title: "Photo Ready",
+                            description: "Photo will be saved when you create the patient.",
+                          });
+                        }
+                      }}
+                      buttonClassName="w-full"
+                    >
+                      <Camera className="w-4 h-4 mr-2" />
+                      {photoUrl ? "Change Photo" : "Upload Photo"}
+                    </ObjectUploader>
+                    {photoUrl && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Photo uploaded and ready to save
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 pt-4">

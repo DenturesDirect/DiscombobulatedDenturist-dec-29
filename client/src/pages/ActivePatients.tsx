@@ -96,20 +96,35 @@ export default function ActivePatients() {
                 {searchQuery ? "No patients match your search" : "No active patients"}
               </div>
             ) : (
-              filteredPatients.map(patient => (
-                <PatientTimelineCard
-                  key={patient.id}
-                  id={patient.id}
-                  name={patient.name}
-                  date={new Date(patient.createdAt)}
-                  currentStep={patient.isCDCP && !patient.copayDiscussed ? 'CDCP Copay Discussion' : 'Active Treatment'}
-                  lastAction={`Created ${new Date(patient.createdAt).toLocaleDateString()}`}
-                  nextStep="Clinical Note"
-                  assignee={patient.isCDCP && !patient.copayDiscussed ? 'Damien' : 'TBD'}
-                  eta={new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)}
-                  onClick={() => handlePatientClick(patient.id)}
-                />
-              ))
+              filteredPatients.map(patient => {
+                const currentStep = patient.lastStepCompleted || 
+                  (patient.isCDCP && !patient.copayDiscussed ? 'CDCP Copay Discussion' : 'New Patient');
+                const assignee = patient.assignedTo || 
+                  (patient.isCDCP && !patient.copayDiscussed ? 'Damien' : 'Unassigned');
+                const nextStep = patient.nextStep || 'Clinical Note';
+                const eta = patient.dueDate ? new Date(patient.dueDate) : undefined;
+                const lastActionDate = patient.lastStepDate ? new Date(patient.lastStepDate) : new Date(patient.createdAt);
+                const lastAction = patient.lastStepCompleted 
+                  ? `${patient.lastStepCompleted} (${lastActionDate.toLocaleDateString()})`
+                  : `Created ${lastActionDate.toLocaleDateString()}`;
+                
+                return (
+                  <PatientTimelineCard
+                    key={patient.id}
+                    id={patient.id}
+                    name={patient.name}
+                    photoUrl={patient.photoUrl}
+                    dentureType={patient.dentureType}
+                    date={lastActionDate}
+                    currentStep={currentStep}
+                    lastAction={lastAction}
+                    nextStep={nextStep}
+                    assignee={assignee}
+                    eta={eta}
+                    onClick={() => handlePatientClick(patient.id)}
+                  />
+                );
+              })
             )}
           </div>
         )}
