@@ -145,7 +145,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Patient not found" });
       }
 
-      const result = await processClinicalNote(plainTextNote, patient.name);
+      // Pass patient shade information to AI
+      const patientContext = {
+        name: patient.name,
+        isCDCP: patient.isCDCP,
+        copayDiscussed: patient.copayDiscussed,
+        currentToothShade: patient.currentToothShade,
+        requestedToothShade: patient.requestedToothShade,
+        dentureType: patient.dentureType
+      };
+
+      const result = await processClinicalNote(plainTextNote, patientContext);
       
       // Save the formatted note to database with authenticated user
       const userName = `${req.user.claims.first_name || ''} ${req.user.claims.last_name || ''}`.trim() || req.user.claims.email || 'Unknown';

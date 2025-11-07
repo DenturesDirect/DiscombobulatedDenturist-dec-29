@@ -92,19 +92,47 @@ Return your response as JSON with this structure:
   ]
 }`;
 
-export async function processClinicalNote(plainTextNote: string, patientName: string): Promise<ClinicalNoteResponse> {
+interface PatientContext {
+  name: string;
+  isCDCP?: boolean;
+  copayDiscussed?: boolean;
+  currentToothShade?: string | null;
+  requestedToothShade?: string | null;
+  dentureType?: string | null;
+}
+
+export async function processClinicalNote(plainTextNote: string, patientContext: PatientContext): Promise<ClinicalNoteResponse> {
   try {
+    // Build patient context string
+    let contextString = `Patient: ${patientContext.name}\n`;
+    
+    if (patientContext.isCDCP) {
+      contextString += `CDCP Patient: Yes (Copay ${patientContext.copayDiscussed ? 'discussed' : 'NOT discussed'})\n`;
+    }
+    
+    if (patientContext.currentToothShade) {
+      contextString += `Current Tooth Shade: ${patientContext.currentToothShade}\n`;
+    }
+    
+    if (patientContext.requestedToothShade) {
+      contextString += `Requested Tooth Shade: ${patientContext.requestedToothShade}\n`;
+    }
+    
+    if (patientContext.dentureType) {
+      contextString += `Denture Type: ${patientContext.dentureType}\n`;
+    }
+
     const response = await openai.chat.completions.create({
       model: "gpt-5", // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { 
           role: "user", 
-          content: `Patient: ${patientName}\n\nClinical Note: ${plainTextNote}\n\nPlease format this as a professional clinical note and suggest any follow-up actions or tasks.` 
+          content: `${contextString}\nClinical Note: ${plainTextNote}\n\nPlease format this as a professional clinical note and suggest any follow-up actions or tasks.` 
         }
       ],
       response_format: { type: "json_object" },
-      max_completion_tokens: 8192,
+      max_completion_tokens: 4096,
     });
 
     const content = response.choices[0]?.message?.content || "{}";

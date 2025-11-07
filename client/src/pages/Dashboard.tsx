@@ -14,7 +14,7 @@ import TreatmentMilestoneTimeline from "@/components/TreatmentMilestoneTimeline"
 import ClinicalPhotoGrid from "@/components/ClinicalPhotoGrid";
 import ShadeReminderModal from "@/components/ShadeReminderModal";
 import { FileText, Camera, Clock, Loader2 } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Patient, ClinicalNote } from "@shared/schema";
 
@@ -84,6 +84,9 @@ export default function Dashboard() {
       setGeneratedDocument(data.formattedNote);
       setCurrentClinicalNote(data.formattedNote);
       
+      // Invalidate clinical notes cache to refresh the list
+      await queryClient.invalidateQueries({ queryKey: ['/api/clinical-notes', patientId] });
+      
       if (data.followUpPrompt) {
         setFollowUpPrompt(data.followUpPrompt);
       }
@@ -94,6 +97,11 @@ export default function Dashboard() {
           description: `${data.suggestedTasks.length} task(s) have been assigned to staff.`
         });
       }
+
+      toast({
+        title: "Clinical Note Saved",
+        description: "The note has been added to the patient's record."
+      });
 
     } catch (error: any) {
       toast({
@@ -110,7 +118,7 @@ export default function Dashboard() {
     setIsProcessing(true);
     try {
       const response = await apiRequest('POST', '/api/referral-letters/generate', {
-        patientName: 'Sarah Johnson',
+        patientName: patient?.name || 'Unknown Patient',
         clinicalNote: currentClinicalNote
       });
 
