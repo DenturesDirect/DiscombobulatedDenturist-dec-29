@@ -6,7 +6,7 @@ export const USE_MEM_STORAGE = !isProduction || !hasDatabaseUrl;
 
 if (USE_MEM_STORAGE) {
   console.log(`📝 Storage mode: IN-MEMORY (temporary)`);
-  console.log('⚠️  Data will be lost on restart - database not available');
+  console.log('⚠️  Data will be lost on restart - database endpoint disabled by Neon');
 } else {
   console.log(`📝 Storage mode: PRODUCTION DATABASE`);
   console.log('✅ Using persistent PostgreSQL storage');
