@@ -37,12 +37,10 @@ export const patients = pgTable("patients", {
   currentToothShade: text("current_tooth_shade"),
   requestedToothShade: text("requested_tooth_shade"),
   photoUrl: text("photo_url"),
-  dentureType: text("denture_type"),
+  upperDentureType: text("upper_denture_type"),
+  lowerDentureType: text("lower_denture_type"),
   lastStepCompleted: text("last_step_completed"),
   lastStepDate: timestamp("last_step_date"),
-  nextStep: text("next_step"),
-  assignedTo: text("assigned_to"),
-  dueDate: timestamp("due_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -50,9 +48,6 @@ export const insertPatientSchema = createInsertSchema(patients).omit({
   id: true,
   createdAt: true,
 }).extend({
-  dueDate: z.union([z.date(), z.string()]).transform((val) => 
-    typeof val === 'string' && val.length > 0 ? new Date(val) : val
-  ).optional(),
   lastStepDate: z.union([z.date(), z.string()]).transform((val) => 
     typeof val === 'string' && val.length > 0 ? new Date(val) : val
   ).optional(),

@@ -43,11 +43,16 @@ interface NewPatientDialogProps {
 }
 
 const DENTURE_TYPES = [
-  "CUD", "APUD", "CPUD", "CLD", "APLD", "CPLD",
-  "Repair", "Tooth Addition", "Reline", "Rebase", "Implant CUD"
+  "",
+  "Complete", 
+  "Acrylic Partial", 
+  "Cast Partial",
+  "Repair", 
+  "Tooth Addition", 
+  "Reline", 
+  "Rebase", 
+  "Implant Retained"
 ];
-
-const STAFF_MEMBERS = ["Damien", "Caroline", "Michael", "Luisa"];
 
 export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewPatientDialogProps) {
   const { toast } = useToast();
@@ -61,10 +66,8 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
       email: z.string().optional(),
       currentToothShade: z.string().optional(),
       requestedToothShade: z.string().optional(),
-      dentureType: z.string().optional(),
-      assignedTo: z.string().optional(),
-      nextStep: z.string().optional(),
-      dueDate: z.string().optional(),
+      upperDentureType: z.string().optional(),
+      lowerDentureType: z.string().optional(),
     })),
     defaultValues: {
       name: "",
@@ -75,10 +78,8 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
       copayDiscussed: false,
       currentToothShade: undefined,
       requestedToothShade: undefined,
-      dentureType: undefined,
-      assignedTo: undefined,
-      nextStep: undefined,
-      dueDate: undefined,
+      upperDentureType: undefined,
+      lowerDentureType: undefined,
     },
   });
 
@@ -171,10 +172,8 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
       copayDiscussed: data.isCDCP ? data.copayDiscussed : false,
       currentToothShade: data.currentToothShade && typeof data.currentToothShade === 'string' ? data.currentToothShade.trim() : undefined,
       requestedToothShade: data.requestedToothShade && typeof data.requestedToothShade === 'string' ? data.requestedToothShade.trim() : undefined,
-      dentureType: data.dentureType || undefined,
-      assignedTo: data.assignedTo || undefined,
-      nextStep: data.nextStep && typeof data.nextStep === 'string' ? data.nextStep.trim() : undefined,
-      dueDate: data.dueDate && typeof data.dueDate === 'string' && data.dueDate.trim() ? new Date(data.dueDate.trim()) : data.dueDate,
+      upperDentureType: data.upperDentureType || undefined,
+      lowerDentureType: data.lowerDentureType || undefined,
     };
     createPatientMutation.mutate(submissionData);
   };
@@ -356,26 +355,26 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
             </div>
 
             <div className="pt-4 border-t">
-              <h3 className="text-sm font-medium mb-4">Workflow Tracking</h3>
+              <h3 className="text-sm font-medium mb-4">Denture Information</h3>
               
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="dentureType"
+                    name="upperDentureType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Denture Type</FormLabel>
+                        <FormLabel>Upper</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-denture-type">
+                            <SelectTrigger data-testid="select-upper-denture">
                               <SelectValue placeholder="Select type" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             {DENTURE_TYPES.map((type) => (
                               <SelectItem key={type} value={type}>
-                                {type}
+                                {type || "None"}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -387,64 +386,24 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
 
                   <FormField
                     control={form.control}
-                    name="assignedTo"
+                    name="lowerDentureType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Assigned To</FormLabel>
+                        <FormLabel>Lower</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-assigned-to">
-                              <SelectValue placeholder="Select staff" />
+                            <SelectTrigger data-testid="select-lower-denture">
+                              <SelectValue placeholder="Select type" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {STAFF_MEMBERS.map((staff) => (
-                              <SelectItem key={staff} value={staff}>
-                                {staff}
+                            {DENTURE_TYPES.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {type || "None"}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="nextStep"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Next Step</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="e.g., Initial impressions" 
-                            {...field}
-                            value={field.value || ""}
-                            data-testid="input-next-step"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="dueDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Due Date</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="date" 
-                            {...field}
-                            value={typeof field.value === 'string' ? field.value : field.value?.toISOString().split('T')[0] || ""}
-                            data-testid="input-due-date"
-                          />
-                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
