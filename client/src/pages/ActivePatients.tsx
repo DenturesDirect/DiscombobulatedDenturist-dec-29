@@ -108,13 +108,18 @@ export default function ActivePatients() {
                   ? `${patient.lastStepCompleted} (${lastActionDate.toLocaleDateString()})`
                   : `Created ${lastActionDate.toLocaleDateString()}`;
                 
+                const dentureType = [
+                  patient.upperDentureType && patient.upperDentureType !== 'None' ? `Upper: ${patient.upperDentureType}` : null,
+                  patient.lowerDentureType && patient.lowerDentureType !== 'None' ? `Lower: ${patient.lowerDentureType}` : null
+                ].filter(Boolean).join(' / ') || undefined;
+                
                 return (
                   <PatientTimelineCard
                     key={patient.id}
                     id={patient.id}
                     name={patient.name}
                     photoUrl={patient.photoUrl}
-                    dentureType={patient.dentureType}
+                    dentureType={dentureType}
                     date={lastActionDate}
                     currentStep={currentStep}
                     lastAction={lastAction}

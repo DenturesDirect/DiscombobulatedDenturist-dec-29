@@ -18,6 +18,51 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### November 9, 2025: Complete Integration of Photos and Timeline Tabs
+
+**Photos Tab - Real Data Integration**:
+- Connected to real `patient_files` database table (not mock data)
+- ClinicalPhotoGrid component fetches files via `GET /api/patients/:patientId/files`
+- Delete functionality with ownership verification before removal
+- Shows empty state when no photos exist
+- Fully tested end-to-end with Playwright
+
+**Timeline Tab - Task Management**:
+- Displays real tasks from database filtered by patientId
+- Task cards show: checkbox, assignee, title, description, priority badge, due date
+- Manual checkbox completion (NO AI auto-completion as requested)
+- Updates task status via `PATCH /api/tasks/:id`
+- Tasks auto-generated from clinical notes via AI
+- Shows empty state when no tasks exist
+- Multi-staff support (Damien, Caroline, Michael, Luisa)
+
+**Workflow Fields in Patient Schema**:
+- Added `assignedTo` (staff member assignment)
+- Added `nextStep` (upcoming task description)
+- Added `dueDate` (deadline for next step)
+- NewPatientDialog includes complete "Workflow" section with:
+  - Select dropdown for assignedTo (data-testid="select-assigned-to")
+  - Textarea for nextStep (data-testid="textarea-next-step")
+  - Calendar date picker for dueDate (data-testid="button-due-date")
+
+**Query Client Enhancement**:
+- Fixed URL construction in `client/src/lib/queryClient.ts`
+- Now handles both string path segments and object query parameters correctly
+- Enables proper hierarchical query keys like `['/api/tasks', { patientId }]`
+- Clinical notes and tasks now fetch correctly by patientId
+
+**Bug Fixes**:
+- Fixed SelectItem empty value error (changed "" to "None" in DENTURE_TYPES)
+- Added missing workflow fields to patient schema
+- Security fix: File deletion now verifies ownership before allowing removal
+- Combined upperDentureType/lowerDentureType for display in patient cards
+
+**End-to-End Testing**:
+- Comprehensive Playwright test validates all features working correctly
+- Verified patient creation → clinical note → task generation → completion workflow
+- Confirmed AI permission-based document generation (asks before generating)
+- All features tested with real data (in-memory storage during database downtime)
+
 ### November 6, 2025: Patient Photo Upload and Workflow Tracking
 
 **Patient Photo Management**:
