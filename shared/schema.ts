@@ -48,9 +48,11 @@ export const insertPatientSchema = createInsertSchema(patients).omit({
   id: true,
   createdAt: true,
 }).extend({
-  lastStepDate: z.union([z.date(), z.string()]).transform((val) => 
-    typeof val === 'string' && val.length > 0 ? new Date(val) : val
-  ).optional(),
+  lastStepDate: z.union([z.date(), z.string()]).transform((val) => {
+    if (val instanceof Date) return val;
+    if (typeof val === 'string' && val.trim().length > 0) return new Date(val);
+    return null;
+  }).nullable().optional(),
 });
 
 export type InsertPatient = z.infer<typeof insertPatientSchema>;

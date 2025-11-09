@@ -98,7 +98,8 @@ interface PatientContext {
   copayDiscussed?: boolean;
   currentToothShade?: string | null;
   requestedToothShade?: string | null;
-  dentureType?: string | null;
+  upperDentureType?: string | null;
+  lowerDentureType?: string | null;
 }
 
 export async function processClinicalNote(plainTextNote: string, patientContext: PatientContext): Promise<ClinicalNoteResponse> {
@@ -118,8 +119,12 @@ export async function processClinicalNote(plainTextNote: string, patientContext:
       contextString += `Requested Tooth Shade: ${patientContext.requestedToothShade}\n`;
     }
     
-    if (patientContext.dentureType) {
-      contextString += `Denture Type: ${patientContext.dentureType}\n`;
+    if (patientContext.upperDentureType) {
+      contextString += `Upper Denture: ${patientContext.upperDentureType}\n`;
+    }
+    
+    if (patientContext.lowerDentureType) {
+      contextString += `Lower Denture: ${patientContext.lowerDentureType}\n`;
     }
 
     const response = await openai.chat.completions.create({

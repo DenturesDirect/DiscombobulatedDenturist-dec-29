@@ -83,12 +83,10 @@ export class MemStorage implements IStorage {
       currentToothShade: insertPatient.currentToothShade ?? null,
       requestedToothShade: insertPatient.requestedToothShade ?? null,
       photoUrl: insertPatient.photoUrl ?? null,
-      dentureType: insertPatient.dentureType ?? null,
+      upperDentureType: insertPatient.upperDentureType ?? null,
+      lowerDentureType: insertPatient.lowerDentureType ?? null,
       lastStepCompleted: insertPatient.lastStepCompleted ?? null,
       lastStepDate: insertPatient.lastStepDate ?? null,
-      nextStep: insertPatient.nextStep ?? null,
-      assignedTo: insertPatient.assignedTo ?? null,
-      dueDate: insertPatient.dueDate ?? null,
       createdAt: new Date()
     };
     this.patients.set(id, patient);
@@ -108,7 +106,13 @@ export class MemStorage implements IStorage {
   async updatePatient(id: string, updates: Partial<InsertPatient>): Promise<Patient | undefined> {
     const patient = this.patients.get(id);
     if (!patient) return undefined;
-    const updated = { ...patient, ...updates };
+    
+    const normalizedUpdates: Partial<Patient> = { ...updates };
+    if (updates.lastStepDate !== undefined) {
+      normalizedUpdates.lastStepDate = updates.lastStepDate as Date | null;
+    }
+    
+    const updated = { ...patient, ...normalizedUpdates };
     this.patients.set(id, updated);
     return updated;
   }

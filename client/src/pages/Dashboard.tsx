@@ -18,22 +18,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Patient, ClinicalNote } from "@shared/schema";
 
-//todo: remove mock functionality
-
-const mockMilestones = [
-  { id: '1', name: 'Metal Design Out', status: 'completed' as const, completedBy: 'Damien', completedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
-  { id: '2', name: 'Metal ETA', status: 'completed' as const, completedBy: 'Caroline', completedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000) },
-  { id: '3', name: 'Setup Assigned', status: 'in-progress' as const, assignedTo: 'Michael' },
-  { id: '4', name: 'Setup Complete', status: 'pending' as const, assignedTo: 'Michael' },
-  { id: '5', name: 'Processing Assigned', status: 'pending' as const, assignedTo: 'Luisa' },
-  { id: '6', name: 'Biteblock Assigned', status: 'pending' as const, assignedTo: 'Damien' },
-  { id: '7', name: 'Insurance Estimate Submitted', status: 'pending' as const, assignedTo: 'Caroline' },
-];
-
-const mockPhotos = [
-  { id: '1', url: 'https://images.unsplash.com/photo-1606811841689-23dfddce3e95?w=400', date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), description: 'Initial impression' },
-  { id: '2', url: 'https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=400', date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), description: 'Bite registration' },
-];
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
@@ -272,14 +256,17 @@ export default function Dashboard() {
               </TabsContent>
 
               <TabsContent value="photos" className="flex-1 overflow-y-auto">
-                <ClinicalPhotoGrid 
-                  photos={mockPhotos}
-                  onDelete={(id) => console.log('Delete photo:', id)}
-                />
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <Camera className="w-12 h-12 mb-4 opacity-50" />
+                  <p>Photos will appear here once uploaded</p>
+                </div>
               </TabsContent>
 
               <TabsContent value="timeline" className="flex-1 overflow-y-auto">
-                <TreatmentMilestoneTimeline milestones={mockMilestones} />
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <Clock className="w-12 h-12 mb-4 opacity-50" />
+                  <p>Treatment timeline will appear here based on tasks</p>
+                </div>
               </TabsContent>
             </Tabs>
           </div>

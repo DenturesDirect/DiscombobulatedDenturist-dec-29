@@ -152,7 +152,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         copayDiscussed: patient.copayDiscussed,
         currentToothShade: patient.currentToothShade,
         requestedToothShade: patient.requestedToothShade,
-        dentureType: patient.dentureType
+        upperDentureType: patient.upperDentureType,
+        lowerDentureType: patient.lowerDentureType
       };
 
       const result = await processClinicalNote(plainTextNote, patientContext);
