@@ -5,18 +5,20 @@ import { useAuth } from "@/hooks/useAuth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import TopNav from "@/components/TopNav";
 import ToothShadeCard from "@/components/ToothShadeCard";
 import VoicePromptInput from "@/components/VoicePromptInput";
 import PhotoUploadZone from "@/components/PhotoUploadZone";
 import DocumentPreview from "@/components/DocumentPreview";
 import TreatmentMilestoneTimeline from "@/components/TreatmentMilestoneTimeline";
+import { Checkbox } from "@/components/ui/checkbox";
 import ClinicalPhotoGrid from "@/components/ClinicalPhotoGrid";
 import ShadeReminderModal from "@/components/ShadeReminderModal";
 import { FileText, Camera, Clock, Loader2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Patient, ClinicalNote } from "@shared/schema";
+import type { Patient, ClinicalNote, PatientFile, Task } from "@shared/schema";
 
 
 export default function Dashboard() {
@@ -40,6 +42,16 @@ export default function Dashboard() {
 
   const { data: clinicalNotes = [], isLoading: isLoadingNotes } = useQuery<ClinicalNote[]>({
     queryKey: ['/api/clinical-notes', patientId],
+    enabled: !!patientId
+  });
+
+  const { data: patientFiles = [], isLoading: isLoadingFiles } = useQuery<PatientFile[]>({
+    queryKey: ['/api/patients', patientId, 'files'],
+    enabled: !!patientId
+  });
+
+  const { data: patientTasks = [], isLoading: isLoadingTasks } = useQuery<Task[]>({
+    queryKey: ['/api/tasks', { patientId }],
     enabled: !!patientId
   });
 
@@ -220,7 +232,7 @@ export default function Dashboard() {
 
               <Card className="p-6">
                 <h2 className="text-xl font-semibold mb-4">Upload Clinical Photos</h2>
-                <PhotoUploadZone onPhotosChange={(photos) => console.log('Photos:', photos.length)} />
+                <PhotoUploadZone onPhotosChange={(photos) => console.log('Selected photos:', photos.length)} />
               </Card>
             </div>
           </div>
@@ -256,17 +268,92 @@ export default function Dashboard() {
               </TabsContent>
 
               <TabsContent value="photos" className="flex-1 overflow-y-auto">
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                  <Camera className="w-12 h-12 mb-4 opacity-50" />
-                  <p>Photos will appear here once uploaded</p>
-                </div>
+                {isLoadingFiles ? (
+                  <div className="flex items-center justify-center h-64">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <ClinicalPhotoGrid
+                    photos={patientFiles.map(file => ({
+                      id: file.id,
+                      url: file.fileUrl,
+                      date: new Date(file.uploadedAt),
+                      description: file.description || undefined
+                    }))}
+                    onDelete={async (fileId) => {
+                      try {
+                        await apiRequest('DELETE', `/api/patients/${patientId}/files/${fileId}`);
+                        queryClient.invalidateQueries({ queryKey: ['/api/patients', patientId, 'files'] });
+                        toast({ title: "Photo deleted successfully" });
+                      } catch (error) {
+                        toast({ title: "Failed to delete photo", variant: "destructive" });
+                      }
+                    }}
+                  />
+                )}
               </TabsContent>
 
               <TabsContent value="timeline" className="flex-1 overflow-y-auto">
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                  <Clock className="w-12 h-12 mb-4 opacity-50" />
-                  <p>Treatment timeline will appear here based on tasks</p>
-                </div>
+                {isLoadingTasks ? (
+                  <div className="flex items-center justify-center h-64">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : patientTasks.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                    <Clock className="w-12 h-12 mb-4 opacity-50" />
+                    <p>No tasks yet. Add clinical notes to generate tasks.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {patientTasks.map((task) => (
+                      <Card key={task.id} className="p-4" data-testid={`card-task-${task.id}`}>
+                        <div className="flex items-start gap-3">
+                          <Checkbox
+                            checked={task.status === "completed"}
+                            onCheckedChange={async (checked) => {
+                              try {
+                                await apiRequest('PATCH', `/api/tasks/${task.id}`, {
+                                  status: checked ? "completed" : "pending"
+                                });
+                                queryClient.invalidateQueries({ queryKey: ['/api/tasks', { patientId }] });
+                                toast({ 
+                                  title: checked ? "Task completed" : "Task reopened"
+                                });
+                              } catch (error) {
+                                toast({ 
+                                  title: "Failed to update task", 
+                                  variant: "destructive" 
+                                });
+                              }
+                            }}
+                            data-testid={`checkbox-task-${task.id}`}
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium mb-1" data-testid={`text-task-title-${task.id}`}>
+                              {task.title}
+                            </div>
+                            {task.description && (
+                              <div className="text-sm text-muted-foreground mb-2">
+                                {task.description}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              <span>Assigned to: {task.assignee}</span>
+                              {task.priority && (
+                                <Badge variant={task.priority === "high" ? "destructive" : "secondary"} className="text-xs">
+                                  {task.priority}
+                                </Badge>
+                              )}
+                              {task.dueDate && (
+                                <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           </div>

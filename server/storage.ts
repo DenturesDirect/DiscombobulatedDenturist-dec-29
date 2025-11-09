@@ -8,7 +8,7 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { ensureDb } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { USE_MEM_STORAGE } from "./config";
 
 export interface IStorage {
@@ -28,12 +28,13 @@ export interface IStorage {
   
   // Tasks
   createTask(task: InsertTask): Promise<Task>;
-  listTasks(assignee?: string): Promise<Task[]>;
+  listTasks(assignee?: string, patientId?: string): Promise<Task[]>;
   updateTaskStatus(id: string, status: string): Promise<Task | undefined>;
   
   // Files
   createPatientFile(file: InsertPatientFile): Promise<PatientFile>;
   listPatientFiles(patientId: string): Promise<PatientFile[]>;
+  deletePatientFile(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -154,12 +155,15 @@ export class MemStorage implements IStorage {
     return task;
   }
 
-  async listTasks(assignee?: string): Promise<Task[]> {
-    const allTasks = Array.from(this.tasks.values());
+  async listTasks(assignee?: string, patientId?: string): Promise<Task[]> {
+    let allTasks = Array.from(this.tasks.values());
     if (assignee) {
-      return allTasks.filter((task) => task.assignee === assignee);
+      allTasks = allTasks.filter((task) => task.assignee === assignee);
     }
-    return allTasks;
+    if (patientId) {
+      allTasks = allTasks.filter((task) => task.patientId === patientId);
+    }
+    return allTasks.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   async updateTaskStatus(id: string, status: string): Promise<Task | undefined> {
@@ -173,8 +177,12 @@ export class MemStorage implements IStorage {
   async createPatientFile(insertFile: InsertPatientFile): Promise<PatientFile> {
     const id = randomUUID();
     const file: PatientFile = { 
-      ...insertFile, 
       id,
+      patientId: insertFile.patientId,
+      filename: insertFile.filename,
+      fileUrl: insertFile.fileUrl,
+      fileType: insertFile.fileType ?? null,
+      description: insertFile.description ?? null,
       uploadedAt: new Date()
     };
     this.patientFiles.set(id, file);
@@ -185,6 +193,10 @@ export class MemStorage implements IStorage {
     return Array.from(this.patientFiles.values()).filter(
       (file) => file.patientId === patientId
     );
+  }
+
+  async deletePatientFile(id: string): Promise<boolean> {
+    return this.patientFiles.delete(id);
   }
 }
 
@@ -255,13 +267,21 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async listTasks(assignee?: string): Promise<Task[]> {
+  async listTasks(assignee?: string, patientId?: string): Promise<Task[]> {
+    const conditions = [];
     if (assignee) {
-      return await ensureDb().select().from(tasks)
-        .where(eq(tasks.assignee, assignee))
-        .orderBy(desc(tasks.createdAt));
+      conditions.push(eq(tasks.assignee, assignee));
     }
-    return await ensureDb().select().from(tasks).orderBy(desc(tasks.createdAt));
+    if (patientId) {
+      conditions.push(eq(tasks.patientId, patientId));
+    }
+    
+    if (conditions.length === 0) {
+      return await ensureDb().select().from(tasks).orderBy(desc(tasks.createdAt));
+    }
+    
+    const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
+    return await ensureDb().select().from(tasks).where(whereClause!).orderBy(desc(tasks.createdAt));
   }
 
   async updateTaskStatus(id: string, status: string): Promise<Task | undefined> {
@@ -283,6 +303,13 @@ export class DbStorage implements IStorage {
     return await ensureDb().select().from(patientFiles)
       .where(eq(patientFiles.patientId, patientId))
       .orderBy(desc(patientFiles.uploadedAt));
+  }
+
+  async deletePatientFile(id: string): Promise<boolean> {
+    const result = await ensureDb().delete(patientFiles)
+      .where(eq(patientFiles.id, id))
+      .returning();
+    return result.length > 0;
   }
 }
 

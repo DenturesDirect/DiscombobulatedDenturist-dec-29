@@ -201,8 +201,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // TASKS (Protected)
   app.get("/api/tasks", isAuthenticated, async (req, res) => {
     try {
-      const { assignee } = req.query;
-      const tasks = await storage.listTasks(assignee as string);
+      const { assignee, patientId } = req.query;
+      const tasks = await storage.listTasks(assignee as string, patientId as string);
       res.json(tasks);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -218,6 +218,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json(task);
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PATIENT FILES (Protected)
+  app.get("/api/patients/:patientId/files", isAuthenticated, async (req, res) => {
+    try {
+      const files = await storage.listPatientFiles(req.params.patientId);
+      res.json(files);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/patients/:patientId/files", isAuthenticated, async (req, res) => {
+    try {
+      const { filename, fileUrl, fileType, description } = req.body;
+      
+      if (!filename || !fileUrl) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const file = await storage.createPatientFile({
+        patientId: req.params.patientId,
+        filename,
+        fileUrl,
+        fileType: fileType || undefined,
+        description: description || undefined
+      });
+      
+      res.json(file);
+    } catch (error: any) {
+      console.error("Error creating patient file:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/patients/:patientId/files/:fileId", isAuthenticated, async (req, res) => {
+    try {
+      const files = await storage.listPatientFiles(req.params.patientId);
+      const fileToDelete = files.find(f => f.id === req.params.fileId);
+      
+      if (!fileToDelete) {
+        return res.status(404).json({ error: "File not found or does not belong to this patient" });
+      }
+      
+      const deleted = await storage.deletePatientFile(req.params.fileId);
+      if (!deleted) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting patient file:", error);
       res.status(500).json({ error: error.message });
     }
   });

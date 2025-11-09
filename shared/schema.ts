@@ -117,10 +117,9 @@ export const patientFiles = pgTable("patient_files", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   patientId: varchar("patient_id").notNull().references(() => patients.id),
   filename: text("filename").notNull(),
-  fileSize: integer("file_size").notNull(),
-  fileType: text("file_type").notNull(),
-  storageKey: text("storage_key").notNull(),
-  uploadedBy: text("uploaded_by").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileType: text("file_type"),
+  description: text("description"),
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
 });
 
