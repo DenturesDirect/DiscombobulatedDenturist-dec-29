@@ -75,9 +75,6 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
       requestedToothShade: z.string().optional(),
       upperDentureType: z.string().optional(),
       lowerDentureType: z.string().optional(),
-      assignedTo: z.string().optional(),
-      nextStep: z.string().max(500).optional(),
-      dueDate: z.string().optional(),
     })),
     defaultValues: {
       name: "",
@@ -90,9 +87,6 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
       requestedToothShade: undefined,
       upperDentureType: undefined,
       lowerDentureType: undefined,
-      assignedTo: undefined,
-      nextStep: undefined,
-      dueDate: undefined,
     },
   });
 
@@ -336,7 +330,7 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
                     <FormLabel>Current Tooth Shade</FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder="A2" 
+                        placeholder="" 
                         {...field}
                         value={field.value || ""}
                         data-testid="input-current-shade"
@@ -355,7 +349,7 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
                     <FormLabel>Requested Tooth Shade</FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder="A1" 
+                        placeholder="" 
                         {...field}
                         value={field.value || ""}
                         data-testid="input-requested-shade"
@@ -460,91 +454,6 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
                     )}
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t">
-              <h3 className="text-sm font-medium mb-4">Workflow</h3>
-              
-              <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="assignedTo"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Assigned To</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ""}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-assigned-to">
-                            <SelectValue placeholder="Select staff member" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {STAFF_MEMBERS.map((staff) => (
-                            <SelectItem key={staff} value={staff}>
-                              {staff}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="nextStep"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Next Step</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Describe the next step in treatment..." 
-                          {...field}
-                          value={field.value || ""}
-                          data-testid="textarea-next-step"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="dueDate"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Due Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              className="w-full justify-start text-left font-normal"
-                              data-testid="button-due-date"
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {field.value ? format(new Date(field.value), "PPP") : <span>Pick a date</span>}
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value ? new Date(field.value) : undefined}
-                            onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : undefined)}
-                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                            initialFocus
-                            data-testid="calendar-due-date"
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
             </div>
 
