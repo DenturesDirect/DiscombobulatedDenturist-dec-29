@@ -77,6 +77,11 @@ export default function Dashboard() {
       });
 
       const data = await response.json();
+      
+      if (!data.formattedNote || data.formattedNote.trim() === '') {
+        throw new Error('AI returned an empty note. Please try again or contact support.');
+      }
+      
       setGeneratedDocument(data.formattedNote);
       setCurrentClinicalNote(data.formattedNote);
       

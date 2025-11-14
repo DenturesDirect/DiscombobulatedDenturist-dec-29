@@ -59,8 +59,6 @@ const DENTURE_TYPES = [
   "Implant Retained"
 ];
 
-const STAFF_MEMBERS = ["Damien", "Caroline", "Michael", "Luisa"];
-
 export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewPatientDialogProps) {
   const { toast } = useToast();
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined);
