@@ -12,10 +12,19 @@ interface VoicePromptInputProps {
 
 export default function VoicePromptInput({ onSubmit, disabled, placeholder = "Speak or type your clinical note..." }: VoicePromptInputProps) {
   const [text, setText] = useState("");
+  const [interimText, setInterimText] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
+
+  // Auto-scroll to bottom when text changes
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
+    }
+  }, [text, interimText]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -42,6 +51,10 @@ export default function VoicePromptInput({ onSubmit, disabled, placeholder = "Sp
 
           if (finalTranscript) {
             setText(prev => prev + finalTranscript);
+            setInterimText('');
+          }
+          if (interimTranscript) {
+            setInterimText(interimTranscript);
           }
         };
 
@@ -83,6 +96,7 @@ export default function VoicePromptInput({ onSubmit, disabled, placeholder = "Sp
     if (isListening) {
       recognitionRef.current.stop();
       setIsListening(false);
+      setInterimText('');
     } else {
       recognitionRef.current.start();
       setIsListening(true);
@@ -93,6 +107,7 @@ export default function VoicePromptInput({ onSubmit, disabled, placeholder = "Sp
     if (text.trim() && onSubmit) {
       onSubmit(text.trim());
       setText("");
+      setInterimText("");
     }
   };
 
@@ -107,10 +122,19 @@ export default function VoicePromptInput({ onSubmit, disabled, placeholder = "Sp
     <div className="space-y-3">
       <div className="relative">
         <Textarea
+          ref={textareaRef}
           placeholder={placeholder}
           className="min-h-[160px] resize-none text-base pr-14"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
+          value={text + interimText}
+          onChange={(e) => {
+            const newValue = e.target.value;
+            if (newValue.length < text.length) {
+              setText(newValue);
+              setInterimText("");
+            } else {
+              setText(newValue);
+            }
+          }}
           onKeyDown={handleKeyDown}
           disabled={disabled}
           data-testid="input-clinical-note"
@@ -131,7 +155,7 @@ export default function VoicePromptInput({ onSubmit, disabled, placeholder = "Sp
       {isListening && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <div className="w-2 h-2 bg-destructive rounded-full animate-pulse" />
-          Listening...
+          <span>Recording - Click the red mic button again to stop</span>
         </div>
       )}
 
@@ -147,7 +171,10 @@ export default function VoicePromptInput({ onSubmit, disabled, placeholder = "Sp
         </Button>
         <Button
           variant="outline"
-          onClick={() => setText("")}
+          onClick={() => {
+            setText("");
+            setInterimText("");
+          }}
           disabled={disabled || !text}
           className="h-11"
           data-testid="button-clear"
