@@ -33,6 +33,7 @@ export const patients = pgTable("patients", {
   phone: text("phone"),
   email: text("email"),
   isCDCP: boolean("is_cdcp").default(false).notNull(),
+  workInsurance: boolean("work_insurance").default(false).notNull(),
   copayDiscussed: boolean("copay_discussed").default(false).notNull(),
   currentToothShade: text("current_tooth_shade"),
   requestedToothShade: text("requested_tooth_shade"),

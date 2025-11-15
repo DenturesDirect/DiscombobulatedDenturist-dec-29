@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import TopNav from "@/components/TopNav";
-import ToothShadeCard from "@/components/ToothShadeCard";
+import ClinicalDetailsCard from "@/components/ClinicalDetailsCard";
 import VoicePromptInput from "@/components/VoicePromptInput";
 import PhotoUploadZone from "@/components/PhotoUploadZone";
 import DocumentPreview from "@/components/DocumentPreview";
@@ -186,18 +186,10 @@ export default function Dashboard() {
               <div>
                 <h1 className="text-3xl font-semibold mb-2">{patient.name}</h1>
                 <div className="text-sm text-muted-foreground mb-4">
-                  {patient.dateOfBirth && `DOB: ${new Date(patient.dateOfBirth).toLocaleDateString()}`}
-                  {patient.phone && ` • Phone: ${patient.phone}`}
-                  {patient.isCDCP && (
-                    <span className="ml-2 px-2 py-0.5 bg-destructive/10 text-destructive rounded text-xs font-medium">
-                      CDCP {!patient.copayDiscussed && '- Copay Not Discussed'}
-                    </span>
-                  )}
+                  {patient.phone && `Phone: ${patient.phone}`}
+                  {patient.email && ` • Email: ${patient.email}`}
                 </div>
-                <ToothShadeCard 
-                  currentShade={patient.currentToothShade || 'Not Set'}
-                  requestedShade={patient.requestedToothShade || 'Not Set'}
-                />
+                <ClinicalDetailsCard patient={patient} />
               </div>
 
               <Card className="p-6">
