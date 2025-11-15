@@ -104,6 +104,12 @@ interface PatientContext {
 
 export async function processClinicalNote(plainTextNote: string, patientContext: PatientContext): Promise<ClinicalNoteResponse> {
   try {
+    console.log('🔍 Processing clinical note:', {
+      plainTextLength: plainTextNote?.length,
+      patientName: patientContext.name,
+      hasContext: !!patientContext
+    });
+
     // Build patient context string
     let contextString = `Patient: ${patientContext.name}\n`;
     
@@ -127,6 +133,8 @@ export async function processClinicalNote(plainTextNote: string, patientContext:
       contextString += `Lower Denture: ${patientContext.lowerDentureType}\n`;
     }
 
+    console.log('📋 Context string:', contextString);
+
     const response = await openai.chat.completions.create({
       model: "gpt-5", // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
       messages: [
@@ -140,12 +148,27 @@ export async function processClinicalNote(plainTextNote: string, patientContext:
       max_completion_tokens: 4096,
     });
 
+    console.log('🤖 OpenAI response received:', {
+      hasChoices: !!response.choices?.length,
+      hasContent: !!response.choices?.[0]?.message?.content,
+      contentLength: response.choices?.[0]?.message?.content?.length
+    });
+
     const content = response.choices[0]?.message?.content || "{}";
+    console.log('📝 Raw AI response:', content);
+
     const result = JSON.parse(content) as ClinicalNoteResponse;
+    console.log('✅ Parsed result:', {
+      hasFormattedNote: !!result.formattedNote,
+      formattedNoteLength: result.formattedNote?.length,
+      hasFollowUpPrompt: !!result.followUpPrompt,
+      suggestedTasksCount: result.suggestedTasks?.length || 0
+    });
     
     return result;
   } catch (error: any) {
-    console.error("Error processing clinical note:", error);
+    console.error("❌ Error processing clinical note:", error);
+    console.error("Error stack:", error.stack);
     throw new Error(`Failed to process clinical note: ${error.message}`);
   }
 }
