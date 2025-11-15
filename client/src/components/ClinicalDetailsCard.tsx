@@ -92,7 +92,18 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
       const response = await apiRequest('PATCH', `/api/patients/${patient.id}`, data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedPatient) => {
+      // Reset form with the fresh data from the mutation response
+      form.reset({
+        dateOfBirth: updatedPatient.dateOfBirth || "",
+        currentToothShade: updatedPatient.currentToothShade || "",
+        requestedToothShade: updatedPatient.requestedToothShade || "",
+        upperDentureType: updatedPatient.upperDentureType || "None",
+        lowerDentureType: updatedPatient.lowerDentureType || "None",
+        isCDCP: updatedPatient.isCDCP || false,
+        workInsurance: updatedPatient.workInsurance || false,
+      });
+      
       queryClient.invalidateQueries({ queryKey: ['/api/patients', patient.id] });
       queryClient.invalidateQueries({ queryKey: ['/api/patients'] });
       toast({
