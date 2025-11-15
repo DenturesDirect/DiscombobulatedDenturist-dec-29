@@ -18,6 +18,42 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### November 15, 2025: Minimal Patient Entry with Post-Consultation Clinical Details
+
+**Patient Entry Workflow Restructured**:
+- NewPatientDialog now MINIMAL: only collects name, phone, email (+ optional photo)
+- Removed ALL clinical fields from patient creation: DOB, shade fields, denture types, CDCP checkbox
+- Philosophy: Collect basic contact info first → Add clinical details AFTER first examination when treatment is known
+
+**Clinical Details Card - Post-Consultation Data Entry**:
+- Created new ClinicalDetailsCard component in patient canvas (replaces ToothShadeCard)
+- Editable card shows: DOB, current shade, requested shade, upper denture type, lower denture type, CDCP insurance, Work insurance
+- View mode displays all clinical data with Edit button
+- Edit mode shows form with all fields + Save/Cancel buttons
+- Proper form sync: mutation response data resets form BEFORE closing edit mode
+- Background refetch protection: useEffect only resets form when NOT editing to prevent data loss
+
+**Insurance Tracking Enhancement**:
+- Added `workInsurance` boolean field to patient schema (alongside existing `isCDCP`)
+- Both insurance fields are NOT nullable with defaults (false)
+- Clinic needs to track BOTH CDCP and Work insurance separately (different processes)
+- Clinical Details card shows badges for both insurance types when enabled
+
+**Form Sync Fix**:
+- Critical bug fix: form.reset() now uses mutation response data directly
+- Prevents stale data issue where reopening edit mode showed old values
+- Flow: Save → mutation returns updated patient → form.reset(updatedPatient) → close edit mode
+- Tested: save → reopen edit → form shows latest saved values (not stale)
+
+**Schema Changes**:
+- All clinical fields remain optional (nullable) - can be added after patient creation
+- Made isCDCP and workInsurance not nullable with defaults for consistency
+- PATCH endpoint already existed - now used for clinical details updates
+
+**End-to-End Testing**:
+- Playwright test validates: minimal patient creation → clinical details entry → save/cancel → form sync
+- Confirmed all features working with real data (in-memory storage)
+
 ### November 9, 2025: Complete Integration of Photos and Timeline Tabs
 
 **Photos Tab - Real Data Integration**:
