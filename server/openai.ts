@@ -1,10 +1,33 @@
 import OpenAI from "openai";
 
-// This is using Replit's AI Integrations service, which provides OpenAI-compatible API access without requiring your own OpenAI API key.
-const openai = new OpenAI({
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY
-});
+// Determine which API key to use: prioritize Replit AI Integrations, fall back to direct OpenAI key
+function getOpenAIConfig(): { apiKey: string; baseURL?: string } {
+  // First try Replit AI Integrations
+  if (process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+    console.log("🤖 Using Replit AI Integrations for OpenAI");
+    return {
+      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL
+    };
+  }
+  
+  // Fall back to direct OpenAI API key
+  if (process.env.OPENAI_API_KEY) {
+    console.log("🤖 Using direct OpenAI API key");
+    return {
+      apiKey: process.env.OPENAI_API_KEY
+    };
+  }
+  
+  // No API key available - will fail at runtime
+  console.error("❌ No OpenAI API key configured! Set AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY");
+  return {
+    apiKey: "" // Will cause auth error
+  };
+}
+
+const config = getOpenAIConfig();
+const openai = new OpenAI(config);
 
 export interface ClinicalNoteResponse {
   formattedNote: string;
@@ -103,6 +126,11 @@ interface PatientContext {
 }
 
 export async function processClinicalNote(plainTextNote: string, patientContext: PatientContext): Promise<ClinicalNoteResponse> {
+  // Check for API key configuration first
+  if (!config.apiKey) {
+    throw new Error("OpenAI API key not configured. Please add AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY to your secrets.");
+  }
+
   try {
     // Build patient context string
     let contextString = `Patient: ${patientContext.name}\n`;
@@ -127,8 +155,12 @@ export async function processClinicalNote(plainTextNote: string, patientContext:
       contextString += `Lower Denture: ${patientContext.lowerDentureType}\n`;
     }
 
+    console.log("🧠 Sending clinical note to OpenAI for processing...");
+    console.log("📝 Patient:", patientContext.name);
+    console.log("📋 Note length:", plainTextNote.length, "characters");
+
     const response = await openai.chat.completions.create({
-      model: "gpt-5", // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+      model: "gpt-4o", // Using gpt-4o for reliability
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { 
@@ -137,16 +169,45 @@ export async function processClinicalNote(plainTextNote: string, patientContext:
         }
       ],
       response_format: { type: "json_object" },
-      max_completion_tokens: 4096,
+      max_tokens: 4096,
     });
 
-    const content = response.choices[0]?.message?.content || "{}";
+    const content = response.choices[0]?.message?.content;
+    
+    if (!content) {
+      console.error("❌ OpenAI returned empty content");
+      throw new Error("OpenAI returned an empty response. Please try again.");
+    }
+
+    console.log("✅ OpenAI response received:", content.length, "characters");
+    
     const result = JSON.parse(content) as ClinicalNoteResponse;
     
+    if (!result.formattedNote) {
+      console.error("❌ Parsed response missing formattedNote:", result);
+      throw new Error("AI response was missing the formatted note. Please try again.");
+    }
+
+    console.log("✅ Clinical note processed successfully");
     return result;
   } catch (error: any) {
-    console.error("Error processing clinical note:", error);
-    throw new Error(`Failed to process clinical note: ${error.message}`);
+    console.error("❌ Error processing clinical note:", error);
+    
+    // Provide specific error messages based on error type
+    if (error.status === 401) {
+      throw new Error("OpenAI authentication failed. Please check your API key configuration.");
+    }
+    if (error.status === 429) {
+      throw new Error("Rate limit exceeded. Please wait a moment and try again.");
+    }
+    if (error.status === 500 || error.status === 503) {
+      throw new Error("OpenAI service is temporarily unavailable. Please try again in a few minutes.");
+    }
+    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      throw new Error("Unable to connect to OpenAI. Please check your internet connection.");
+    }
+    
+    throw new Error(error.message || "Failed to process clinical note. Please try again.");
   }
 }
 

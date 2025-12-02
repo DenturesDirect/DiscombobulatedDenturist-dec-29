@@ -78,8 +78,13 @@ export default function Dashboard() {
 
       const data = await response.json();
       
+      // Check if server returned an error
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Server error processing clinical note');
+      }
+      
       if (!data.formattedNote || data.formattedNote.trim() === '') {
-        throw new Error('AI returned an empty note. Please try again or contact support.');
+        throw new Error('AI returned an empty note. Please try again.');
       }
       
       setGeneratedDocument(data.formattedNote);
@@ -87,6 +92,9 @@ export default function Dashboard() {
       
       // Invalidate clinical notes cache to refresh the list
       await queryClient.invalidateQueries({ queryKey: ['/api/clinical-notes', patientId] });
+      
+      // Also invalidate tasks since AI may have created new tasks
+      await queryClient.invalidateQueries({ queryKey: ['/api/tasks', { patientId }] });
       
       if (data.followUpPrompt) {
         setFollowUpPrompt(data.followUpPrompt);
@@ -105,6 +113,7 @@ export default function Dashboard() {
       });
 
     } catch (error: any) {
+      console.error("Clinical note processing error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to process clinical note",
@@ -124,6 +133,12 @@ export default function Dashboard() {
       });
 
       const data = await response.json();
+      
+      // Check if server returned an error
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Server error generating referral letter');
+      }
+      
       setGeneratedDocument(prev => `${prev}\n\n---\n\nREFERRAL LETTER\n\n${data.letter}`);
       setFollowUpPrompt("");
       
@@ -133,6 +148,7 @@ export default function Dashboard() {
       });
 
     } catch (error: any) {
+      console.error("Referral letter error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to generate referral letter",
