@@ -1,283 +1,84 @@
 # The Discombobulated Denturist
 
 ## Overview
-
-The Discombobulated Denturist is an AI-powered clinical workflow management system designed specifically for denture professionals. The application streamlines patient treatment tracking from initial consultation through delivery and follow-up, with voice-to-text dictation, automated task assignment, intelligent document generation, and treatment milestone tracking.
-
-The system is built for a denturist clinic with four staff members:
-- **Damien**: Denturist (treatment plans, clinical procedures, bite blocks, CDCP copay discussions)
-- **Caroline**: Administrative (CDCP estimates, insurance, scheduling)
-- **Michael**: Lab technician (denture setup, fabrication)
-- **Luisa**: Digital technician (scan imports, digital design, processing)
-
-The core philosophy is "clinician-driven" with minimal prompts, no unnecessary automation, and continuous patient records that never overwrite previous entries.
+The Discombobulated Denturist is an AI-powered clinical workflow management system designed for denture professionals. It streamlines patient treatment tracking from initial consultation to follow-up, offering voice-to-text dictation, automated task suggestions, intelligent document generation, and treatment milestone tracking. The system supports a four-person dental clinic team (Denturist, Administrative, Lab Technician, Digital Technician) and operates on a "clinician-driven" philosophy, prioritizing user control and continuous, non-overwriting patient records. Its business vision is to enhance clinical clarity, ensure patient safety, and improve workflow efficiency in dental practices.
 
 ## User Preferences
-
 Preferred communication style: Simple, everyday language.
-
-## Recent Changes
-
-### November 15, 2025: Minimal Patient Entry with Post-Consultation Clinical Details
-
-**Patient Entry Workflow Restructured**:
-- NewPatientDialog now MINIMAL: only collects name, phone, email (+ optional photo)
-- Removed ALL clinical fields from patient creation: DOB, shade fields, denture types, CDCP checkbox
-- Philosophy: Collect basic contact info first → Add clinical details AFTER first examination when treatment is known
-
-**Clinical Details Card - Post-Consultation Data Entry**:
-- Created new ClinicalDetailsCard component in patient canvas (replaces ToothShadeCard)
-- Editable card shows: DOB, current shade, requested shade, upper denture type, lower denture type, CDCP insurance, Work insurance
-- View mode displays all clinical data with Edit button
-- Edit mode shows form with all fields + Save/Cancel buttons
-- Proper form sync: mutation response data resets form BEFORE closing edit mode
-- Background refetch protection: useEffect only resets form when NOT editing to prevent data loss
-
-**Insurance Tracking Enhancement**:
-- Added `workInsurance` boolean field to patient schema (alongside existing `isCDCP`)
-- Both insurance fields are NOT nullable with defaults (false)
-- Clinic needs to track BOTH CDCP and Work insurance separately (different processes)
-- Clinical Details card shows badges for both insurance types when enabled
-
-**Form Sync Fix**:
-- Critical bug fix: form.reset() now uses mutation response data directly
-- Prevents stale data issue where reopening edit mode showed old values
-- Flow: Save → mutation returns updated patient → form.reset(updatedPatient) → close edit mode
-- Tested: save → reopen edit → form shows latest saved values (not stale)
-
-**Schema Changes**:
-- All clinical fields remain optional (nullable) - can be added after patient creation
-- Made isCDCP and workInsurance not nullable with defaults for consistency
-- PATCH endpoint already existed - now used for clinical details updates
-
-**End-to-End Testing**:
-- Playwright test validates: minimal patient creation → clinical details entry → save/cancel → form sync
-- Confirmed all features working with real data (in-memory storage)
-
-### November 9, 2025: Complete Integration of Photos and Timeline Tabs
-
-**Photos Tab - Real Data Integration**:
-- Connected to real `patient_files` database table (not mock data)
-- ClinicalPhotoGrid component fetches files via `GET /api/patients/:patientId/files`
-- Delete functionality with ownership verification before removal
-- Shows empty state when no photos exist
-- Fully tested end-to-end with Playwright
-
-**Timeline Tab - Task Management**:
-- Displays real tasks from database filtered by patientId
-- Task cards show: checkbox, assignee, title, description, priority badge, due date
-- Manual checkbox completion (NO AI auto-completion as requested)
-- Updates task status via `PATCH /api/tasks/:id`
-- Tasks auto-generated from clinical notes via AI
-- Shows empty state when no tasks exist
-- Multi-staff support (Damien, Caroline, Michael, Luisa)
-
-**Workflow Fields in Patient Schema**:
-- Added `assignedTo` (staff member assignment)
-- Added `nextStep` (upcoming task description)
-- Added `dueDate` (deadline for next step)
-- NewPatientDialog includes complete "Workflow" section with:
-  - Select dropdown for assignedTo (data-testid="select-assigned-to")
-  - Textarea for nextStep (data-testid="textarea-next-step")
-  - Calendar date picker for dueDate (data-testid="button-due-date")
-
-**Query Client Enhancement**:
-- Fixed URL construction in `client/src/lib/queryClient.ts`
-- Now handles both string path segments and object query parameters correctly
-- Enables proper hierarchical query keys like `['/api/tasks', { patientId }]`
-- Clinical notes and tasks now fetch correctly by patientId
-
-**Bug Fixes**:
-- Fixed SelectItem empty value error (changed "" to "None" in DENTURE_TYPES)
-- Added missing workflow fields to patient schema
-- Security fix: File deletion now verifies ownership before allowing removal
-- Combined upperDentureType/lowerDentureType for display in patient cards
-
-**End-to-End Testing**:
-- Comprehensive Playwright test validates all features working correctly
-- Verified patient creation → clinical note → task generation → completion workflow
-- Confirmed AI permission-based document generation (asks before generating)
-- All features tested with real data (in-memory storage during database downtime)
-
-### November 6, 2025: Patient Photo Upload and Workflow Tracking
-
-**Patient Photo Management**:
-- Implemented patient photo upload using Replit Object Storage integration
-- ObjectUploader component using Uppy Dashboard with drag-and-drop interface
-- Secure signed URL generation for photo storage in `.private/patient-photos/` directory
-- ACL-protected endpoints for photo retrieval (only authenticated users can access)
-- PatientAvatar component displays photos with graceful fallback to initials
-- Photo uploads integrated into NewPatientDialog with post-creation upload flow
-
-**Workflow Tracking System**:
-- Enhanced patient schema with workflow fields:
-  - `dentureType`: 13 options (CUD, APUD, CPUD, CLD, APLD, CPLD, Repair, Tooth Addition, Reline, Rebase, Implant CUD)
-  - `assignedTo`: Staff assignment (Damien, Caroline, Michael, Luisa)
-  - `nextStep`: Upcoming task description
-  - `dueDate`: Deadline tracking with date validation and transformation
-  - `lastStepCompleted`: Treatment milestone tracking
-  - `lastStepDate`: Timestamp of last completed step
-- NewPatientDialog now includes all workflow fields with proper validation
-- Active Patients page displays workflow data in PatientTimelineCard component
-- Date field validation fixed: schema accepts both Date objects and ISO strings, automatically transforming strings to Date
-
-**Technical Improvements**:
-- Centralized storage configuration in `server/config.ts` for easy MemStorage/DbStorage switching
-- Enhanced Zod schema with `.extend()` and `.transform()` for date field coercion
-- ACL metadata system for secure photo access control
-- End-to-end testing verified all features working correctly
+The AI should NEVER auto-create tasks, auto-generate documents, or assume workflow steps.
+The AI should only offer gentle suggestions (e.g., "Would you like me to...").
+The clinician must control all decisions about workflow, timing, and next steps.
+The AI should format clinical notes professionally but make no assumptions about workflow.
+No changes to the database credentials or `USE_MEM_STORAGE` setting without explicit instruction.
 
 ## System Architecture
 
 ### Frontend Architecture
-
-**Framework**: React 18 with TypeScript using Vite as the build tool
-
-**UI Component System**: 
-- Radix UI primitives for accessible, unstyled components
-- shadcn/ui component library configured with "new-york" style
-- Tailwind CSS for styling with custom design tokens
-- Design system follows "Healthcare-Productivity Hybrid" approach (Epic/Cerner meets Linear/Notion)
-
-**State Management**:
-- TanStack React Query (v5) for server state management and caching
-- React hooks for local component state
-- No global state management library
-
-**Routing**: wouter for lightweight client-side routing
-
-**Key Design Principles**:
-- Clinical clarity with patient safety-first information hierarchy
-- Workflow efficiency to minimize clicks
-- Split-screen layout (left panel for input, right panel for output)
-- Typography: Inter for UI/body text, JetBrains Mono for timestamps/metadata
-- Responsive: Stack vertically (mobile) → 40/60 split (tablet) → Full split-screen (desktop)
+- **Framework**: React 18 with TypeScript and Vite.
+- **UI Components**: Radix UI primitives, shadcn/ui ("new-york" style), Tailwind CSS for styling.
+- **State Management**: TanStack React Query for server state, React hooks for local state.
+- **Routing**: wouter for client-side routing.
+- **Design Principles**: Clinician-driven clarity, patient safety-first information hierarchy, workflow efficiency, split-screen layout, Inter and JetBrains Mono typography, responsive design.
 
 ### Backend Architecture
-
-**Server Framework**: Express.js on Node.js
-
-**API Design**: RESTful API with JSON responses
-
-**Database ORM**: Drizzle ORM with PostgreSQL dialect
-
-**Core Data Models**:
-- **Users**: Authentication and staff member accounts
-- **Patients**: Core patient records with CDCP status, tooth shade tracking, contact information, patient photos, and workflow tracking (denture type, assigned staff, next step, due dates, treatment milestones)
-- **Clinical Notes**: Timestamped clinical documentation linked to patients
-- **Tasks**: Staff task assignments with priority levels, due dates, and status tracking
-- **Patient Files**: File attachments and clinical photos
-- **Appointments**: Scheduling and appointment tracking
-
-**Storage Strategy**: 
-- **TEMPORARY**: Currently using in-memory storage due to disabled database endpoint
-- Set in `server/config.ts` via `USE_MEM_STORAGE = true`
-- All data and sessions reset on server restart
-- Will switch back to PostgreSQL once Replit support re-enables the database endpoint
-- In-memory implementation (MemStorage class) fully functional with all features
-- Database storage (DbStorage class) ready to be reactivated by setting `USE_MEM_STORAGE = false`
-
-**Middleware**:
-- JSON body parsing with raw body preservation for webhooks
-- Request/response logging with duration tracking
-- CORS enabled for cross-origin requests
+- **Server Framework**: Express.js on Node.js.
+- **API Design**: RESTful API with JSON responses.
+- **Database ORM**: Drizzle ORM with PostgreSQL dialect.
+- **Core Data Models**: Users, Patients (with CDCP status, photos, workflow tracking), Clinical Notes, Tasks, Patient Files, Appointments.
+- **Storage Strategy**: Currently uses in-memory storage (`MemStorage`) for development due to database issues; designed to switch to PostgreSQL (`DbStorage`).
+- **Middleware**: JSON body parsing, request/response logging, CORS.
 
 ### AI Integration
-
-**Provider**: OpenAI-compatible API via Replit's AI Integrations service
-
-**Core AI Features**:
-1. **Clinical Note Processing**: Converts plain English dictation into formal denturist clinical documentation
-2. **Task Auto-assignment**: Automatically identifies and suggests task assignments to appropriate staff members
-3. **Follow-up Suggestions**: Provides context-aware follow-up prompts
-4. **Document Generation**: Creates referral letters, treatment plans, progress notes
-
-**Critical Hard Rules Enforced by AI**:
-- Every clinical note must end with medical/dental history update and consent documentation
-- Treatment plans must document that patient was given option of doing nothing, all risks/benefits discussed, approximate costs provided, and alternative options (implants, crown/bridge) were discussed
-- CDCP patients require copay discussion documentation with high-priority task creation if missing
-
-**Staff Assignment Logic**:
-- Damien: Treatment plans, clinical procedures, bite blocks, CDCP copay
-- Caroline: CDCP estimates, insurance, scheduling
-- Michael: Denture setup, fabrication
-- Luisa: Scan imports, digital design, processing
+- **Provider**: OpenAI-compatible API via Replit's AI Integrations.
+- **Core Features**: Clinical note processing, task assignment suggestions, follow-up prompts, document generation.
+- **Critical Hard Rules**: Enforces medical/dental history updates, consent documentation, detailed treatment plan discussions (risks, benefits, costs, alternatives), and CDCP copay discussion documentation.
+- **Staff Assignment Logic**: AI suggests tasks based on staff roles (Damien: treatment/procedures; Caroline: insurance/scheduling; Michael: lab; Luisa: digital).
 
 ### Data Flow Architecture
-
-1. **Voice Input → AI Processing**: 
-   - Voice dictation captured via Web Speech API
-   - Sent to AI for formatting and analysis
-   - Returns formatted clinical note + suggested tasks + follow-up prompts
-
-2. **Patient Canvas Workflow**:
-   - Left panel: Voice/text input, photo uploads, shade tracking
-   - Right panel: Generated documents, treatment timeline, clinical photos
-   - Real-time updates via React Query cache invalidation
-
-3. **Task Management Flow**:
-   - AI auto-generates tasks during clinical note processing
-   - Tasks filtered by staff member
-   - Status updates trigger cache refresh
+- **Voice Input → AI**: Web Speech API input sent to AI for formatting, analysis, and suggestions.
+- **Patient Canvas**: Left panel for input (voice/text, photos), right for output (documents, timeline, photos); real-time updates via React Query.
+- **Task Management**: AI suggests tasks from clinical notes; tasks filtered by staff; status updates refresh cache.
 
 ### Session Management
-
-**Strategy**: PostgreSQL-backed sessions using connect-pg-simple
-- Session storage in database for persistence
-- Cookie-based session identification
+- **Strategy**: PostgreSQL-backed sessions using `connect-pg-simple` for persistence.
 
 ### Build and Deployment
-
-**Development**:
-- Vite dev server with HMR
-- Express server running on tsx for TypeScript execution
-- Replit-specific plugins for error overlays and dev banners
-
-**Production Build**:
-- Vite builds client to `dist/public`
-- esbuild bundles server to `dist/index.js`
-- ESM module format throughout
-
-**Type Safety**:
-- Shared schema types between client and server via `@shared` alias
-- Zod schemas for runtime validation
-- TypeScript strict mode enabled
+- **Development**: Vite dev server, Express with `tsx`.
+- **Production**: Vite builds client, esbuild bundles server.
+- **Type Safety**: Shared schema types, Zod for runtime validation, TypeScript strict mode.
 
 ## External Dependencies
 
 ### Database
-- **PostgreSQL**: Primary data store
-- **Neon Serverless**: PostgreSQL connection via @neondatabase/serverless with WebSocket support
-- **Drizzle ORM**: Type-safe database queries and migrations
+- **PostgreSQL**: Primary data store.
+- **Neon Serverless**: PostgreSQL connection.
+- **Drizzle ORM**: Type-safe database queries.
 
 ### Object Storage
-- **Replit Object Storage**: Patient photo storage using @google-cloud/storage
-- **Uppy**: File upload UI (@uppy/core, @uppy/dashboard, @uppy/aws-s3, @uppy/react)
-- Secure signed URL generation for upload/download
-- ACL-based access control for private patient photos
+- **Replit Object Storage**: For patient photos.
+- **Uppy**: File upload UI (with `@uppy/aws-s3` for S3-compatible storage).
 
 ### AI Services
-- **OpenAI API**: Clinical note processing, document generation, task assignment (accessed via Replit AI Integrations)
+- **OpenAI API**: For AI integration (accessed via Replit AI Integrations).
 
 ### UI Libraries
-- **Radix UI**: Complete suite of accessible component primitives (accordion, dialog, dropdown, select, tabs, toast, etc.)
-- **shadcn/ui**: Pre-built component library built on Radix UI
-- **Tailwind CSS**: Utility-first CSS framework with custom design tokens
-- **Lucide React**: Icon library
+- **Radix UI**: Accessible component primitives.
+- **shadcn/ui**: Component library.
+- **Tailwind CSS**: Utility-first CSS framework.
+- **Lucide React**: Icon library.
 
 ### Development Tools
-- **Vite**: Frontend build tool and dev server
-- **TypeScript**: Type safety across full stack
-- **Drizzle Kit**: Database migration management
-- **Replit Plugins**: Runtime error modal, cartographer, dev banner
+- **Vite**: Frontend build tool.
+- **TypeScript**: Language.
+- **Drizzle Kit**: Database migration management.
 
 ### Utility Libraries
-- **date-fns**: Date formatting and manipulation
-- **clsx + tailwind-merge**: Conditional className composition
-- **zod**: Schema validation
-- **nanoid**: Unique ID generation
-- **cmdk**: Command palette component
+- **date-fns**: Date manipulation.
+- **clsx + tailwind-merge**: CSS class composition.
+- **zod**: Schema validation.
+- **nanoid**: Unique ID generation.
+- **cmdk**: Command palette.
 
 ### Browser APIs
-- **Web Speech API**: Voice-to-text dictation (SpeechRecognition)
-- **FileReader API**: Clinical photo uploads and previews
+- **Web Speech API**: Voice-to-text dictation.
+- **FileReader API**: File uploads.
