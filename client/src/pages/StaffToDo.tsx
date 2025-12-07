@@ -5,12 +5,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { CheckCircle2, Clock, Loader2 } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, User } from "lucide-react";
 import { format } from "date-fns";
 import { Checkbox } from "@/components/ui/checkbox";
 import TopNav from "@/components/TopNav";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Task } from "@shared/schema";
+import type { Task, Patient } from "@shared/schema";
 
 const staffMembers = ['All', 'Damien', 'Caroline', 'Michael', 'Luisa'];
 
@@ -23,6 +23,15 @@ export default function StaffToDo() {
   const { data: tasks = [], isLoading } = useQuery<Task[]>({
     queryKey: ['/api/tasks']
   });
+
+  const { data: patients = [] } = useQuery<Patient[]>({
+    queryKey: ['/api/patients']
+  });
+
+  const patientMap = patients.reduce((acc, p) => {
+    acc[p.id] = p.name;
+    return acc;
+  }, {} as Record<string, string>);
 
   const updateTaskMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -148,6 +157,12 @@ export default function StaffToDo() {
                   <div className="flex-1">
                     <div className="flex items-start justify-between gap-4 mb-2">
                       <div className="flex-1">
+                        {task.patientId && patientMap[task.patientId] && (
+                          <div className="flex items-center gap-1 text-sm text-primary font-medium mb-1" data-testid={`text-patient-${task.id}`}>
+                            <User className="w-3 h-3" />
+                            {patientMap[task.patientId]}
+                          </div>
+                        )}
                         <div className={`font-medium mb-1 ${task.status === 'completed' ? 'line-through' : ''}`}>
                           {task.title}
                         </div>

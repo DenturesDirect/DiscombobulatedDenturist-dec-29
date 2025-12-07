@@ -1,15 +1,14 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
+import pg from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";
 import { USE_MEM_STORAGE } from './config';
 
-let pool: Pool | null = null;
+const { Pool } = pg;
+
+let pool: pg.Pool | null = null;
 let db: ReturnType<typeof drizzle> | null = null;
 
 if (!USE_MEM_STORAGE) {
-  neonConfig.webSocketConstructor = ws;
-
   if (!process.env.DATABASE_URL) {
     throw new Error(
       "DATABASE_URL must be set. Did you forget to provision a database?",
@@ -17,7 +16,7 @@ if (!USE_MEM_STORAGE) {
   }
   
   pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  db = drizzle({ client: pool, schema });
+  db = drizzle(pool, { schema });
 }
 
 function throwDbDisabledError(): never {
