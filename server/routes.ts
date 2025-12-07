@@ -167,20 +167,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdBy: userName
       });
 
-      // Save any suggested tasks
-      if (result.suggestedTasks) {
-        for (const task of result.suggestedTasks) {
-          await storage.createTask({
-            title: task.title,
-            description: null,
-            assignee: task.assignee,
-            patientId,
-            dueDate: task.dueDate ? new Date(task.dueDate) : null,
-            priority: task.priority,
-            status: "pending"
-          });
-        }
-      }
+      // Note: Tasks are NO LONGER auto-created. The clinician controls all workflow decisions.
+      // The AI only formats notes and provides gentle suggestions via followUpPrompt.
 
       res.json({ ...result, noteId: savedNote.id });
     } catch (error: any) {
