@@ -1,7 +1,7 @@
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";
-import { USE_MEM_STORAGE } from './config';
+import { USE_MEM_STORAGE, DATABASE_URL } from './config';
 
 const { Pool } = pg;
 
@@ -9,13 +9,13 @@ let pool: pg.Pool | null = null;
 let db: ReturnType<typeof drizzle> | null = null;
 
 if (!USE_MEM_STORAGE) {
-  if (!process.env.DATABASE_URL) {
+  if (!DATABASE_URL) {
     throw new Error(
       "DATABASE_URL must be set. Did you forget to provision a database?",
     );
   }
   
-  pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  pool = new Pool({ connectionString: DATABASE_URL });
   db = drizzle(pool, { schema });
 }
 
