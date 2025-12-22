@@ -24,8 +24,8 @@ No changes to the database credentials or `USE_MEM_STORAGE` setting without expl
 - **Server Framework**: Express.js on Node.js.
 - **API Design**: RESTful API with JSON responses.
 - **Database ORM**: Drizzle ORM with PostgreSQL dialect.
-- **Core Data Models**: Users, Patients (with CDCP status, photos, workflow tracking), Clinical Notes, Tasks, Patient Files, Appointments.
-- **Storage Strategy**: Currently uses in-memory storage (`MemStorage`) for development due to database issues; designed to switch to PostgreSQL (`DbStorage`).
+- **Core Data Models**: Users, Patients (with CDCP status, photos, workflow tracking), Clinical Notes, Lab Notes, Admin Notes, Lab Prescriptions, Tasks, Patient Files, Appointments.
+- **Storage Strategy**: Uses PostgreSQL database storage (`DbStorage`) for persistent data.
 - **Middleware**: JSON body parsing, request/response logging, CORS.
 
 ### AI Integration
@@ -77,6 +77,20 @@ No changes to the database credentials or `USE_MEM_STORAGE` setting without expl
 - **Per-Patient Toggle**: Each patient has an `emailNotifications` boolean field (defaults to false).
 - **Manual Control**: Staff must explicitly enable notifications for each patient.
 - **Privacy-First**: No automatic emails; clinician controls all communication.
+
+### Documentation System
+The system provides a comprehensive multi-type documentation workflow:
+- **Clinical Notes**: AI-processed voice-to-text notes with automatic formatting and task suggestions. Must include date, reason, consent, history review, and next steps.
+- **Lab Notes**: Plain text notes for in-house lab work (fabrication details, adjustments, materials used). No AI processing.
+- **Admin Notes**: Plain text notes for administrative tracking (scheduling, billing, insurance follow-ups). No AI processing.
+- **Lab Prescriptions**: Structured forms for external lab orders with fields for:
+  - Lab selection (Vivi Labs, Vital Lab, Aesthetic Minds)
+  - Case type (complete denture, partial, implant-retained, repair, etc.)
+  - Arch (upper, lower, both)
+  - Fabrication stage (framework only, try-in, finish, repair)
+  - Deadline, design instructions, bite notes, shipping instructions
+  - Auto-included safety clause: "No unstated design decisions are authorized. Please confirm any uncertainty prior to fabrication."
+  - Status tracking (draft, sent, in_progress, completed)
 
 ### UI Libraries
 - **Radix UI**: Accessible component primitives.
