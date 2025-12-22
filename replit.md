@@ -72,6 +72,12 @@ No changes to the database credentials or `USE_MEM_STORAGE` setting without expl
 ### AI Services
 - **OpenAI API**: For AI integration (accessed via Replit AI Integrations).
 
+### Email Notifications
+- **Gmail Integration**: Using Replit's Google Mail connector for patient notifications.
+- **Per-Patient Toggle**: Each patient has an `emailNotifications` boolean field (defaults to false).
+- **Manual Control**: Staff must explicitly enable notifications for each patient.
+- **Privacy-First**: No automatic emails; clinician controls all communication.
+
 ### UI Libraries
 - **Radix UI**: Accessible component primitives.
 - **shadcn/ui**: Component library.

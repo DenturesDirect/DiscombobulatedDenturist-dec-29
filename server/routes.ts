@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { insertPatientSchema } from "@shared/schema";
 import { setupLocalAuth, isAuthenticated, seedStaffAccounts } from "./localAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { sendCustomNotification, sendAppointmentReminder } from "./gmail";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupLocalAuth(app);
@@ -217,6 +218,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const signedUrl = await objectStorageService.getObjectEntityUploadURL();
       res.json({ uploadURL: signedUrl });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Patient email notifications
+  app.post("/api/patients/:id/notify", isAuthenticated, async (req, res) => {
+    try {
+      const patient = await storage.getPatient(req.params.id);
+      if (!patient) return res.status(404).json({ error: "Patient not found" });
+      
+      if (!patient.email) {
+        return res.status(400).json({ error: "Patient has no email address" });
+      }
+      
+      if (!patient.emailNotifications) {
+        return res.status(400).json({ error: "Email notifications are disabled for this patient" });
+      }
+      
+      const { subject, message } = req.body;
+      if (!subject || !message) {
+        return res.status(400).json({ error: "Subject and message are required" });
+      }
+      
+      const success = await sendCustomNotification(patient.name, patient.email, subject, message);
+      
+      if (success) {
+        res.json({ success: true, message: "Email sent successfully" });
+      } else {
+        res.status(500).json({ error: "Failed to send email" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Toggle email notifications for a patient
+  app.patch("/api/patients/:id/email-notifications", isAuthenticated, async (req, res) => {
+    try {
+      const { enabled } = req.body;
+      
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: "Invalid request: 'enabled' must be a boolean" });
+      }
+      
+      const patient = await storage.getPatient(req.params.id);
+      
+      if (!patient) return res.status(404).json({ error: "Patient not found" });
+      
+      if (enabled && !patient.email) {
+        return res.status(400).json({ error: "Cannot enable notifications: patient has no email address" });
+      }
+      
+      const updated = await storage.updatePatient(req.params.id, { emailNotifications: enabled });
+      res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

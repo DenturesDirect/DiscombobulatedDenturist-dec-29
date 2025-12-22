@@ -15,7 +15,8 @@ import TreatmentMilestoneTimeline from "@/components/TreatmentMilestoneTimeline"
 import { Checkbox } from "@/components/ui/checkbox";
 import ClinicalPhotoGrid from "@/components/ClinicalPhotoGrid";
 import ShadeReminderModal from "@/components/ShadeReminderModal";
-import { FileText, Camera, Clock, Loader2 } from "lucide-react";
+import { FileText, Camera, Clock, Loader2, Mail, MailX } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Patient, ClinicalNote, PatientFile, Task } from "@shared/schema";
@@ -212,10 +213,50 @@ export default function Dashboard() {
             <div className="space-y-6">
               <div>
                 <h1 className="text-3xl font-semibold mb-2">{patient.name}</h1>
-                <div className="text-sm text-muted-foreground mb-4">
+                <div className="text-sm text-muted-foreground mb-2">
                   {patient.phone && `Phone: ${patient.phone}`}
                   {patient.email && ` • Email: ${patient.email}`}
                 </div>
+                {patient.email && (
+                  <div className="flex items-center gap-2 mb-4">
+                    <Switch
+                      id="email-notifications"
+                      checked={patient.emailNotifications}
+                      onCheckedChange={async (checked) => {
+                        try {
+                          await apiRequest('PATCH', `/api/patients/${patientId}/email-notifications`, { enabled: checked });
+                          queryClient.invalidateQueries({ queryKey: ['/api/patients', patientId] });
+                          toast({
+                            title: checked ? "Email Notifications Enabled" : "Email Notifications Disabled",
+                            description: checked 
+                              ? `${patient.name} will now receive email notifications.`
+                              : `${patient.name} will no longer receive email notifications.`
+                          });
+                        } catch (error: any) {
+                          toast({
+                            title: "Error",
+                            description: error.message || "Failed to update notification preference",
+                            variant: "destructive"
+                          });
+                        }
+                      }}
+                      data-testid="switch-email-notifications"
+                    />
+                    <label htmlFor="email-notifications" className="text-sm cursor-pointer flex items-center gap-1">
+                      {patient.emailNotifications ? (
+                        <>
+                          <Mail className="w-4 h-4 text-primary" />
+                          Email notifications enabled
+                        </>
+                      ) : (
+                        <>
+                          <MailX className="w-4 h-4 text-muted-foreground" />
+                          Email notifications disabled
+                        </>
+                      )}
+                    </label>
+                  </div>
+                )}
                 <ClinicalDetailsCard patient={patient} />
               </div>
 

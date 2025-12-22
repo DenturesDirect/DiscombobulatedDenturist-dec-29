@@ -55,6 +55,7 @@ export const patients = pgTable("patients", {
   dueDate: timestamp("due_date"),
   lastStepCompleted: text("last_step_completed"),
   lastStepDate: timestamp("last_step_date"),
+  emailNotifications: boolean("email_notifications").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
