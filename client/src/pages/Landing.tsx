@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import logoUrl from "@assets/DenturesDirect Logo Design_1762294635743.png";
+import heroImage from "@assets/4dbde174-cea7-4870-9e8b-e390986a9b22-md_1766378992180.jpeg";
 
 export default function Landing() {
   const [email, setEmail] = useState("");
@@ -34,15 +35,31 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center space-y-4">
-          <img src={logoUrl} alt="Dentures Direct" className="h-32 mx-auto" />
-          <h1 className="text-3xl font-bold">Clinical Workflow Assistant</h1>
-          <p className="text-muted-foreground">
-            Voice-powered AI for denturist practices
-          </p>
+    <div className="min-h-screen bg-background flex flex-col lg:flex-row">
+      <div className="lg:flex-1 flex flex-col items-center justify-center p-8 bg-gradient-to-br from-primary/10 via-background to-primary/5">
+        <div className="max-w-md text-center lg:text-left space-y-6">
+          <img 
+            src={heroImage} 
+            alt="The Discombobulated Denturist" 
+            className="w-64 h-64 lg:w-80 lg:h-80 object-cover rounded-2xl shadow-2xl mx-auto lg:mx-0 border-4 border-background"
+          />
+          <div>
+            <h1 className="text-4xl font-bold text-foreground mb-2">The Discombobulated Denturist</h1>
+            <p className="text-lg text-muted-foreground">
+              Finally, a clinical workflow assistant that understands the chaos.
+            </p>
+          </div>
         </div>
+      </div>
+
+      <div className="lg:flex-1 flex flex-col items-center justify-center p-6">
+        <div className="w-full max-w-md space-y-6">
+          <div className="text-center space-y-2">
+            <img src={logoUrl} alt="Dentures Direct" className="h-16 mx-auto" />
+            <p className="text-sm text-muted-foreground">
+              Voice-powered AI for denturist practices
+            </p>
+          </div>
 
         <Card>
           <CardHeader>
@@ -91,6 +108,7 @@ export default function Landing() {
             </p>
           </CardContent>
         </Card>
+        </div>
       </div>
     </div>
   );
