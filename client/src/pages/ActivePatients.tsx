@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Search, Loader2, Plus } from "lucide-react";
 import PatientTimelineCard from "@/components/PatientTimelineCard";
 import NewPatientDialog from "@/components/NewPatientDialog";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Patient } from "@shared/schema";
 
 export default function ActivePatients() {
@@ -34,6 +35,16 @@ export default function ActivePatients() {
     document.documentElement.classList.toggle('dark');
   };
 
+  const handleLogout = async () => {
+    try {
+      await apiRequest('POST', '/api/auth/logout');
+      await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      window.location.reload();
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
   const handleNavigate = (page: 'patients' | 'canvas' | 'todos') => {
     if (page === 'canvas') {
       const firstPatient = patients[0];
@@ -55,8 +66,9 @@ export default function ActivePatients() {
         notificationCount={3}
         isDark={isDark}
         onThemeToggle={handleThemeToggle}
-        onLogout={() => window.location.href = '/api/logout'}
+        onLogout={handleLogout}
         onNavigate={handleNavigate}
+        onSettings={() => setLocation('/settings')}
         currentPage="patients"
       />
       <div className="p-6 border-b bg-background">

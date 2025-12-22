@@ -8,6 +8,7 @@ import Landing from "@/pages/Landing";
 import ActivePatients from "@/pages/ActivePatients";
 import Dashboard from "@/pages/Dashboard";
 import StaffToDo from "@/pages/StaffToDo";
+import AdminSettings from "@/pages/AdminSettings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -30,6 +31,7 @@ function Router() {
       <Route path="/" component={ActivePatients} />
       <Route path="/patient/:id" component={Dashboard} />
       <Route path="/todos" component={StaffToDo} />
+      <Route path="/settings" component={AdminSettings} />
       <Route component={NotFound} />
     </Switch>
   );

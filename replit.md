@@ -38,9 +38,20 @@ No changes to the database credentials or `USE_MEM_STORAGE` setting without expl
 - **Voice Input → AI**: Web Speech API input sent to AI for formatting, analysis, and suggestions.
 - **Patient Canvas**: Left panel for input (voice/text, photos), right for output (documents, timeline, photos); real-time updates via React Query.
 - **Task Management**: AI suggests tasks from clinical notes; tasks filtered by staff; status updates refresh cache.
+- **Caroline's Insurance Exception**: When a patient is marked as CDCP or has work insurance, automatically creates a high-priority insurance estimate task for Caroline, due the next business day (Mon-Fri only).
 
-### Session Management
-- **Strategy**: PostgreSQL-backed sessions using `connect-pg-simple` for persistence.
+### Authentication
+- **Strategy**: Custom email/password authentication (replaced Replit Auth)
+- **Library**: Passport.js with local strategy + bcrypt (12 rounds)
+- **Domain Restriction**: Only @denturesdirect.ca emails allowed
+- **Staff Accounts**: 
+  - damien@denturesdirect.ca (admin)
+  - michael@denturesdirect.ca (staff)
+  - luisa@denturesdirect.ca (staff)
+  - info@denturesdirect.ca (Caroline, staff)
+- **Default Password**: TempPassword123! (staff should change on first login)
+- **Session Store**: PostgreSQL-backed sessions using `connect-pg-simple`
+- **Admin Features**: Password reset, login attempt monitoring (Settings page)
 
 ### Build and Deployment
 - **Development**: Vite dev server, Express with `tsx`.

@@ -4,7 +4,7 @@ import {
   type ClinicalNote, type InsertClinicalNote,
   type Task, type InsertTask,
   type PatientFile, type InsertPatientFile,
-  users, patients, clinicalNotes, tasks, patientFiles
+  users, patients, clinicalNotes, tasks, patientFiles, loginAttempts
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { ensureDb } from "./db";
@@ -12,9 +12,15 @@ import { eq, desc, and } from "drizzle-orm";
 import { USE_MEM_STORAGE } from "./config";
 
 export interface IStorage {
-  // Users (Replit Auth)
+  // Users
   getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUserPassword(id: string, password: string): Promise<void>;
+  
+  // Login Attempts
+  logLoginAttempt(email: string, success: boolean, ipAddress?: string): Promise<void>;
+  getLoginAttempts(): Promise<Array<{ id: string; email: string; success: boolean; ipAddress: string | null; createdAt: Date }>>;
   
   // Patients
   createPatient(patient: InsertPatient): Promise<Patient>;
@@ -43,6 +49,7 @@ export class MemStorage implements IStorage {
   private clinicalNotes: Map<string, ClinicalNote>;
   private tasks: Map<string, Task>;
   private patientFiles: Map<string, PatientFile>;
+  private loginAttemptsStore: Map<string, { id: string; email: string; success: boolean; ipAddress: string | null; createdAt: Date }>;
 
   constructor() {
     this.users = new Map();
@@ -50,10 +57,15 @@ export class MemStorage implements IStorage {
     this.clinicalNotes = new Map();
     this.tasks = new Map();
     this.patientFiles = new Map();
+    this.loginAttemptsStore = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
     return this.users.get(id);
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(u => u.email?.toLowerCase() === email.toLowerCase());
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
@@ -61,14 +73,42 @@ export class MemStorage implements IStorage {
     const user: User = {
       id: userData.id as string,
       email: userData.email ?? null,
+      password: userData.password ?? existing?.password ?? null,
       firstName: userData.firstName ?? null,
       lastName: userData.lastName ?? null,
+      role: userData.role ?? existing?.role ?? 'staff',
       profileImageUrl: userData.profileImageUrl ?? null,
       createdAt: existing?.createdAt ?? new Date(),
       updatedAt: new Date()
     };
     this.users.set(user.id, user);
     return user;
+  }
+
+  async updateUserPassword(id: string, password: string): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      user.password = password;
+      user.updatedAt = new Date();
+      this.users.set(id, user);
+    }
+  }
+
+  async logLoginAttempt(email: string, success: boolean, ipAddress?: string): Promise<void> {
+    const id = randomUUID();
+    this.loginAttemptsStore.set(id, {
+      id,
+      email,
+      success,
+      ipAddress: ipAddress ?? null,
+      createdAt: new Date()
+    });
+  }
+
+  async getLoginAttempts(): Promise<Array<{ id: string; email: string; success: boolean; ipAddress: string | null; createdAt: Date }>> {
+    return Array.from(this.loginAttemptsStore.values()).sort((a, b) => 
+      b.createdAt.getTime() - a.createdAt.getTime()
+    );
   }
 
   async createPatient(insertPatient: InsertPatient): Promise<Patient> {
@@ -80,12 +120,16 @@ export class MemStorage implements IStorage {
       phone: insertPatient.phone ?? null,
       email: insertPatient.email ?? null,
       isCDCP: insertPatient.isCDCP ?? false,
+      workInsurance: insertPatient.workInsurance ?? false,
       copayDiscussed: insertPatient.copayDiscussed ?? false,
       currentToothShade: insertPatient.currentToothShade ?? null,
       requestedToothShade: insertPatient.requestedToothShade ?? null,
       photoUrl: insertPatient.photoUrl ?? null,
       upperDentureType: insertPatient.upperDentureType ?? null,
       lowerDentureType: insertPatient.lowerDentureType ?? null,
+      assignedTo: insertPatient.assignedTo ?? null,
+      nextStep: insertPatient.nextStep ?? null,
+      dueDate: insertPatient.dueDate ?? null,
       lastStepCompleted: insertPatient.lastStepCompleted ?? null,
       lastStepDate: insertPatient.lastStepDate ?? null,
       createdAt: new Date()
@@ -206,6 +250,11 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const result = await ensureDb().select().from(users).where(eq(users.email, email.toLowerCase()));
+    return result[0];
+  }
+
   async upsertUser(userData: UpsertUser): Promise<User> {
     const result = await ensureDb().insert(users)
       .values(userData)
@@ -213,14 +262,31 @@ export class DbStorage implements IStorage {
         target: users.id,
         set: {
           email: userData.email,
+          password: userData.password,
           firstName: userData.firstName,
           lastName: userData.lastName,
+          role: userData.role,
           profileImageUrl: userData.profileImageUrl,
           updatedAt: new Date()
         }
       })
       .returning();
     return result[0];
+  }
+
+  async updateUserPassword(id: string, password: string): Promise<void> {
+    await ensureDb().update(users)
+      .set({ password, updatedAt: new Date() })
+      .where(eq(users.id, id));
+  }
+
+  async logLoginAttempt(email: string, success: boolean, ipAddress?: string): Promise<void> {
+    await ensureDb().insert(loginAttempts)
+      .values({ email, success, ipAddress: ipAddress ?? null });
+  }
+
+  async getLoginAttempts(): Promise<Array<{ id: string; email: string; success: boolean; ipAddress: string | null; createdAt: Date }>> {
+    return await ensureDb().select().from(loginAttempts).orderBy(desc(loginAttempts.createdAt)).limit(100);
   }
 
   async createPatient(insertPatient: InsertPatient): Promise<Patient> {

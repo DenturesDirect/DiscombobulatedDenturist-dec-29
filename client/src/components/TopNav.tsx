@@ -13,10 +13,11 @@ interface TopNavProps {
   onThemeToggle?: () => void;
   onLogout?: () => void;
   onNavigate?: (page: 'patients' | 'canvas' | 'todos') => void;
+  onSettings?: () => void;
   currentPage?: 'patients' | 'canvas' | 'todos';
 }
 
-export default function TopNav({ userName, userRole, notificationCount = 0, isDark, onThemeToggle, onLogout, onNavigate, currentPage = 'patients' }: TopNavProps) {
+export default function TopNav({ userName, userRole, notificationCount = 0, isDark, onThemeToggle, onLogout, onNavigate, onSettings, currentPage = 'patients' }: TopNavProps) {
   const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase();
 
   return (
@@ -92,7 +93,7 @@ export default function TopNav({ userName, userRole, notificationCount = 0, isDa
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => console.log('Settings')}>
+            <DropdownMenuItem onClick={onSettings} data-testid="menu-settings">
               Settings
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => console.log('My Tasks')}>

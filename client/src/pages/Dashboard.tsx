@@ -60,6 +60,16 @@ export default function Dashboard() {
     document.documentElement.classList.toggle('dark');
   };
 
+  const handleLogout = async () => {
+    try {
+      await apiRequest('POST', '/api/auth/logout');
+      await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      window.location.reload();
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
   const handleNavigate = (page: 'patients' | 'canvas' | 'todos') => {
     if (page === 'patients') {
       setLocation('/');
@@ -191,8 +201,9 @@ export default function Dashboard() {
         notificationCount={3}
         isDark={isDark}
         onThemeToggle={handleThemeToggle}
-        onLogout={() => window.location.href = '/api/logout'}
+        onLogout={handleLogout}
         onNavigate={handleNavigate}
+        onSettings={() => setLocation('/settings')}
         currentPage="canvas"
       />
 
@@ -245,7 +256,51 @@ export default function Dashboard() {
 
               <Card className="p-6">
                 <h2 className="text-xl font-semibold mb-4">Upload Clinical Photos</h2>
-                <PhotoUploadZone onPhotosChange={(photos) => console.log('Selected photos:', photos.length)} />
+                <PhotoUploadZone 
+                  onPhotosChange={async (photos) => {
+                    if (photos.length === 0) return;
+                    
+                    for (const photo of photos) {
+                      try {
+                        // Get upload URL
+                        const urlResponse = await apiRequest('POST', '/api/objects/upload', {});
+                        const { uploadURL } = await urlResponse.json();
+                        
+                        // Upload the file
+                        await fetch(uploadURL, {
+                          method: 'PUT',
+                          body: photo,
+                          headers: { 'Content-Type': photo.type }
+                        });
+                        
+                        // Extract the file URL (without query params)
+                        const fileUrl = uploadURL.split('?')[0];
+                        
+                        // Save file record to database
+                        await apiRequest('POST', `/api/patients/${patientId}/files`, {
+                          filename: photo.name,
+                          fileUrl,
+                          fileType: photo.type,
+                          description: ''
+                        });
+                        
+                        // Refresh file list
+                        queryClient.invalidateQueries({ queryKey: ['/api/patients', patientId, 'files'] });
+                        
+                        toast({
+                          title: "Photo Uploaded",
+                          description: `${photo.name} has been saved to the patient record.`
+                        });
+                      } catch (error: any) {
+                        toast({
+                          title: "Upload Failed",
+                          description: error.message || "Failed to upload photo",
+                          variant: "destructive"
+                        });
+                      }
+                    }
+                  }} 
+                />
               </Card>
             </div>
           </div>

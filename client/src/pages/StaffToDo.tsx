@@ -47,6 +47,16 @@ export default function StaffToDo() {
     document.documentElement.classList.toggle('dark');
   };
 
+  const handleLogout = async () => {
+    try {
+      await apiRequest('POST', '/api/auth/logout');
+      await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      window.location.reload();
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
   const handleNavigate = (page: 'patients' | 'canvas' | 'todos') => {
     if (page === 'patients') {
       setLocation('/');
@@ -59,9 +69,18 @@ export default function StaffToDo() {
     }
   };
 
+  // Sort tasks by due date (earliest first), then filter by staff
+  const sortedTasks = [...tasks].sort((a, b) => {
+    // Tasks without due dates go to the end
+    if (!a.dueDate && !b.dueDate) return 0;
+    if (!a.dueDate) return 1;
+    if (!b.dueDate) return -1;
+    return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+  });
+
   const filteredTasks = selectedStaff === 'All' 
-    ? tasks 
-    : tasks.filter(t => t.assignee === selectedStaff);
+    ? sortedTasks 
+    : sortedTasks.filter(t => t.assignee === selectedStaff);
 
   const toggleTask = (id: string, currentStatus: string) => {
     const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
@@ -92,8 +111,9 @@ export default function StaffToDo() {
         notificationCount={3}
         isDark={isDark}
         onThemeToggle={handleThemeToggle}
-        onLogout={() => window.location.href = '/api/logout'}
+        onLogout={handleLogout}
         onNavigate={handleNavigate}
+        onSettings={() => setLocation('/settings')}
         currentPage="todos"
       />
       

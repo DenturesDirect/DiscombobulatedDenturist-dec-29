@@ -3,21 +3,12 @@ import { createServer, type Server } from "http";
 import { processClinicalNote, generateReferralLetter } from "./openai";
 import { storage } from "./storage";
 import { insertPatientSchema } from "@shared/schema";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupLocalAuth, isAuthenticated, seedStaffAccounts } from "./localAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  await setupAuth(app);
-
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
+  await setupLocalAuth(app);
+  await seedStaffAccounts();
 
   app.post("/api/patients", isAuthenticated, async (req, res) => {
     try {
@@ -48,10 +39,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to calculate next business day (Mon-Fri)
+  function getNextBusinessDay(): Date {
+    const now = new Date();
+    const result = new Date(now);
+    result.setDate(result.getDate() + 1);
+    
+    // Skip weekends
+    while (result.getDay() === 0 || result.getDay() === 6) {
+      result.setDate(result.getDate() + 1);
+    }
+    
+    // Set to end of business day (5 PM)
+    result.setHours(17, 0, 0, 0);
+    return result;
+  }
+
   app.patch("/api/patients/:id", isAuthenticated, async (req, res) => {
     try {
+      // Get current patient state before update
+      const currentPatient = await storage.getPatient(req.params.id);
+      if (!currentPatient) return res.status(404).json({ error: "Patient not found" });
+      
       const patient = await storage.updatePatient(req.params.id, req.body);
       if (!patient) return res.status(404).json({ error: "Patient not found" });
+      
+      // CAROLINE INSURANCE EXCEPTION: Auto-create insurance task when CDCP or work insurance is newly set
+      const wasInsurance = currentPatient.isCDCP || currentPatient.workInsurance;
+      const isInsurance = patient.isCDCP || patient.workInsurance;
+      
+      if (!wasInsurance && isInsurance) {
+        const insuranceType = patient.isCDCP ? "CDCP" : "Work Insurance";
+        await storage.createTask({
+          title: `Submit ${insuranceType} estimate for ${patient.name}`,
+          assignee: "Caroline",
+          patientId: patient.id,
+          dueDate: getNextBusinessDay(),
+          priority: "high",
+          status: "pending"
+        });
+      }
+      
       res.json(patient);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -84,19 +112,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdBy: userName
       });
 
-      // FIX: Linked task save logic
-      if (result.suggestedTasks && result.suggestedTasks.length > 0) {
-        for (const suggested of result.suggestedTasks) {
-          await storage.createTask({
-            title: suggested.title,
-            assignee: suggested.assignee,
-            patientId: patientId, // Bind task to patient
-            dueDate: new Date(suggested.dueDate),
-            priority: suggested.priority || "normal",
-            status: "pending"
-          });
-        }
-      }
+      // CLINICIAN-DRIVEN: AI suggestions are returned to frontend only
+      // Tasks are NOT auto-created - clinician must approve each one
+      // Exception: Caroline's insurance tasks for CDCP/work insurance (handled separately)
 
       res.json({ ...result, noteId: savedNote.id });
     } catch (error: any) {
@@ -119,6 +137,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { status } = req.body;
       const task = await storage.updateTaskStatus(req.params.id, status);
       res.json(task);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create task endpoint (for manual task creation by clinician)
+  app.post("/api/tasks", isAuthenticated, async (req, res) => {
+    try {
+      const task = await storage.createTask(req.body);
+      res.json(task);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Clinical notes listing
+  app.get("/api/clinical-notes/:patientId", isAuthenticated, async (req, res) => {
+    try {
+      const notes = await storage.listClinicalNotes(req.params.patientId);
+      res.json(notes);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Patient files
+  app.get("/api/patients/:id/files", isAuthenticated, async (req, res) => {
+    try {
+      const files = await storage.listPatientFiles(req.params.id);
+      res.json(files);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/patients/:id/files", isAuthenticated, async (req, res) => {
+    try {
+      const { filename, fileUrl, fileType, description } = req.body;
+      const file = await storage.createPatientFile({
+        patientId: req.params.id,
+        filename,
+        fileUrl,
+        fileType,
+        description
+      });
+      res.json(file);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/patients/:id/files/:fileId", isAuthenticated, async (req, res) => {
+    try {
+      const success = await storage.deletePatientFile(req.params.fileId);
+      if (!success) return res.status(404).json({ error: "File not found" });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update patient photo
+  app.patch("/api/patients/:id/photo", isAuthenticated, async (req, res) => {
+    try {
+      const { photoUrl } = req.body;
+      const patient = await storage.updatePatient(req.params.id, { photoUrl });
+      if (!patient) return res.status(404).json({ error: "Patient not found" });
+      res.json(patient);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Object storage upload URL generation
+  const objectStorageService = new ObjectStorageService();
+  
+  app.post("/api/objects/upload", isAuthenticated, async (req, res) => {
+    try {
+      const signedUrl = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL: signedUrl });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
