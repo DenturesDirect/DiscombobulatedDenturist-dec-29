@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { processClinicalNote, generateReferralLetter } from "./openai";
 import { storage } from "./storage";
-import { insertPatientSchema } from "@shared/schema";
+import { insertPatientSchema, insertLabNoteSchema, insertAdminNoteSchema, insertLabPrescriptionSchema } from "@shared/schema";
 import { setupLocalAuth, isAuthenticated, seedStaffAccounts } from "./localAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { sendCustomNotification, sendAppointmentReminder } from "./gmail";
@@ -273,6 +273,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const updated = await storage.updatePatient(req.params.id, { emailNotifications: enabled });
       res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ===== LAB NOTES =====
+  // Get lab notes for a patient
+  app.get("/api/lab-notes/:patientId", isAuthenticated, async (req, res) => {
+    try {
+      const notes = await storage.listLabNotes(req.params.patientId);
+      res.json(notes);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create lab note
+  app.post("/api/lab-notes", isAuthenticated, async (req: any, res) => {
+    try {
+      const validatedData = insertLabNoteSchema.parse(req.body);
+      const userName = `${req.user.claims.first_name || ''} ${req.user.claims.last_name || ''}`.trim() || req.user.claims.email;
+      
+      const note = await storage.createLabNote({
+        ...validatedData,
+        createdBy: userName
+      });
+      res.json(note);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // ===== ADMIN NOTES =====
+  // Get admin notes for a patient
+  app.get("/api/admin-notes/:patientId", isAuthenticated, async (req, res) => {
+    try {
+      const notes = await storage.listAdminNotes(req.params.patientId);
+      res.json(notes);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create admin note
+  app.post("/api/admin-notes", isAuthenticated, async (req: any, res) => {
+    try {
+      const validatedData = insertAdminNoteSchema.parse(req.body);
+      const userName = `${req.user.claims.first_name || ''} ${req.user.claims.last_name || ''}`.trim() || req.user.claims.email;
+      
+      const note = await storage.createAdminNote({
+        ...validatedData,
+        createdBy: userName
+      });
+      res.json(note);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // ===== LAB PRESCRIPTIONS =====
+  // Get lab prescriptions for a patient
+  app.get("/api/lab-prescriptions/:patientId", isAuthenticated, async (req, res) => {
+    try {
+      const prescriptions = await storage.listLabPrescriptions(req.params.patientId);
+      res.json(prescriptions);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get single lab prescription
+  app.get("/api/lab-prescription/:id", isAuthenticated, async (req, res) => {
+    try {
+      const prescription = await storage.getLabPrescription(req.params.id);
+      if (!prescription) return res.status(404).json({ error: "Prescription not found" });
+      res.json(prescription);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create lab prescription
+  app.post("/api/lab-prescriptions", isAuthenticated, async (req: any, res) => {
+    try {
+      const validatedData = insertLabPrescriptionSchema.parse(req.body);
+      const userName = `${req.user.claims.first_name || ''} ${req.user.claims.last_name || ''}`.trim() || req.user.claims.email;
+      
+      const prescription = await storage.createLabPrescription({
+        ...validatedData,
+        createdBy: userName
+      });
+      res.json(prescription);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Update lab prescription (mark as sent, update status, etc.)
+  app.patch("/api/lab-prescriptions/:id", isAuthenticated, async (req, res) => {
+    try {
+      const updates = req.body;
+      
+      // If marking as sent, set the sentAt timestamp
+      if (updates.status === "sent" && !updates.sentAt) {
+        updates.sentAt = new Date();
+      }
+      
+      const prescription = await storage.updateLabPrescription(req.params.id, updates);
+      if (!prescription) return res.status(404).json({ error: "Prescription not found" });
+      res.json(prescription);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

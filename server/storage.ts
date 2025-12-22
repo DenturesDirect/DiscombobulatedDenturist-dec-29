@@ -156,6 +156,7 @@ export class MemStorage implements IStorage {
       dueDate: insertPatient.dueDate ?? null,
       lastStepCompleted: insertPatient.lastStepCompleted ?? null,
       lastStepDate: insertPatient.lastStepDate ?? null,
+      emailNotifications: insertPatient.emailNotifications ?? false,
       createdAt: new Date()
     };
     this.patients.set(id, patient);
