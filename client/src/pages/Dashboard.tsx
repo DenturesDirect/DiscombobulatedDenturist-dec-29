@@ -9,17 +9,19 @@ import { Badge } from "@/components/ui/badge";
 import TopNav from "@/components/TopNav";
 import ClinicalDetailsCard from "@/components/ClinicalDetailsCard";
 import VoicePromptInput from "@/components/VoicePromptInput";
+import SimpleNoteInput from "@/components/SimpleNoteInput";
+import LabPrescriptionForm, { type LabPrescriptionData } from "@/components/LabPrescriptionForm";
 import PhotoUploadZone from "@/components/PhotoUploadZone";
 import DocumentPreview from "@/components/DocumentPreview";
 import TreatmentMilestoneTimeline from "@/components/TreatmentMilestoneTimeline";
 import { Checkbox } from "@/components/ui/checkbox";
 import ClinicalPhotoGrid from "@/components/ClinicalPhotoGrid";
 import ShadeReminderModal from "@/components/ShadeReminderModal";
-import { FileText, Camera, Clock, Loader2, Mail, MailX } from "lucide-react";
+import { FileText, Camera, Clock, Loader2, Mail, MailX, FlaskConical, ClipboardList, Pill } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Patient, ClinicalNote, PatientFile, Task } from "@shared/schema";
+import type { Patient, ClinicalNote, PatientFile, Task, LabNote, AdminNote, LabPrescription } from "@shared/schema";
 
 
 export default function Dashboard() {
@@ -55,6 +57,23 @@ export default function Dashboard() {
     queryKey: ['/api/tasks', { patientId }],
     enabled: !!patientId
   });
+
+  const { data: labNotes = [], isLoading: isLoadingLabNotes } = useQuery<LabNote[]>({
+    queryKey: ['/api/lab-notes', patientId],
+    enabled: !!patientId
+  });
+
+  const { data: adminNotes = [], isLoading: isLoadingAdminNotes } = useQuery<AdminNote[]>({
+    queryKey: ['/api/admin-notes', patientId],
+    enabled: !!patientId
+  });
+
+  const { data: labPrescriptions = [], isLoading: isLoadingPrescriptions } = useQuery<LabPrescription[]>({
+    queryKey: ['/api/lab-prescriptions', patientId],
+    enabled: !!patientId
+  });
+
+  const [activeInputTab, setActiveInputTab] = useState<'clinical' | 'lab' | 'admin' | 'prescription'>('clinical');
 
   const handleThemeToggle = () => {
     setIsDark(!isDark);
@@ -170,6 +189,81 @@ export default function Dashboard() {
     }
   };
 
+  const handleLabNoteSubmit = async (content: string) => {
+    setIsProcessing(true);
+    try {
+      await apiRequest('POST', '/api/lab-notes', {
+        patientId,
+        content
+      });
+      
+      await queryClient.invalidateQueries({ queryKey: ['/api/lab-notes', patientId] });
+      
+      toast({
+        title: "Lab Note Added",
+        description: "The lab note has been saved to the patient's record."
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save lab note",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleAdminNoteSubmit = async (content: string) => {
+    setIsProcessing(true);
+    try {
+      await apiRequest('POST', '/api/admin-notes', {
+        patientId,
+        content
+      });
+      
+      await queryClient.invalidateQueries({ queryKey: ['/api/admin-notes', patientId] });
+      
+      toast({
+        title: "Admin Note Added",
+        description: "The admin note has been saved to the patient's record."
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save admin note",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleLabPrescriptionSubmit = async (data: LabPrescriptionData) => {
+    setIsProcessing(true);
+    try {
+      await apiRequest('POST', '/api/lab-prescriptions', {
+        patientId,
+        ...data
+      });
+      
+      await queryClient.invalidateQueries({ queryKey: ['/api/lab-prescriptions', patientId] });
+      
+      toast({
+        title: "Lab Prescription Created",
+        description: "The prescription has been saved as a draft."
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create prescription",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   if (!patientId) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -262,37 +356,93 @@ export default function Dashboard() {
 
               <Card className="p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold">Add New Clinical Note</h2>
+                  <h2 className="text-xl font-semibold">Add Notes / Prescriptions</h2>
                   {isProcessing && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
                 </div>
-                <VoicePromptInput 
-                  onSubmit={handleClinicalNoteSubmit}
-                  disabled={isProcessing}
-                />
-                {followUpPrompt && (
-                  <div className="mt-4 p-4 bg-muted rounded-lg">
-                    <p className="text-sm mb-3">{followUpPrompt}</p>
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        onClick={handleGenerateReferralLetter}
-                        disabled={isProcessing}
-                        data-testid="button-accept-followup"
-                      >
-                        Yes, Generate
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => setFollowUpPrompt("")}
-                        disabled={isProcessing}
-                        data-testid="button-decline-followup"
-                      >
-                        No, Thanks
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                
+                <Tabs value={activeInputTab} onValueChange={(v) => setActiveInputTab(v as any)} className="w-full">
+                  <TabsList className="grid grid-cols-4 w-full mb-4">
+                    <TabsTrigger value="clinical" className="text-xs gap-1" data-testid="tab-input-clinical">
+                      <FileText className="w-3 h-3" />
+                      Clinical
+                    </TabsTrigger>
+                    <TabsTrigger value="lab" className="text-xs gap-1" data-testid="tab-input-lab">
+                      <FlaskConical className="w-3 h-3" />
+                      Lab
+                    </TabsTrigger>
+                    <TabsTrigger value="admin" className="text-xs gap-1" data-testid="tab-input-admin">
+                      <ClipboardList className="w-3 h-3" />
+                      Admin
+                    </TabsTrigger>
+                    <TabsTrigger value="prescription" className="text-xs gap-1" data-testid="tab-input-prescription">
+                      <Pill className="w-3 h-3" />
+                      Lab Rx
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="clinical" className="mt-0">
+                    <VoicePromptInput 
+                      onSubmit={handleClinicalNoteSubmit}
+                      disabled={isProcessing}
+                    />
+                    {followUpPrompt && (
+                      <div className="mt-4 p-4 bg-muted rounded-lg">
+                        <p className="text-sm mb-3">{followUpPrompt}</p>
+                        <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            onClick={handleGenerateReferralLetter}
+                            disabled={isProcessing}
+                            data-testid="button-accept-followup"
+                          >
+                            Yes, Generate
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => setFollowUpPrompt("")}
+                            disabled={isProcessing}
+                            data-testid="button-decline-followup"
+                          >
+                            No, Thanks
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="lab" className="mt-0">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Add notes for in-house lab work. These are plain text notes without AI processing.
+                    </p>
+                    <SimpleNoteInput
+                      onSubmit={handleLabNoteSubmit}
+                      disabled={isProcessing}
+                      placeholder="Enter lab notes (fabrication details, adjustments, materials used...)"
+                      buttonLabel="Add Lab Note"
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="admin" className="mt-0">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Add administrative notes (scheduling, billing, insurance follow-ups, etc.)
+                    </p>
+                    <SimpleNoteInput
+                      onSubmit={handleAdminNoteSubmit}
+                      disabled={isProcessing}
+                      placeholder="Enter admin notes (billing, insurance, appointments...)"
+                      buttonLabel="Add Admin Note"
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="prescription" className="mt-0">
+                    <LabPrescriptionForm
+                      patientName={patient.name}
+                      onSubmit={handleLabPrescriptionSubmit}
+                      disabled={isProcessing}
+                    />
+                  </TabsContent>
+                </Tabs>
               </Card>
 
               <Card className="p-6">
@@ -347,32 +497,172 @@ export default function Dashboard() {
           </div>
 
           <div className="flex-1 p-6 overflow-y-auto">
-            <Tabs defaultValue="document" className="h-full flex flex-col">
-              <TabsList className="mb-4">
-                <TabsTrigger value="document" className="gap-2" data-testid="tab-document">
-                  <FileText className="w-4 h-4" />
-                  Document
+            <Tabs defaultValue="clinical" className="h-full flex flex-col">
+              <TabsList className="mb-4 flex-wrap gap-1">
+                <TabsTrigger value="clinical" className="gap-1 text-xs" data-testid="tab-clinical-notes">
+                  <FileText className="w-3 h-3" />
+                  Clinical
                 </TabsTrigger>
-                <TabsTrigger value="photos" className="gap-2" data-testid="tab-photos">
-                  <Camera className="w-4 h-4" />
+                <TabsTrigger value="lab" className="gap-1 text-xs" data-testid="tab-lab-notes">
+                  <FlaskConical className="w-3 h-3" />
+                  Lab
+                </TabsTrigger>
+                <TabsTrigger value="admin" className="gap-1 text-xs" data-testid="tab-admin-notes">
+                  <ClipboardList className="w-3 h-3" />
+                  Admin
+                </TabsTrigger>
+                <TabsTrigger value="prescriptions" className="gap-1 text-xs" data-testid="tab-prescriptions">
+                  <Pill className="w-3 h-3" />
+                  Lab Rx
+                </TabsTrigger>
+                <TabsTrigger value="photos" className="gap-1 text-xs" data-testid="tab-photos">
+                  <Camera className="w-3 h-3" />
                   Photos
                 </TabsTrigger>
-                <TabsTrigger value="timeline" className="gap-2" data-testid="tab-timeline">
-                  <Clock className="w-4 h-4" />
-                  Timeline
+                <TabsTrigger value="tasks" className="gap-1 text-xs" data-testid="tab-tasks">
+                  <Clock className="w-3 h-3" />
+                  Tasks
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="document" className="flex-1 overflow-y-auto">
+              <TabsContent value="clinical" className="flex-1 overflow-y-auto">
                 {isLoadingNotes ? (
                   <div className="flex items-center justify-center h-64">
                     <Loader2 className="w-6 h-6 animate-spin text-primary" />
                   </div>
+                ) : clinicalNotes.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                    <FileText className="w-12 h-12 mb-4 opacity-50" />
+                    <p>No clinical notes yet.</p>
+                    <p className="text-sm">Use the Clinical tab on the left to add notes.</p>
+                  </div>
                 ) : (
                   <DocumentPreview 
-                    content={generatedDocument || clinicalNotes.map(note => note.content).join('\n\n---\n\n') || 'No clinical notes yet. Add one using the form on the left.'}
+                    content={generatedDocument || clinicalNotes.map(note => note.content).join('\n\n---\n\n')}
                     onRewrite={(text) => console.log('Rewrite:', text)}
                   />
+                )}
+              </TabsContent>
+
+              <TabsContent value="lab" className="flex-1 overflow-y-auto">
+                {isLoadingLabNotes ? (
+                  <div className="flex items-center justify-center h-64">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : labNotes.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                    <FlaskConical className="w-12 h-12 mb-4 opacity-50" />
+                    <p>No lab notes yet.</p>
+                    <p className="text-sm">Use the Lab tab on the left to add notes.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {labNotes.map((note) => (
+                      <Card key={note.id} className="p-4" data-testid={`card-lab-note-${note.id}`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="secondary" className="text-xs">
+                            <FlaskConical className="w-3 h-3 mr-1" />
+                            Lab Note
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(note.createdAt).toLocaleDateString()} by {note.createdBy}
+                          </span>
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="admin" className="flex-1 overflow-y-auto">
+                {isLoadingAdminNotes ? (
+                  <div className="flex items-center justify-center h-64">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : adminNotes.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                    <ClipboardList className="w-12 h-12 mb-4 opacity-50" />
+                    <p>No admin notes yet.</p>
+                    <p className="text-sm">Use the Admin tab on the left to add notes.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {adminNotes.map((note) => (
+                      <Card key={note.id} className="p-4" data-testid={`card-admin-note-${note.id}`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="secondary" className="text-xs">
+                            <ClipboardList className="w-3 h-3 mr-1" />
+                            Admin Note
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(note.createdAt).toLocaleDateString()} by {note.createdBy}
+                          </span>
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="prescriptions" className="flex-1 overflow-y-auto">
+                {isLoadingPrescriptions ? (
+                  <div className="flex items-center justify-center h-64">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : labPrescriptions.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                    <Pill className="w-12 h-12 mb-4 opacity-50" />
+                    <p>No lab prescriptions yet.</p>
+                    <p className="text-sm">Use the Lab Rx tab on the left to create prescriptions.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {labPrescriptions.map((rx) => (
+                      <Card key={rx.id} className="p-4" data-testid={`card-prescription-${rx.id}`}>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <Badge variant={rx.status === 'sent' ? 'default' : rx.status === 'completed' ? 'secondary' : 'outline'} className="text-xs">
+                              {rx.status}
+                            </Badge>
+                            <span className="font-medium">{rx.labName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(rx.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                          <div><span className="text-muted-foreground">Case Type:</span> {rx.caseType.replace(/_/g, ' ')}</div>
+                          <div><span className="text-muted-foreground">Arch:</span> {rx.arch}</div>
+                          <div><span className="text-muted-foreground">Stage:</span> {rx.fabricationStage.replace(/_/g, ' ')}</div>
+                          {rx.deadline && <div><span className="text-muted-foreground">Deadline:</span> {new Date(rx.deadline).toLocaleDateString()}</div>}
+                        </div>
+                        {rx.designInstructions && (
+                          <div className="text-sm mb-2">
+                            <span className="text-muted-foreground">Design:</span> {rx.designInstructions}
+                          </div>
+                        )}
+                        {rx.status === 'draft' && (
+                          <Button 
+                            size="sm" 
+                            onClick={async () => {
+                              try {
+                                await apiRequest('PATCH', `/api/lab-prescriptions/${rx.id}`, { status: 'sent' });
+                                queryClient.invalidateQueries({ queryKey: ['/api/lab-prescriptions', patientId] });
+                                toast({ title: "Prescription marked as sent" });
+                              } catch (error) {
+                                toast({ title: "Failed to update", variant: "destructive" });
+                              }
+                            }}
+                            data-testid={`button-send-prescription-${rx.id}`}
+                          >
+                            Mark as Sent
+                          </Button>
+                        )}
+                      </Card>
+                    ))}
+                  </div>
                 )}
               </TabsContent>
 
@@ -402,15 +692,15 @@ export default function Dashboard() {
                 )}
               </TabsContent>
 
-              <TabsContent value="timeline" className="flex-1 overflow-y-auto">
+              <TabsContent value="tasks" className="flex-1 overflow-y-auto">
                 {isLoadingTasks ? (
                   <div className="flex items-center justify-center h-64">
                     <Loader2 className="w-6 h-6 animate-spin text-primary" />
                   </div>
                 ) : patientTasks.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                     <Clock className="w-12 h-12 mb-4 opacity-50" />
-                    <p>No tasks yet. Add clinical notes to generate tasks.</p>
+                    <p>No tasks yet.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
