@@ -145,3 +145,66 @@ export const insertPatientFileSchema = createInsertSchema(patientFiles).omit({
 
 export type InsertPatientFile = z.infer<typeof insertPatientFileSchema>;
 export type PatientFile = typeof patientFiles.$inferSelect;
+
+// Lab Notes - for in-house lab work tracking
+export const labNotes = pgTable("lab_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: varchar("patient_id").notNull().references(() => patients.id),
+  content: text("content").notNull(),
+  createdBy: text("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertLabNoteSchema = createInsertSchema(labNotes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertLabNote = z.infer<typeof insertLabNoteSchema>;
+export type LabNote = typeof labNotes.$inferSelect;
+
+// Admin Notes - for administrative tracking
+export const adminNotes = pgTable("admin_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: varchar("patient_id").notNull().references(() => patients.id),
+  content: text("content").notNull(),
+  createdBy: text("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAdminNoteSchema = createInsertSchema(adminNotes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAdminNote = z.infer<typeof insertAdminNoteSchema>;
+export type AdminNote = typeof adminNotes.$inferSelect;
+
+// Lab Prescriptions - outgoing orders to external labs
+export const labPrescriptions = pgTable("lab_prescriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: varchar("patient_id").notNull().references(() => patients.id),
+  labName: text("lab_name").notNull(), // Vivi Labs, Vital Lab, Aesthetic Minds
+  caseType: text("case_type").notNull(), // cast partial, complete denture, implant-retained, repair, tooth addition
+  arch: text("arch").notNull(), // upper, lower, both
+  fabricationStage: text("fabrication_stage").notNull(), // framework only, try-in, finish, repair
+  deadline: timestamp("deadline"),
+  digitalFiles: text("digital_files").array(), // STL, PLY, bite scan, vestibular scan, etc.
+  designInstructions: text("design_instructions"), // explicit design details
+  existingDentureReference: text("existing_denture_reference"), // closely followed, loose reference, intentionally modified
+  biteNotes: text("bite_notes"), // bite/occlusion information
+  shippingInstructions: text("shipping_instructions"), // digital-only return, physical return, etc.
+  specialNotes: text("special_notes"), // additional instructions
+  status: text("status").notNull().default("draft"), // draft, sent, in_progress, completed
+  sentAt: timestamp("sent_at"),
+  createdBy: text("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertLabPrescriptionSchema = createInsertSchema(labPrescriptions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertLabPrescription = z.infer<typeof insertLabPrescriptionSchema>;
+export type LabPrescription = typeof labPrescriptions.$inferSelect;

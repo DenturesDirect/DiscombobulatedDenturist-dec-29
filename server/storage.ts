@@ -4,7 +4,11 @@ import {
   type ClinicalNote, type InsertClinicalNote,
   type Task, type InsertTask,
   type PatientFile, type InsertPatientFile,
-  users, patients, clinicalNotes, tasks, patientFiles, loginAttempts
+  type LabNote, type InsertLabNote,
+  type AdminNote, type InsertAdminNote,
+  type LabPrescription, type InsertLabPrescription,
+  users, patients, clinicalNotes, tasks, patientFiles, loginAttempts,
+  labNotes, adminNotes, labPrescriptions
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { ensureDb } from "./db";
@@ -41,6 +45,20 @@ export interface IStorage {
   createPatientFile(file: InsertPatientFile): Promise<PatientFile>;
   listPatientFiles(patientId: string): Promise<PatientFile[]>;
   deletePatientFile(id: string): Promise<boolean>;
+  
+  // Lab Notes
+  createLabNote(note: InsertLabNote): Promise<LabNote>;
+  listLabNotes(patientId: string): Promise<LabNote[]>;
+  
+  // Admin Notes
+  createAdminNote(note: InsertAdminNote): Promise<AdminNote>;
+  listAdminNotes(patientId: string): Promise<AdminNote[]>;
+  
+  // Lab Prescriptions
+  createLabPrescription(prescription: InsertLabPrescription): Promise<LabPrescription>;
+  listLabPrescriptions(patientId: string): Promise<LabPrescription[]>;
+  getLabPrescription(id: string): Promise<LabPrescription | undefined>;
+  updateLabPrescription(id: string, updates: Partial<InsertLabPrescription>): Promise<LabPrescription | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -50,6 +68,9 @@ export class MemStorage implements IStorage {
   private tasks: Map<string, Task>;
   private patientFiles: Map<string, PatientFile>;
   private loginAttemptsStore: Map<string, { id: string; email: string; success: boolean; ipAddress: string | null; createdAt: Date }>;
+  private labNotesStore: Map<string, LabNote>;
+  private adminNotesStore: Map<string, AdminNote>;
+  private labPrescriptionsStore: Map<string, LabPrescription>;
 
   constructor() {
     this.users = new Map();
@@ -58,6 +79,9 @@ export class MemStorage implements IStorage {
     this.tasks = new Map();
     this.patientFiles = new Map();
     this.loginAttemptsStore = new Map();
+    this.labNotesStore = new Map();
+    this.adminNotesStore = new Map();
+    this.labPrescriptionsStore = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -242,6 +266,90 @@ export class MemStorage implements IStorage {
   async deletePatientFile(id: string): Promise<boolean> {
     return this.patientFiles.delete(id);
   }
+
+  // Lab Notes
+  async createLabNote(insertNote: InsertLabNote): Promise<LabNote> {
+    const id = randomUUID();
+    const note: LabNote = {
+      id,
+      patientId: insertNote.patientId,
+      content: insertNote.content,
+      createdBy: insertNote.createdBy,
+      createdAt: new Date()
+    };
+    this.labNotesStore.set(id, note);
+    return note;
+  }
+
+  async listLabNotes(patientId: string): Promise<LabNote[]> {
+    return Array.from(this.labNotesStore.values())
+      .filter((note) => note.patientId === patientId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  // Admin Notes
+  async createAdminNote(insertNote: InsertAdminNote): Promise<AdminNote> {
+    const id = randomUUID();
+    const note: AdminNote = {
+      id,
+      patientId: insertNote.patientId,
+      content: insertNote.content,
+      createdBy: insertNote.createdBy,
+      createdAt: new Date()
+    };
+    this.adminNotesStore.set(id, note);
+    return note;
+  }
+
+  async listAdminNotes(patientId: string): Promise<AdminNote[]> {
+    return Array.from(this.adminNotesStore.values())
+      .filter((note) => note.patientId === patientId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  // Lab Prescriptions
+  async createLabPrescription(insertPrescription: InsertLabPrescription): Promise<LabPrescription> {
+    const id = randomUUID();
+    const prescription: LabPrescription = {
+      id,
+      patientId: insertPrescription.patientId,
+      labName: insertPrescription.labName,
+      caseType: insertPrescription.caseType,
+      arch: insertPrescription.arch,
+      fabricationStage: insertPrescription.fabricationStage,
+      deadline: insertPrescription.deadline ?? null,
+      digitalFiles: insertPrescription.digitalFiles ?? null,
+      designInstructions: insertPrescription.designInstructions ?? null,
+      existingDentureReference: insertPrescription.existingDentureReference ?? null,
+      biteNotes: insertPrescription.biteNotes ?? null,
+      shippingInstructions: insertPrescription.shippingInstructions ?? null,
+      specialNotes: insertPrescription.specialNotes ?? null,
+      status: insertPrescription.status ?? "draft",
+      sentAt: insertPrescription.sentAt ?? null,
+      createdBy: insertPrescription.createdBy,
+      createdAt: new Date()
+    };
+    this.labPrescriptionsStore.set(id, prescription);
+    return prescription;
+  }
+
+  async listLabPrescriptions(patientId: string): Promise<LabPrescription[]> {
+    return Array.from(this.labPrescriptionsStore.values())
+      .filter((rx) => rx.patientId === patientId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async getLabPrescription(id: string): Promise<LabPrescription | undefined> {
+    return this.labPrescriptionsStore.get(id);
+  }
+
+  async updateLabPrescription(id: string, updates: Partial<InsertLabPrescription>): Promise<LabPrescription | undefined> {
+    const prescription = this.labPrescriptionsStore.get(id);
+    if (!prescription) return undefined;
+    const updated = { ...prescription, ...updates };
+    this.labPrescriptionsStore.set(id, updated);
+    return updated;
+  }
 }
 
 export class DbStorage implements IStorage {
@@ -376,6 +484,62 @@ export class DbStorage implements IStorage {
       .where(eq(patientFiles.id, id))
       .returning();
     return result.length > 0;
+  }
+
+  // Lab Notes
+  async createLabNote(insertNote: InsertLabNote): Promise<LabNote> {
+    const result = await ensureDb().insert(labNotes)
+      .values(insertNote)
+      .returning();
+    return result[0];
+  }
+
+  async listLabNotes(patientId: string): Promise<LabNote[]> {
+    return await ensureDb().select().from(labNotes)
+      .where(eq(labNotes.patientId, patientId))
+      .orderBy(desc(labNotes.createdAt));
+  }
+
+  // Admin Notes
+  async createAdminNote(insertNote: InsertAdminNote): Promise<AdminNote> {
+    const result = await ensureDb().insert(adminNotes)
+      .values(insertNote)
+      .returning();
+    return result[0];
+  }
+
+  async listAdminNotes(patientId: string): Promise<AdminNote[]> {
+    return await ensureDb().select().from(adminNotes)
+      .where(eq(adminNotes.patientId, patientId))
+      .orderBy(desc(adminNotes.createdAt));
+  }
+
+  // Lab Prescriptions
+  async createLabPrescription(insertPrescription: InsertLabPrescription): Promise<LabPrescription> {
+    const result = await ensureDb().insert(labPrescriptions)
+      .values(insertPrescription)
+      .returning();
+    return result[0];
+  }
+
+  async listLabPrescriptions(patientId: string): Promise<LabPrescription[]> {
+    return await ensureDb().select().from(labPrescriptions)
+      .where(eq(labPrescriptions.patientId, patientId))
+      .orderBy(desc(labPrescriptions.createdAt));
+  }
+
+  async getLabPrescription(id: string): Promise<LabPrescription | undefined> {
+    const result = await ensureDb().select().from(labPrescriptions)
+      .where(eq(labPrescriptions.id, id));
+    return result[0];
+  }
+
+  async updateLabPrescription(id: string, updates: Partial<InsertLabPrescription>): Promise<LabPrescription | undefined> {
+    const result = await ensureDb().update(labPrescriptions)
+      .set(updates)
+      .where(eq(labPrescriptions.id, id))
+      .returning();
+    return result[0];
   }
 }
 
