@@ -104,7 +104,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const result = await processClinicalNote(plainTextNote, patientContext);
-      const userName = `${req.user.claims.first_name || ''} ${req.user.claims.last_name || ''}`.trim();
+      const user = req.user as any;
+      const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
 
       const savedNote = await storage.createClinicalNote({
         patientId,
@@ -293,7 +294,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/lab-notes", isAuthenticated, async (req: any, res) => {
     try {
       const validatedData = insertLabNoteSchema.parse(req.body);
-      const userName = `${req.user.claims.first_name || ''} ${req.user.claims.last_name || ''}`.trim() || req.user.claims.email;
+      const user = req.user as any;
+      const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
       
       const note = await storage.createLabNote({
         ...validatedData,
@@ -320,7 +322,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin-notes", isAuthenticated, async (req: any, res) => {
     try {
       const validatedData = insertAdminNoteSchema.parse(req.body);
-      const userName = `${req.user.claims.first_name || ''} ${req.user.claims.last_name || ''}`.trim() || req.user.claims.email;
+      const user = req.user as any;
+      const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
       
       const note = await storage.createAdminNote({
         ...validatedData,
@@ -358,7 +361,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/lab-prescriptions", isAuthenticated, async (req: any, res) => {
     try {
       const validatedData = insertLabPrescriptionSchema.parse(req.body);
-      const userName = `${req.user.claims.first_name || ''} ${req.user.claims.last_name || ''}`.trim() || req.user.claims.email;
+      const user = req.user as any;
+      const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
       
       const prescription = await storage.createLabPrescription({
         ...validatedData,
