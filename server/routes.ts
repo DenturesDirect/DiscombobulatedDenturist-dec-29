@@ -298,7 +298,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
       
       const note = await storage.createLabNote({
-        ...validatedData,
+        patientId: validatedData.patientId,
+        content: validatedData.content,
         createdBy: userName
       });
       res.json(note);
@@ -326,7 +327,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
       
       const note = await storage.createAdminNote({
-        ...validatedData,
+        patientId: validatedData.patientId,
+        content: validatedData.content,
         createdBy: userName
       });
       res.json(note);
@@ -365,7 +367,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
       
       const prescription = await storage.createLabPrescription({
-        ...validatedData,
+        patientId: validatedData.patientId,
+        labName: validatedData.labName,
+        caseType: validatedData.caseType,
+        arch: validatedData.arch,
+        fabricationStage: validatedData.fabricationStage,
+        deadline: validatedData.deadline,
+        digitalFiles: validatedData.digitalFiles,
+        designInstructions: validatedData.designInstructions,
+        existingDentureReference: validatedData.existingDentureReference,
+        biteNotes: validatedData.biteNotes,
+        shippingInstructions: validatedData.shippingInstructions,
+        specialNotes: validatedData.specialNotes,
+        status: validatedData.status,
         createdBy: userName
       });
       res.json(prescription);

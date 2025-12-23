@@ -158,7 +158,6 @@ export const labNotes = pgTable("lab_notes", {
 export const insertLabNoteSchema = createInsertSchema(labNotes).omit({
   id: true,
   createdAt: true,
-  createdBy: true,
 });
 
 export type InsertLabNote = z.infer<typeof insertLabNoteSchema>;
@@ -176,7 +175,6 @@ export const adminNotes = pgTable("admin_notes", {
 export const insertAdminNoteSchema = createInsertSchema(adminNotes).omit({
   id: true,
   createdAt: true,
-  createdBy: true,
 });
 
 export type InsertAdminNote = z.infer<typeof insertAdminNoteSchema>;
@@ -206,7 +204,6 @@ export const labPrescriptions = pgTable("lab_prescriptions", {
 export const insertLabPrescriptionSchema = createInsertSchema(labPrescriptions).omit({
   id: true,
   createdAt: true,
-  createdBy: true,
   sentAt: true,
 });
 

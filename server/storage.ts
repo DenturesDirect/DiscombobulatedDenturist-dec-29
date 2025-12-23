@@ -326,7 +326,7 @@ export class MemStorage implements IStorage {
       shippingInstructions: insertPrescription.shippingInstructions ?? null,
       specialNotes: insertPrescription.specialNotes ?? null,
       status: insertPrescription.status ?? "draft",
-      sentAt: insertPrescription.sentAt ?? null,
+      sentAt: null,
       createdBy: insertPrescription.createdBy,
       createdAt: new Date()
     };
