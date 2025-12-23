@@ -87,9 +87,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Process clinical note with AI (does NOT save - gives clinician a chance to review/edit)
   app.post("/api/clinical-notes/process", isAuthenticated, async (req: any, res) => {
     try {
-      const { plainTextNote, patientId, noteDate } = req.body;
+      const { plainTextNote, patientId } = req.body;
       const patient = await storage.getPatient(patientId);
       if (!patient) return res.status(404).json({ error: "Patient not found" });
 
@@ -104,26 +105,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const result = await processClinicalNote(plainTextNote, patientContext);
+      
+      // CLINICIAN-DRIVEN: Return formatted note for review - NOT saving yet
+      // Clinician must explicitly approve and save after reviewing
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Save clinical note after clinician review/edit
+  app.post("/api/clinical-notes/save", isAuthenticated, async (req: any, res) => {
+    try {
+      const { patientId, content, noteDate } = req.body;
+      const patient = await storage.getPatient(patientId);
+      if (!patient) return res.status(404).json({ error: "Patient not found" });
+      
       const user = req.user as any;
       const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
-
-      // Parse noteDate if provided, otherwise use current date
       const parsedNoteDate = noteDate ? new Date(noteDate) : new Date();
 
       const savedNote = await storage.createClinicalNote({
         patientId,
         appointmentId: null,
-        content: result.formattedNote,
+        content,
         noteDate: parsedNoteDate,
         createdBy: userName
       });
+      
+      // CAROLINE INSURANCE EXCEPTION: Auto-create task if note mentions CDCP/insurance predetermination
+      const lowerContent = content.toLowerCase();
+      const mentionsCDCPTask = lowerContent.includes('cdcp') && 
+        (lowerContent.includes('predetermination') || lowerContent.includes('insurance') || 
+         lowerContent.includes('estimate') || lowerContent.includes('caroline'));
+      
+      if (mentionsCDCPTask || patient.isCDCP || patient.workInsurance) {
+        // Check if a similar task already exists
+        const existingTasks = await storage.listTasks('Caroline', patientId);
+        const hasInsuranceTask = existingTasks.some(t => 
+          t.title.toLowerCase().includes('insurance') || 
+          t.title.toLowerCase().includes('cdcp') ||
+          t.title.toLowerCase().includes('estimate')
+        );
+        
+        if (!hasInsuranceTask) {
+          const insuranceType = patient.isCDCP ? "CDCP" : "Insurance";
+          await storage.createTask({
+            title: `Submit ${insuranceType} estimate/predetermination for ${patient.name}`,
+            assignee: "Caroline",
+            patientId: patient.id,
+            dueDate: getNextBusinessDay(),
+            priority: "high",
+            status: "pending"
+          });
+        }
+      }
 
-      // CLINICIAN-DRIVEN: AI suggestions are returned to frontend only
-      // Tasks are NOT auto-created - clinician must approve each one
-      // Exception: Caroline's insurance tasks for CDCP/work insurance (handled separately)
-
-      res.json({ ...result, noteId: savedNote.id });
+      res.json({ noteId: savedNote.id, note: savedNote });
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Referral letter generation
+  app.post("/api/referral-letters/generate", isAuthenticated, async (req, res) => {
+    try {
+      const { patientName, clinicalNote, dentistName } = req.body;
+      
+      if (!patientName || !clinicalNote) {
+        return res.status(400).json({ error: "Patient name and clinical note are required" });
+      }
+      
+      const letter = await generateReferralLetter(patientName, clinicalNote, dentistName);
+      res.json({ letter });
+    } catch (error: any) {
+      console.error("Error generating referral letter:", error);
       res.status(500).json({ error: error.message });
     }
   });

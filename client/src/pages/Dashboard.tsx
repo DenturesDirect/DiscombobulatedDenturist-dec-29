@@ -17,8 +17,9 @@ import TreatmentMilestoneTimeline from "@/components/TreatmentMilestoneTimeline"
 import { Checkbox } from "@/components/ui/checkbox";
 import ClinicalPhotoGrid from "@/components/ClinicalPhotoGrid";
 import ShadeReminderModal from "@/components/ShadeReminderModal";
-import { FileText, Camera, Clock, Loader2, Mail, MailX, FlaskConical, ClipboardList, Pill } from "lucide-react";
+import { FileText, Camera, Clock, Loader2, Mail, MailX, FlaskConical, ClipboardList, Pill, Save, X, Edit3 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Patient, ClinicalNote, PatientFile, Task, LabNote, AdminNote, LabPrescription } from "@shared/schema";
@@ -37,6 +38,8 @@ export default function Dashboard() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [followUpPrompt, setFollowUpPrompt] = useState<string>("");
   const [currentClinicalNote, setCurrentClinicalNote] = useState("");
+  const [pendingNoteDate, setPendingNoteDate] = useState<Date>(new Date());
+  const [isReviewingNote, setIsReviewingNote] = useState(false);
 
   const { data: patient, isLoading: isLoadingPatient } = useQuery<Patient>({
     queryKey: ['/api/patients', patientId],
@@ -103,8 +106,7 @@ export default function Dashboard() {
     try {
       const response = await apiRequest('POST', '/api/clinical-notes/process', {
         plainTextNote: plainText,
-        patientId: patientId,
-        noteDate: noteDate?.toISOString() || new Date().toISOString()
+        patientId: patientId
       });
 
       const data = await response.json();
@@ -118,29 +120,19 @@ export default function Dashboard() {
         throw new Error('AI returned an empty note. Please try again.');
       }
       
+      // Show the formatted note for REVIEW - not saved yet
       setGeneratedDocument(data.formattedNote);
       setCurrentClinicalNote(data.formattedNote);
-      
-      // Invalidate clinical notes cache to refresh the list
-      await queryClient.invalidateQueries({ queryKey: ['/api/clinical-notes', patientId] });
-      
-      // Also invalidate tasks since AI may have created new tasks
-      await queryClient.invalidateQueries({ queryKey: ['/api/tasks', { patientId }] });
+      setPendingNoteDate(noteDate || new Date());
+      setIsReviewingNote(true);
       
       if (data.followUpPrompt) {
         setFollowUpPrompt(data.followUpPrompt);
       }
 
-      if (data.suggestedTasks && data.suggestedTasks.length > 0) {
-        toast({
-          title: "Tasks Created",
-          description: `${data.suggestedTasks.length} task(s) have been assigned to staff.`
-        });
-      }
-
       toast({
-        title: "Clinical Note Saved",
-        description: "The note has been added to the patient's record."
+        title: "Ready for Review",
+        description: "Please review and edit the formatted note, then click Save to add it to the record."
       });
 
     } catch (error: any) {
@@ -153,6 +145,69 @@ export default function Dashboard() {
     } finally {
       setIsProcessing(false);
     }
+  };
+  
+  // Save the clinical note after review/edit
+  const handleSaveClinicalNote = async () => {
+    if (!currentClinicalNote.trim()) {
+      toast({
+        title: "Error",
+        description: "Cannot save an empty note",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsProcessing(true);
+    try {
+      const response = await apiRequest('POST', '/api/clinical-notes/save', {
+        patientId: patientId,
+        content: currentClinicalNote,
+        noteDate: pendingNoteDate.toISOString()
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Server error saving clinical note');
+      }
+      
+      // Invalidate clinical notes cache to refresh the list
+      await queryClient.invalidateQueries({ queryKey: ['/api/clinical-notes', patientId] });
+      
+      // Also invalidate tasks since Caroline's insurance task may have been created
+      await queryClient.invalidateQueries({ queryKey: ['/api/tasks', { patientId }] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
+      
+      setIsReviewingNote(false);
+      
+      toast({
+        title: "Clinical Note Saved",
+        description: "The note has been added to the patient's record."
+      });
+
+    } catch (error: any) {
+      console.error("Clinical note save error:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save clinical note",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+  
+  // Discard the pending note
+  const handleDiscardNote = () => {
+    setGeneratedDocument("");
+    setCurrentClinicalNote("");
+    setFollowUpPrompt("");
+    setIsReviewingNote(false);
+    toast({
+      title: "Note Discarded",
+      description: "The formatted note was discarded without saving."
+    });
   };
 
   const handleGenerateReferralLetter = async () => {
@@ -537,7 +592,70 @@ export default function Dashboard() {
                   <div className="flex items-center justify-center h-64">
                     <Loader2 className="w-6 h-6 animate-spin text-primary" />
                   </div>
-                ) : clinicalNotes.length === 0 ? (
+                ) : isReviewingNote ? (
+                  // Review mode: show editable note with Save/Discard buttons
+                  <div className="space-y-4">
+                    <Card className="p-4 border-primary/50 bg-primary/5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Badge className="bg-amber-500 text-white">
+                          <Edit3 className="w-3 h-3 mr-1" />
+                          Review & Edit
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          Review the AI-formatted note below. Edit if needed, then save or discard.
+                        </span>
+                      </div>
+                      <Textarea
+                        value={currentClinicalNote}
+                        onChange={(e) => setCurrentClinicalNote(e.target.value)}
+                        className="min-h-[300px] text-sm font-mono"
+                        placeholder="Edit your clinical note..."
+                        data-testid="textarea-review-note"
+                      />
+                      <div className="flex gap-2 mt-4">
+                        <Button
+                          onClick={handleSaveClinicalNote}
+                          disabled={isProcessing || !currentClinicalNote.trim()}
+                          className="flex-1"
+                          data-testid="button-save-note"
+                        >
+                          {isProcessing ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Save className="w-4 h-4 mr-2" />
+                          )}
+                          Save to Patient Record
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={handleDiscardNote}
+                          disabled={isProcessing}
+                          data-testid="button-discard-note"
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          Discard
+                        </Button>
+                      </div>
+                    </Card>
+                    
+                    {followUpPrompt && (
+                      <Card className="p-4 border-blue-200 bg-blue-50 dark:bg-blue-950/30">
+                        <p className="text-sm mb-3">{followUpPrompt}</p>
+                        {followUpPrompt.toLowerCase().includes('referral') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleGenerateReferralLetter}
+                            disabled={isProcessing}
+                            data-testid="button-generate-referral"
+                          >
+                            Yes, Generate Referral Letter
+                          </Button>
+                        )}
+                      </Card>
+                    )}
+                  </div>
+                ) : clinicalNotes.length === 0 && !generatedDocument ? (
                   <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                     <FileText className="w-12 h-12 mb-4 opacity-50" />
                     <p>No clinical notes yet.</p>
@@ -545,7 +663,7 @@ export default function Dashboard() {
                   </div>
                 ) : (
                   <DocumentPreview 
-                    content={generatedDocument || clinicalNotes.map(note => note.content).join('\n\n---\n\n')}
+                    content={clinicalNotes.map(note => note.content).join('\n\n---\n\n')}
                     onRewrite={(text) => console.log('Rewrite:', text)}
                   />
                 )}
