@@ -6,6 +6,36 @@ interface PatientAvatarProps {
   className?: string;
 }
 
+// Convert GCS URLs to our API endpoint for authenticated access
+function normalizePhotoUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  
+  // Already an API URL
+  if (url.startsWith('/api/objects/')) {
+    return url;
+  }
+  
+  // Convert GCS URL to API endpoint
+  if (url.startsWith('https://storage.googleapis.com/')) {
+    try {
+      const gcsUrl = new URL(url);
+      const pathParts = gcsUrl.pathname.split('/');
+      const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
+      if (uploadsIndex >= 0) {
+        const objectId = pathParts.slice(uploadsIndex).join('/');
+        return `/api/objects/${objectId}`;
+      }
+      // Fallback: use last two path segments
+      return `/api/objects/${pathParts.slice(-2).join('/')}`;
+    } catch {
+      return undefined;
+    }
+  }
+  
+  // Return as-is for other URLs (e.g., external URLs)
+  return url;
+}
+
 export function PatientAvatar({ name, photoUrl, className }: PatientAvatarProps) {
   const getInitials = (fullName: string) => {
     const parts = fullName.trim().split(/\s+/);
@@ -15,9 +45,11 @@ export function PatientAvatar({ name, photoUrl, className }: PatientAvatarProps)
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   };
 
+  const normalizedUrl = normalizePhotoUrl(photoUrl);
+
   return (
     <Avatar className={className} data-testid="avatar-patient">
-      {photoUrl && <AvatarImage src={photoUrl} alt={name} />}
+      {normalizedUrl && <AvatarImage src={normalizedUrl} alt={name} />}
       <AvatarFallback data-testid="avatar-fallback">{getInitials(name)}</AvatarFallback>
     </Avatar>
   );

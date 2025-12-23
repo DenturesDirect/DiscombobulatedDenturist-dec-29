@@ -22,7 +22,7 @@ export default function Landing() {
       await apiRequest('POST', '/api/auth/login', { email, password });
       
       await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
-      window.location.reload();
+      window.location.href = "/";
     } catch (error: any) {
       toast({
         title: "Login Failed",

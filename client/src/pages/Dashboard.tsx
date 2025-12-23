@@ -98,12 +98,13 @@ export default function Dashboard() {
     }
   };
 
-  const handleClinicalNoteSubmit = async (plainText: string) => {
+  const handleClinicalNoteSubmit = async (plainText: string, noteDate?: Date) => {
     setIsProcessing(true);
     try {
       const response = await apiRequest('POST', '/api/clinical-notes/process', {
         plainTextNote: plainText,
-        patientId: patientId
+        patientId: patientId,
+        noteDate: noteDate?.toISOString() || new Date().toISOString()
       });
 
       const data = await response.json();
@@ -464,8 +465,14 @@ export default function Dashboard() {
                           headers: { 'Content-Type': photo.type }
                         });
                         
-                        // Extract the file URL (without query params)
-                        const fileUrl = uploadURL.split('?')[0];
+                        // Extract the object path from the GCS URL for our API
+                        // URL format: https://storage.googleapis.com/bucket/.private/uploads/uuid?params
+                        const gcsUrl = new URL(uploadURL);
+                        const pathParts = gcsUrl.pathname.split('/');
+                        // Find the "uploads" part and take everything after the bucket
+                        const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
+                        const objectId = uploadsIndex >= 0 ? pathParts.slice(uploadsIndex).join('/') : pathParts.slice(-2).join('/');
+                        const fileUrl = `/api/objects/${objectId}`;
                         
                         // Save file record to database
                         await apiRequest('POST', `/api/patients/${patientId}/files`, {

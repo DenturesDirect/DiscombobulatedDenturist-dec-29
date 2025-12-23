@@ -89,7 +89,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/clinical-notes/process", isAuthenticated, async (req: any, res) => {
     try {
-      const { plainTextNote, patientId } = req.body;
+      const { plainTextNote, patientId, noteDate } = req.body;
       const patient = await storage.getPatient(patientId);
       if (!patient) return res.status(404).json({ error: "Patient not found" });
 
@@ -107,10 +107,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.user as any;
       const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
 
+      // Parse noteDate if provided, otherwise use current date
+      const parsedNoteDate = noteDate ? new Date(noteDate) : new Date();
+
       const savedNote = await storage.createClinicalNote({
         patientId,
         appointmentId: null,
         content: result.formattedNote,
+        noteDate: parsedNoteDate,
         createdBy: userName
       });
 
@@ -220,6 +224,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const signedUrl = await objectStorageService.getObjectEntityUploadURL();
       res.json({ uploadURL: signedUrl });
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Serve object storage files (for patient photos)
+  // This route streams the file directly to the client for privacy
+  app.get("/api/objects/*", isAuthenticated, async (req, res) => {
+    try {
+      const objectPath = `/objects/${req.params[0]}`;
+      const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+      await objectStorageService.downloadObject(objectFile, res);
+    } catch (error: any) {
+      if (error.name === "ObjectNotFoundError") {
+        return res.status(404).json({ error: "File not found" });
+      }
+      console.error("Error serving object:", error);
       res.status(500).json({ error: error.message });
     }
   });

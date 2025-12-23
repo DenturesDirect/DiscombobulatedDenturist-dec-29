@@ -224,9 +224,14 @@ export async function generateReferralLetter(
   clinicalNote: string,
   dentistName?: string
 ): Promise<string> {
+  // Check for API key configuration first
+  if (!config.apiKey) {
+    throw new Error("OpenAI API key not configured. Please add AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY to your secrets.");
+  }
+  
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5", // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+      model: "gpt-4o",
       messages: [
         { 
           role: "system", 
@@ -237,12 +242,21 @@ export async function generateReferralLetter(
           content: `Write a referral letter for ${patientName}${dentistName ? ` to Dr. ${dentistName}` : ''}.\n\nClinical context:\n${clinicalNote}\n\nFormat as a professional referral letter from a denturist to a dentist.` 
         }
       ],
-      max_completion_tokens: 8192,
+      max_tokens: 4096,
     });
 
     return response.choices[0]?.message?.content || "";
   } catch (error: any) {
     console.error("Error generating referral letter:", error);
+    
+    // Provide specific error messages based on error type
+    if (error.status === 401) {
+      throw new Error("OpenAI authentication failed. Please check your API key configuration.");
+    }
+    if (error.status === 429) {
+      throw new Error("Rate limit exceeded. Please wait a moment and try again.");
+    }
+    
     throw new Error(`Failed to generate referral letter: ${error.message}`);
   }
 }

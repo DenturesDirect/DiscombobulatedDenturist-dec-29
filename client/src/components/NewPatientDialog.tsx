@@ -242,7 +242,13 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
                   onComplete={(result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
                     if (result.successful && result.successful.length > 0) {
                       const uploadedFile = result.successful[0];
-                      const url = (uploadedFile.uploadURL as string).split('?')[0];
+                      const rawUrl = uploadedFile.uploadURL as string;
+                      // Convert GCS URL to our API endpoint
+                      const gcsUrl = new URL(rawUrl);
+                      const pathParts = gcsUrl.pathname.split('/');
+                      const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
+                      const objectId = uploadsIndex >= 0 ? pathParts.slice(uploadsIndex).join('/') : pathParts.slice(-2).join('/');
+                      const url = `/api/objects/${objectId}`;
                       setPhotoUrl(url);
                       toast({
                         title: "Photo Ready",

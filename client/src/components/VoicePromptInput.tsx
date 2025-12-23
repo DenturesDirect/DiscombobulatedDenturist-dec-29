@@ -1,11 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, Send, Loader2 } from "lucide-react";
+import { Mic, MicOff, Send, Loader2, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Label } from "@/components/ui/label";
 
 interface VoicePromptInputProps {
-  onSubmit?: (text: string) => void;
+  onSubmit?: (text: string, noteDate: Date) => void;
   disabled?: boolean;
   placeholder?: string;
 }
@@ -15,6 +19,8 @@ export default function VoicePromptInput({ onSubmit, disabled, placeholder = "Sp
   const [interimText, setInterimText] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
+  const [noteDate, setNoteDate] = useState<Date>(new Date());
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const recognitionRef = useRef<any>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
@@ -105,9 +111,10 @@ export default function VoicePromptInput({ onSubmit, disabled, placeholder = "Sp
 
   const handleSubmit = () => {
     if (text.trim() && onSubmit) {
-      onSubmit(text.trim());
+      onSubmit(text.trim(), noteDate);
       setText("");
       setInterimText("");
+      setNoteDate(new Date()); // Reset to today after submission
     }
   };
 
@@ -158,6 +165,40 @@ export default function VoicePromptInput({ onSubmit, disabled, placeholder = "Sp
           <span>Recording - Click the red mic button again to stop</span>
         </div>
       )}
+
+      <div className="flex items-center gap-3 py-2">
+        <Label className="text-sm text-muted-foreground whitespace-nowrap">Note Date:</Label>
+        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 font-normal"
+              disabled={disabled}
+              data-testid="button-select-date"
+            >
+              <Calendar className="w-4 h-4" />
+              {format(noteDate, 'MMM d, yyyy')}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <CalendarComponent
+              mode="single"
+              selected={noteDate}
+              onSelect={(date) => {
+                if (date) {
+                  setNoteDate(date);
+                  setIsCalendarOpen(false);
+                }
+              }}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+        <span className="text-xs text-muted-foreground">
+          (Change to backdate entries for old records)
+        </span>
+      </div>
 
       <div className="flex gap-2">
         <Button

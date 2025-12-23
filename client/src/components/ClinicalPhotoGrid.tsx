@@ -17,6 +17,33 @@ interface ClinicalPhotoGridProps {
   onDelete?: (id: string) => void;
 }
 
+// Convert GCS URLs to our API endpoint for authenticated access
+function normalizePhotoUrl(url: string): string {
+  // Already an API URL
+  if (url.startsWith('/api/objects/')) {
+    return url;
+  }
+  
+  // Convert GCS URL to API endpoint
+  if (url.startsWith('https://storage.googleapis.com/')) {
+    try {
+      const gcsUrl = new URL(url);
+      const pathParts = gcsUrl.pathname.split('/');
+      const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
+      if (uploadsIndex >= 0) {
+        const objectId = pathParts.slice(uploadsIndex).join('/');
+        return `/api/objects/${objectId}`;
+      }
+      // Fallback: use last two path segments
+      return `/api/objects/${pathParts.slice(-2).join('/')}`;
+    } catch {
+      return url;
+    }
+  }
+  
+  return url;
+}
+
 export default function ClinicalPhotoGrid({ photos, onDelete }: ClinicalPhotoGridProps) {
   const [selectedPhoto, setSelectedPhoto] = useState<ClinicalPhoto | null>(null);
 
@@ -40,7 +67,7 @@ export default function ClinicalPhotoGrid({ photos, onDelete }: ClinicalPhotoGri
             data-testid={`card-photo-${photo.id}`}
           >
             <img 
-              src={photo.url} 
+              src={normalizePhotoUrl(photo.url)} 
               alt={photo.description || 'Clinical photo'} 
               className="w-full h-full object-cover"
             />
@@ -84,7 +111,7 @@ export default function ClinicalPhotoGrid({ photos, onDelete }: ClinicalPhotoGri
           {selectedPhoto && (
             <div className="space-y-4">
               <img 
-                src={selectedPhoto.url} 
+                src={normalizePhotoUrl(selectedPhoto.url)} 
                 alt={selectedPhoto.description || 'Clinical photo'} 
                 className="w-full rounded-lg"
               />

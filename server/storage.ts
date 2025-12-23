@@ -194,6 +194,7 @@ export class MemStorage implements IStorage {
       patientId: insertNote.patientId,
       appointmentId: insertNote.appointmentId ?? null,
       content: insertNote.content,
+      noteDate: insertNote.noteDate ?? null,
       createdBy: insertNote.createdBy,
       createdAt: new Date()
     };

@@ -96,6 +96,7 @@ export const clinicalNotes = pgTable("clinical_notes", {
   patientId: varchar("patient_id").notNull().references(() => patients.id),
   appointmentId: varchar("appointment_id").references(() => appointments.id),
   content: text("content").notNull(),
+  noteDate: timestamp("note_date"),
   createdBy: text("created_by").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -103,6 +104,12 @@ export const clinicalNotes = pgTable("clinical_notes", {
 export const insertClinicalNoteSchema = createInsertSchema(clinicalNotes).omit({
   id: true,
   createdAt: true,
+}).extend({
+  noteDate: z.union([z.date(), z.string()]).transform((val) => {
+    if (val instanceof Date) return val;
+    if (typeof val === 'string' && val.trim().length > 0) return new Date(val);
+    return new Date();
+  }).optional(),
 });
 
 export type InsertClinicalNote = z.infer<typeof insertClinicalNoteSchema>;
