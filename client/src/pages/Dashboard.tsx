@@ -179,7 +179,12 @@ export default function Dashboard() {
       await queryClient.invalidateQueries({ queryKey: ['/api/tasks', { patientId }] });
       await queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
       
+      // Clear all review state so next note starts fresh
       setIsReviewingNote(false);
+      setGeneratedDocument("");
+      setCurrentClinicalNote("");
+      setFollowUpPrompt("");
+      setPendingNoteDate(new Date()); // Reset to today for next note
       
       toast({
         title: "Clinical Note Saved",
@@ -655,17 +660,32 @@ export default function Dashboard() {
                       </Card>
                     )}
                   </div>
-                ) : clinicalNotes.length === 0 && !generatedDocument ? (
+                ) : clinicalNotes.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                     <FileText className="w-12 h-12 mb-4 opacity-50" />
                     <p>No clinical notes yet.</p>
                     <p className="text-sm">Use the Clinical tab on the left to add notes.</p>
                   </div>
                 ) : (
-                  <DocumentPreview 
-                    content={clinicalNotes.map(note => note.content).join('\n\n---\n\n')}
-                    onRewrite={(text) => console.log('Rewrite:', text)}
-                  />
+                  <div className="space-y-4">
+                    {clinicalNotes.map((note) => (
+                      <Card key={note.id} className="p-4" data-testid={`card-clinical-note-${note.id}`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="secondary" className="text-xs">
+                            <FileText className="w-3 h-3 mr-1" />
+                            Clinical Note
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {note.noteDate 
+                              ? new Date(note.noteDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                              : new Date(note.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                            } by {note.createdBy}
+                          </span>
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                      </Card>
+                    ))}
+                  </div>
                 )}
               </TabsContent>
 
