@@ -1,9 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { processClinicalNote, generateReferralLetter } from "./openai";
+import { processClinicalNote, generateReferralLetter } from "./vertex-ai";
 import { storage } from "./storage";
 import { insertPatientSchema, insertLabNoteSchema, insertAdminNoteSchema, insertLabPrescriptionSchema } from "@shared/schema";
 import { setupLocalAuth, isAuthenticated, seedStaffAccounts } from "./localAuth";
+import { seedTestData } from "./test-data";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { sendCustomNotification, sendAppointmentReminder } from "./gmail";
 
@@ -369,18 +370,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create lab note
   app.post("/api/lab-notes", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertLabNoteSchema.parse(req.body);
+      console.log("Lab note request body:", JSON.stringify(req.body, null, 2));
+      
+      if (!req.body.patientId) {
+        return res.status(400).json({ error: "Patient ID is required" });
+      }
+      if (!req.body.content || req.body.content.trim() === "") {
+        return res.status(400).json({ error: "Lab note content cannot be empty" });
+      }
+      
+      const dataToValidate = {
+        patientId: String(req.body.patientId).trim(),
+        content: String(req.body.content).trim()
+      };
+      
+      console.log("Data to validate:", dataToValidate);
+      
+      const validatedData = insertLabNoteSchema.parse(dataToValidate);
       const user = req.user as any;
       const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
       
-      const note = await storage.createLabNote({
+      console.log("Validated data:", validatedData);
+      console.log("Created by:", userName);
+      
+      // Create the note with createdBy included
+      const noteData = {
         patientId: validatedData.patientId,
         content: validatedData.content,
         createdBy: userName
-      });
+      };
+      
+      console.log("Note data to insert:", noteData);
+      
+      const note = await storage.createLabNote(noteData as any);
+      
+      console.log("Lab note created successfully:", note.id);
       res.json(note);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      console.error("Error creating lab note:", error);
+      console.error("Error details:", JSON.stringify(error, null, 2));
+      
+      if (error.errors && Array.isArray(error.errors)) {
+        const errorMessages = error.errors.map((e: any) => {
+          return `${e.path.join('.')}: ${e.message}`;
+        }).join(", ");
+        return res.status(400).json({ error: `Validation error: ${errorMessages}` });
+      }
+      
+      if (error.message) {
+        return res.status(400).json({ error: error.message });
+      }
+      
+      res.status(400).json({ error: "Failed to create lab note. Please check the server logs." });
     }
   });
 
@@ -398,7 +439,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create admin note
   app.post("/api/admin-notes", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertAdminNoteSchema.parse(req.body);
+      if (!req.body.patientId) {
+        return res.status(400).json({ error: "Patient ID is required" });
+      }
+      if (!req.body.content || req.body.content.trim() === "") {
+        return res.status(400).json({ error: "Admin note content cannot be empty" });
+      }
+      
+      const validatedData = insertAdminNoteSchema.parse({
+        patientId: String(req.body.patientId).trim(),
+        content: String(req.body.content).trim()
+      });
       const user = req.user as any;
       const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
       
@@ -406,10 +457,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         patientId: validatedData.patientId,
         content: validatedData.content,
         createdBy: userName
-      });
+      } as any);
       res.json(note);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      console.error("Error creating admin note:", error);
+      if (error.errors && Array.isArray(error.errors)) {
+        const errorMessages = error.errors.map((e: any) => {
+          return `${e.path.join('.')}: ${e.message}`;
+        }).join(", ");
+        return res.status(400).json({ error: `Validation error: ${errorMessages}` });
+      }
+      res.status(400).json({ error: error.message || "Failed to create admin note" });
     }
   });
 
@@ -438,7 +496,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create lab prescription
   app.post("/api/lab-prescriptions", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertLabPrescriptionSchema.parse(req.body);
+      // Validate required fields before schema validation
+      if (!req.body.patientId) {
+        return res.status(400).json({ error: "Patient ID is required" });
+      }
+      if (!req.body.labName || req.body.labName.trim() === "") {
+        return res.status(400).json({ error: "Lab name is required" });
+      }
+      if (!req.body.caseType || req.body.caseType.trim() === "") {
+        return res.status(400).json({ error: "Case type is required" });
+      }
+      if (!req.body.arch || req.body.arch.trim() === "") {
+        return res.status(400).json({ error: "Arch (upper/lower/both) is required" });
+      }
+      if (!req.body.fabricationStage || req.body.fabricationStage.trim() === "") {
+        return res.status(400).json({ error: "Fabrication stage is required" });
+      }
+      
+      const validatedData = insertLabPrescriptionSchema.parse({
+        ...req.body,
+        labName: req.body.labName.trim(),
+        caseType: req.body.caseType.trim(),
+        arch: req.body.arch.trim(),
+        fabricationStage: req.body.fabricationStage.trim(),
+        status: req.body.status || "draft"
+      });
       const user = req.user as any;
       const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
       
@@ -455,12 +537,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         biteNotes: validatedData.biteNotes,
         shippingInstructions: validatedData.shippingInstructions,
         specialNotes: validatedData.specialNotes,
-        status: validatedData.status,
+        status: validatedData.status || "draft",
         createdBy: userName
       });
       res.json(prescription);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      console.error("Error creating lab prescription:", error);
+      if (error.errors) {
+        return res.status(400).json({ error: `Validation error: ${error.errors.map((e: any) => e.message).join(", ")}` });
+      }
+      res.status(400).json({ error: error.message || "Failed to create lab prescription" });
     }
   });
 
@@ -477,6 +563,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const prescription = await storage.updateLabPrescription(req.params.id, updates);
       if (!prescription) return res.status(404).json({ error: "Prescription not found" });
       res.json(prescription);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Test data seeding endpoint (for development/testing)
+  app.post("/api/test-data/seed", isAuthenticated, async (req, res) => {
+    try {
+      await seedTestData();
+      res.json({ success: true, message: "Test data seeded successfully" });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

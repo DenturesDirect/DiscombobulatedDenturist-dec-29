@@ -165,6 +165,8 @@ export const labNotes = pgTable("lab_notes", {
 export const insertLabNoteSchema = createInsertSchema(labNotes).omit({
   id: true,
   createdAt: true,
+}).extend({
+  createdBy: z.string().optional(), // Optional in request, added server-side if missing
 });
 
 export type InsertLabNote = z.infer<typeof insertLabNoteSchema>;
@@ -182,6 +184,8 @@ export const adminNotes = pgTable("admin_notes", {
 export const insertAdminNoteSchema = createInsertSchema(adminNotes).omit({
   id: true,
   createdAt: true,
+}).extend({
+  createdBy: z.string().optional(), // Optional in request, added server-side if missing
 });
 
 export type InsertAdminNote = z.infer<typeof insertAdminNoteSchema>;

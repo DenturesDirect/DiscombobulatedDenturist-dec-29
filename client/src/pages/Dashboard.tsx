@@ -17,7 +17,8 @@ import TreatmentMilestoneTimeline from "@/components/TreatmentMilestoneTimeline"
 import { Checkbox } from "@/components/ui/checkbox";
 import ClinicalPhotoGrid from "@/components/ClinicalPhotoGrid";
 import ShadeReminderModal from "@/components/ShadeReminderModal";
-import { FileText, Camera, Clock, Loader2, Mail, MailX, FlaskConical, ClipboardList, Pill, Save, X, Edit3 } from "lucide-react";
+import TaskForm from "@/components/TaskForm";
+import { FileText, Camera, Clock, Loader2, Mail, MailX, FlaskConical, ClipboardList, Pill, Save, X, Edit3, CheckSquare } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -76,7 +77,7 @@ export default function Dashboard() {
     enabled: !!patientId
   });
 
-  const [activeInputTab, setActiveInputTab] = useState<'clinical' | 'lab' | 'admin' | 'prescription'>('clinical');
+  const [activeInputTab, setActiveInputTab] = useState<'clinical' | 'lab' | 'admin' | 'prescription' | 'task'>('clinical');
 
   const handleThemeToggle = () => {
     setIsDark(!isDark);
@@ -251,11 +252,29 @@ export default function Dashboard() {
   };
 
   const handleLabNoteSubmit = async (content: string) => {
+    if (!patientId) {
+      toast({
+        title: "Error",
+        description: "No patient selected. Please select a patient first.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!content || content.trim() === "") {
+      toast({
+        title: "Error",
+        description: "Lab note cannot be empty.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setIsProcessing(true);
     try {
       await apiRequest('POST', '/api/lab-notes', {
         patientId,
-        content
+        content: content.trim()
       });
       
       await queryClient.invalidateQueries({ queryKey: ['/api/lab-notes', patientId] });
@@ -265,6 +284,7 @@ export default function Dashboard() {
         description: "The lab note has been saved to the patient's record."
       });
     } catch (error: any) {
+      console.error("Lab note error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to save lab note",
@@ -318,6 +338,43 @@ export default function Dashboard() {
       toast({
         title: "Error",
         description: error.message || "Failed to create prescription",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleTaskSubmit = async (taskData: {
+    title: string;
+    description?: string;
+    assignee: string;
+    priority: "high" | "normal" | "low";
+    dueDate?: Date;
+  }) => {
+    setIsProcessing(true);
+    try {
+      await apiRequest('POST', '/api/tasks', {
+        patientId,
+        title: taskData.title,
+        description: taskData.description,
+        assignee: taskData.assignee,
+        priority: taskData.priority,
+        dueDate: taskData.dueDate,
+        status: "pending"
+      });
+      
+      await queryClient.invalidateQueries({ queryKey: ['/api/tasks', { patientId }] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
+      
+      toast({
+        title: "Task Created",
+        description: `Task assigned to ${taskData.assignee}`
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create task",
         variant: "destructive"
       });
     } finally {
@@ -422,7 +479,7 @@ export default function Dashboard() {
                 </div>
                 
                 <Tabs value={activeInputTab} onValueChange={(v) => setActiveInputTab(v as any)} className="w-full">
-                  <TabsList className="grid grid-cols-4 w-full mb-4">
+                  <TabsList className="grid grid-cols-5 w-full mb-4">
                     <TabsTrigger value="clinical" className="text-xs gap-1" data-testid="tab-input-clinical">
                       <FileText className="w-3 h-3" />
                       Clinical
@@ -438,6 +495,10 @@ export default function Dashboard() {
                     <TabsTrigger value="prescription" className="text-xs gap-1" data-testid="tab-input-prescription">
                       <Pill className="w-3 h-3" />
                       Lab Rx
+                    </TabsTrigger>
+                    <TabsTrigger value="task" className="text-xs gap-1" data-testid="tab-input-task">
+                      <CheckSquare className="w-3 h-3" />
+                      Task
                     </TabsTrigger>
                   </TabsList>
 
@@ -500,6 +561,14 @@ export default function Dashboard() {
                     <LabPrescriptionForm
                       patientName={patient.name}
                       onSubmit={handleLabPrescriptionSubmit}
+                      disabled={isProcessing}
+                    />
+                  </TabsContent>
+                  <TabsContent value="task" className="mt-0">
+                    <TaskForm
+                      patientId={patientId}
+                      patientName={patient.name}
+                      onSubmit={handleTaskSubmit}
                       disabled={isProcessing}
                     />
                   </TabsContent>
@@ -581,6 +650,10 @@ export default function Dashboard() {
                 <TabsTrigger value="prescriptions" className="gap-1 text-xs" data-testid="tab-prescriptions">
                   <Pill className="w-3 h-3" />
                   Lab Rx
+                </TabsTrigger>
+                <TabsTrigger value="tasks" className="gap-1 text-xs" data-testid="tab-tasks">
+                  <CheckSquare className="w-3 h-3" />
+                  Tasks
                 </TabsTrigger>
                 <TabsTrigger value="photos" className="gap-1 text-xs" data-testid="tab-photos">
                   <Camera className="w-3 h-3" />

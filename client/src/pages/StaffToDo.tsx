@@ -4,8 +4,9 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { CheckCircle2, Clock, Loader2, User } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, User, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { Checkbox } from "@/components/ui/checkbox";
 import TopNav from "@/components/TopNav";
@@ -20,8 +21,11 @@ export default function StaffToDo() {
   const [isDark, setIsDark] = useState(false);
   const { user } = useAuth();
 
-  const { data: tasks = [], isLoading } = useQuery<Task[]>({
-    queryKey: ['/api/tasks']
+  const { data: tasks = [], isLoading, refetch } = useQuery<Task[]>({
+    queryKey: ['/api/tasks'],
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 30000, // Consider data stale after 30 seconds
   });
 
   const { data: patients = [] } = useQuery<Patient[]>({
@@ -78,9 +82,10 @@ export default function StaffToDo() {
     return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
   });
 
+  // Filter tasks by selected staff member (case-insensitive matching)
   const filteredTasks = selectedStaff === 'All' 
     ? sortedTasks 
-    : sortedTasks.filter(t => t.assignee === selectedStaff);
+    : sortedTasks.filter(t => t.assignee?.toLowerCase() === selectedStaff.toLowerCase());
 
   const toggleTask = (id: string, currentStatus: string) => {
     const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
@@ -118,7 +123,19 @@ export default function StaffToDo() {
       />
       
       <div className="p-6 border-b">
-        <h1 className="text-3xl font-semibold mb-4">Staff To-Do List</h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-3xl font-semibold">Staff To-Do List</h1>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isLoading}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
         
         <div className="flex gap-2 flex-wrap">
           {staffMembers.map(staff => {
