@@ -274,7 +274,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Object storage upload URL generation
-  const objectStorageService = new ObjectStorageService();
+  // Use Supabase Storage if configured, otherwise fall back to Replit storage
+  let objectStorageService: any;
+  try {
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const { SupabaseStorageService } = await import("./supabaseStorage");
+      objectStorageService = new SupabaseStorageService();
+      console.log("💾 Using Supabase Storage for file uploads");
+    } else {
+      objectStorageService = new ObjectStorageService();
+      console.log("💾 Using Replit Object Storage (fallback)");
+    }
+  } catch (error) {
+    objectStorageService = new ObjectStorageService();
+    console.log("💾 Using Replit Object Storage (fallback)");
+  }
   
   app.post("/api/objects/upload", isAuthenticated, async (req, res) => {
     try {
