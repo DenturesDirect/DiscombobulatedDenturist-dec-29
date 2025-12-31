@@ -5,6 +5,7 @@ import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import MemoryStore from "memorystore";
+import { randomUUID } from "crypto";
 import { storage } from "./storage";
 import { USE_MEM_STORAGE } from "./config";
 
@@ -265,7 +266,7 @@ export async function seedStaffAccounts() {
       const tempPassword = await hashPassword('TempPassword123!');
       
       await storage.upsertUser({
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         email: staff.email,
         password: tempPassword,
         firstName: staff.firstName,
