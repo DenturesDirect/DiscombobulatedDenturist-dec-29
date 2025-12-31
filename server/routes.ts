@@ -283,9 +283,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("💾 Using Supabase Storage for file uploads");
     } else {
       objectStorageService = new ObjectStorageService();
-      console.log("💾 Using Replit Object Storage (fallback)");
+      console.log("💾 Using Replit Object Storage (fallback - Supabase not configured)");
     }
-  } catch (error) {
+  } catch (error: any) {
+    console.warn("⚠️  Failed to initialize Supabase Storage, using fallback:", error.message);
     objectStorageService = new ObjectStorageService();
     console.log("💾 Using Replit Object Storage (fallback)");
   }

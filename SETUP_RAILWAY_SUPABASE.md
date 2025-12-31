@@ -172,3 +172,5 @@ Your setup:
 - Make sure PostgreSQL is connected in Railway
 - Verify `DATABASE_URL` is set automatically
 
+
+
