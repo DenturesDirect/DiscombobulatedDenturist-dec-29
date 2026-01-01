@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { processClinicalNote, generateReferralLetter } from "./openai";
+// Force redeploy to pick up Supabase bucket name
 import { storage } from "./storage";
 import { insertPatientSchema, insertLabNoteSchema, insertAdminNoteSchema, insertLabPrescriptionSchema } from "@shared/schema";
 import { setupLocalAuth, isAuthenticated, seedStaffAccounts } from "./localAuth";
