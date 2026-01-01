@@ -304,10 +304,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ uploadURL: signedUrl });
     } catch (error: any) {
       console.error("❌ Photo upload error:", error.message);
-      // Return a helpful error message instead of crashing
-      res.status(500).json({ 
-        error: "Photo upload is not configured. Please set up Supabase Storage or configure file storage. Photos are optional - you can continue without uploading photos."
-      });
+      
+      // Check if Supabase is configured
+      const hasSupabase = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY;
+      
+      if (!hasSupabase) {
+        res.status(500).json({ 
+          error: "Photo upload is not configured. Please add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to Railway Variables. Photos are optional - you can continue without uploading photos."
+        });
+      } else {
+        res.status(500).json({ 
+          error: `Photo upload error: ${error.message}. Please check that the Supabase Storage bucket 'patient-files' exists and your service_role key has the correct permissions.`
+        });
+      }
     }
   });
 
