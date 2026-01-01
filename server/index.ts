@@ -50,7 +50,7 @@ app.use((req, res, next) => {
 // Log all environment variables on startup (for debugging Railway variable issues)
 console.log("🔍 Environment Variables Check:");
 console.log("  SUPABASE_URL:", process.env.SUPABASE_URL ? `✅ Set (${process.env.SUPABASE_URL.substring(0, 30)}...)` : "❌ Missing");
-console.log("  SUPABASE_SERVICE_ROLE_KEY:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "✅ Set" : "❌ Missing");
+console.log("  SUPABASE_SERVICE_ROLE:", (process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY) ? "✅ Set" : "❌ Missing");
 console.log("  SUPABASE_STORAGE_BUCKET:", process.env.SUPABASE_STORAGE_BUCKET || "patient-files (default)");
 console.log("  All SUPABASE_* vars:", Object.keys(process.env).filter(k => k.toUpperCase().startsWith('SUPABASE')).join(', ') || 'None');
 

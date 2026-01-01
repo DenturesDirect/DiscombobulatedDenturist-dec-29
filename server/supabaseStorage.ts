@@ -18,11 +18,11 @@ function getSupabaseClient(): SupabaseClient {
   }
 
   const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY; // Support both names
 
   if (!supabaseUrl || !supabaseKey) {
     throw new Error(
-      "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set. " +
+      "SUPABASE_URL and SUPABASE_SERVICE_ROLE (or SUPABASE_SERVICE_ROLE_KEY) must be set. " +
       "Configure Supabase Storage in your environment variables."
     );
   }
@@ -45,10 +45,10 @@ export class SupabaseStorageService {
     
     // Don't throw error here - let it fail gracefully when methods are called
     // The routes.ts will catch and use fallback
-    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    if (!process.env.SUPABASE_URL || (!process.env.SUPABASE_SERVICE_ROLE && !process.env.SUPABASE_SERVICE_ROLE_KEY)) {
       console.warn(
         "⚠️  Supabase Storage not fully configured. " +
-        "File uploads will use fallback storage until SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set."
+        "File uploads will use fallback storage until SUPABASE_URL and SUPABASE_SERVICE_ROLE are set."
       );
     }
   }
