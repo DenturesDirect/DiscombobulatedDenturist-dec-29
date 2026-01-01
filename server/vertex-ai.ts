@@ -238,7 +238,10 @@ export async function generateReferralLetter(
     const result = await model.generateContent(prompt);
 
     const response = result.response;
-    const content = response.text();
+    // Use getText() instead of text() if available, fallback to text()
+    const content = typeof response.getText === 'function' 
+      ? response.getText() 
+      : response.text();
     
     return content || "";
   } catch (error: any) {
