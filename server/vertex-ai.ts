@@ -21,8 +21,8 @@ function getGeminiConfig() {
 }
 
 const getModel = () => {
-  // Try gemini-1.5-flash first (most available), fall back to gemini-pro
-  const modelName = "gemini-1.5-flash";
+  // Use gemini-pro - the stable, widely available model
+  const modelName = "gemini-pro";
   return getGeminiConfig().getGenerativeModel({ 
     model: modelName,
     generationConfig: {
