@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS patients (
   last_step_completed TEXT,
   last_step_date TIMESTAMP,
   email_notifications BOOLEAN DEFAULT false NOT NULL,
+  text_notifications BOOLEAN DEFAULT false NOT NULL,
   created_at TIMESTAMP DEFAULT NOW() NOT NULL
 );
 

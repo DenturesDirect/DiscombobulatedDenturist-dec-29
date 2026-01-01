@@ -464,6 +464,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Toggle text notifications for a patient
+  app.patch("/api/patients/:id/text-notifications", isAuthenticated, async (req, res) => {
+    try {
+      const { enabled } = req.body;
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: "enabled must be a boolean" });
+      }
+      
+      const patient = await storage.getPatient(req.params.id);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+      
+      if (!patient.phone) {
+        return res.status(400).json({ error: "Patient has no phone number. Please add a phone number before enabling text notifications." });
+      }
+      
+      const updated = await storage.updatePatient(req.params.id, { textNotifications: enabled });
+      if (!updated) return res.status(404).json({ error: "Patient not found" });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Toggle email notifications for a patient
   app.patch("/api/patients/:id/email-notifications", isAuthenticated, async (req, res) => {
     try {
