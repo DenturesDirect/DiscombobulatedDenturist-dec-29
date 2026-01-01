@@ -296,7 +296,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const signedUrl = await objectStorageService.getObjectEntityUploadURL();
       res.json({ uploadURL: signedUrl });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error("❌ Photo upload error:", error.message);
+      // Return a helpful error message instead of crashing
+      res.status(500).json({ 
+        error: "Photo upload is not configured. Please set up Supabase Storage or configure file storage. Photos are optional - you can continue without uploading photos." 
+      });
     }
   });
 
