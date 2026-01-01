@@ -161,13 +161,15 @@ export async function processClinicalNote(plainTextNote: string, patientContext:
       contextString += `Lower Denture: ${patientContext.lowerDentureType}\n`;
     }
 
-    console.log("🧠 Sending clinical note to Google AI Studio (Gemini 1.5 Pro) for processing...");
+    console.log("🧠 Sending clinical note to Google AI Studio for processing...");
     console.log("📝 Patient:", patientContext.name);
     console.log("📋 Note length:", plainTextNote.length, "characters");
 
     const prompt = `${SYSTEM_PROMPT}\n\n${contextString}\nClinical Note: ${plainTextNote}\n\nPlease format this as a professional clinical note and suggest any follow-up actions or tasks. Return your response as JSON.`;
 
     const model = getModel();
+    console.log("🤖 Using model:", model.model || "gemini-1.5-flash");
+    
     const result = await model.generateContent(prompt);
 
     const response = result.response;
@@ -191,6 +193,10 @@ export async function processClinicalNote(plainTextNote: string, patientContext:
     return parsedResult;
   } catch (error: any) {
     console.error("❌ Error processing clinical note:", error);
+    console.error("❌ Error details:", JSON.stringify(error, null, 2));
+    console.error("❌ Error message:", error.message);
+    console.error("❌ Error status:", error.status);
+    console.error("❌ Error code:", error.code);
     
     // Provide specific error messages based on error type
     if (error.message?.includes("API_KEY") || error.message?.includes("authentication")) {
@@ -201,6 +207,9 @@ export async function processClinicalNote(plainTextNote: string, patientContext:
     }
     if (error.message?.includes("unavailable") || error.status === 503) {
       throw new Error("Google AI service is temporarily unavailable. Please try again in a few minutes.");
+    }
+    if (error.message?.includes("not found") || error.message?.includes("404")) {
+      throw new Error(`Model not found. Error: ${error.message}. Please check Railway logs for full error details.`);
     }
     
     throw new Error(error.message || "Failed to process clinical note. Please try again.");
