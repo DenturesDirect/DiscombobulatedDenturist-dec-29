@@ -73,12 +73,52 @@ const NOTIFICATION_MESSAGES: Record<NotificationEvent, NotificationMessage> = {
   }
 };
 
-// Send text notification (placeholder - needs SMS service integration)
+// Send text notification via Twilio
 async function sendTextNotification(phone: string, message: string): Promise<boolean> {
-  // TODO: Integrate with SMS service (Twilio, etc.)
-  // For now, log it
-  console.log(`📱 Text notification to ${phone}: ${message}`);
-  return true;
+  try {
+    const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
+    const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+    const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+
+    if (!twilioAccountSid || !twilioAuthToken || !twilioPhoneNumber) {
+      console.warn("⚠️  Twilio not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER");
+      return false;
+    }
+
+    // Format phone number (remove non-digits, ensure it starts with country code)
+    const cleanPhone = phone.replace(/\D/g, '');
+    const formattedPhone = cleanPhone.startsWith('1') ? `+${cleanPhone}` : `+1${cleanPhone}`;
+
+    // Use Twilio REST API directly (no SDK needed for simple SMS)
+    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
+    
+    const formData = new URLSearchParams();
+    formData.append('To', formattedPhone);
+    formData.append('From', twilioPhoneNumber);
+    formData.append('Body', message);
+
+    const response = await fetch(twilioUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString('base64')}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData.toString(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Twilio API error: ${response.status}`, errorText);
+      return false;
+    }
+
+    const result = await response.json();
+    console.log(`✅ Text sent via Twilio to ${formattedPhone}: ${result.sid}`);
+    return true;
+  } catch (error: any) {
+    console.error(`❌ Failed to send text notification:`, error);
+    return false;
+  }
 }
 
 // Main notification function
