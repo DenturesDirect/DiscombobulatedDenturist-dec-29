@@ -788,6 +788,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Debug endpoint for login issues
+  app.get("/api/debug/auth", async (req, res) => {
+    const checks: Record<string, any> = {
+      sessionSecret: !!process.env.SESSION_SECRET,
+      databaseUrl: !!process.env.DATABASE_URL,
+      useMemStorage: process.env.USE_MEM_STORAGE === "1",
+      nodeEnv: process.env.NODE_ENV,
+    };
+
+    // Try to check if users table exists and has data
+    try {
+      const testUser = await storage.getUserByEmail("damien@denturesdirect.ca");
+      checks.userExists = !!testUser;
+      checks.userHasPassword = !!testUser?.password;
+    } catch (error: any) {
+      checks.userCheckError = error.message;
+    }
+
+    // Check session
+    checks.isAuthenticated = req.isAuthenticated();
+    checks.hasUser = !!req.user;
+
+    res.json(checks);
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
