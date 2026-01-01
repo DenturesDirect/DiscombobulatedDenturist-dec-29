@@ -209,17 +209,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create task endpoint (for manual task creation by clinician)
   app.post("/api/tasks", isAuthenticated, async (req, res) => {
     try {
+      console.log("📝 Creating task with data:", {
+        title: req.body.title,
+        assignee: req.body.assignee,
+        priority: req.body.priority,
+        hasDueDate: !!req.body.dueDate,
+        dueDateType: typeof req.body.dueDate,
+        patientId: req.body.patientId
+      });
+      
       // Convert dueDate from ISO string to Date if provided
+      let dueDate: Date | null = null;
+      if (req.body.dueDate) {
+        try {
+          dueDate = new Date(req.body.dueDate);
+          if (isNaN(dueDate.getTime())) {
+            console.warn("⚠️  Invalid dueDate provided, setting to null");
+            dueDate = null;
+          }
+        } catch (e) {
+          console.warn("⚠️  Error parsing dueDate:", e);
+          dueDate = null;
+        }
+      }
+      
       const taskData = {
         ...req.body,
-        dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
+        dueDate,
         patientId: req.body.patientId || null,
       };
+      
       const task = await storage.createTask(taskData);
+      console.log("✅ Task created successfully:", task.id);
       res.json(task);
     } catch (error: any) {
       console.error("❌ Error creating task:", error);
-      res.status(400).json({ error: error.message });
+      console.error("❌ Error stack:", error.stack);
+      res.status(400).json({ error: error.message || "Failed to create task" });
     }
   });
 
