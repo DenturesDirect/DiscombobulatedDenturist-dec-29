@@ -30,7 +30,7 @@ export interface LabPrescriptionData {
 }
 
 const LABS = [
-  { value: "vivi_labs", label: "Vivi Labs (China)" },
+  { value: "vivi_labs", label: "Vivi Labs (Hong Kong)" },
   { value: "vital_lab", label: "Vital Lab (Ottawa)" },
   { value: "aesthetic_minds", label: "Aesthetic Minds (Mississauga)" }
 ];
@@ -58,9 +58,8 @@ const FABRICATION_STAGES = [
 ];
 
 const DIGITAL_FILE_OPTIONS = [
-  "STL",
-  "PLY",
-  "Bite Scan",
+  "Maxillary Scan",
+  "Mandibular Scan",
   "Vestibular Scan",
   "Intraoral Scan",
   "CBCT"
