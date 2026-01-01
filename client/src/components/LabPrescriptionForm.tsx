@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Send, FileText, AlertTriangle } from "lucide-react";
+import { Send, FileText, AlertTriangle, Mic, MicOff } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface LabPrescriptionFormProps {
   patientName: string;
@@ -87,10 +88,94 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
   const [deadline, setDeadline] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [designInstructions, setDesignInstructions] = useState("");
+  const [interimDesignText, setInterimDesignText] = useState("");
+  const [isListeningDesign, setIsListeningDesign] = useState(false);
+  const [isVoiceSupported, setIsVoiceSupported] = useState(false);
   const [existingDentureReference, setExistingDentureReference] = useState("");
   const [biteNotes, setBiteNotes] = useState("");
   const [shippingInstructions, setShippingInstructions] = useState("");
   const [specialNotes, setSpecialNotes] = useState("");
+  const recognitionRef = useRef<any>(null);
+  const designTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const { toast } = useToast();
+
+  // Voice input setup
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        setIsVoiceSupported(true);
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognition.onresult = (event: any) => {
+          let interimTranscript = '';
+          let finalTranscript = '';
+
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript + ' ';
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+
+          if (finalTranscript) {
+            setDesignInstructions(prev => prev + finalTranscript);
+            setInterimDesignText('');
+          }
+          if (interimTranscript) {
+            setInterimDesignText(interimTranscript);
+          }
+        };
+
+        recognition.onerror = (event: any) => {
+          console.error('Speech recognition error:', event.error);
+          setIsListeningDesign(false);
+          toast({
+            title: "Voice input error",
+            description: "Please check your microphone permissions and try again.",
+            variant: "destructive"
+          });
+        };
+
+        recognition.onend = () => {
+          setIsListeningDesign(false);
+        };
+
+        recognitionRef.current = recognition;
+      }
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [toast]);
+
+  const toggleVoiceInput = () => {
+    if (!recognitionRef.current) {
+      toast({
+        title: "Not supported",
+        description: "Voice input is not supported in your browser. Please use Chrome or Edge.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (isListeningDesign) {
+      recognitionRef.current.stop();
+      setIsListeningDesign(false);
+      setInterimDesignText('');
+    } else {
+      recognitionRef.current.start();
+      setIsListeningDesign(true);
+    }
+  };
 
   const toggleFile = (file: string) => {
     setSelectedFiles(prev => 
@@ -250,14 +335,42 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
 
         <div className="space-y-2">
           <Label htmlFor="design-instructions">Design Instructions</Label>
-          <Textarea
-            id="design-instructions"
-            placeholder="Specify major connector type, rests, clasps, finish lines, coverage, occlusal scheme, relief areas, etc. Labs will NOT assume any design elements not explicitly stated."
-            value={designInstructions}
-            onChange={(e) => setDesignInstructions(e.target.value)}
-            className="min-h-[100px]"
-            data-testid="input-design-instructions"
-          />
+          <div className="relative">
+            <Textarea
+              ref={designTextareaRef}
+              id="design-instructions"
+              placeholder="Specify major connector type, rests, clasps, finish lines, coverage, occlusal scheme, relief areas, etc. Labs will NOT assume any design elements not explicitly stated."
+              value={designInstructions + interimDesignText}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                if (newValue.length < designInstructions.length) {
+                  setDesignInstructions(newValue);
+                  setInterimDesignText("");
+                } else {
+                  setDesignInstructions(newValue);
+                }
+              }}
+              className="min-h-[100px] pr-14"
+              data-testid="input-design-instructions"
+            />
+            <Button
+              type="button"
+              size="icon"
+              variant={isListeningDesign ? "default" : "ghost"}
+              className={`absolute top-3 right-3 w-10 h-10 ${isListeningDesign ? 'animate-pulse bg-destructive hover:bg-destructive' : ''}`}
+              onClick={toggleVoiceInput}
+              disabled={disabled || !isVoiceSupported}
+              title={isListeningDesign ? "Stop recording" : "Start voice input"}
+            >
+              {isListeningDesign ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            </Button>
+          </div>
+          {isListeningDesign && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="w-2 h-2 bg-destructive rounded-full animate-pulse" />
+              <span>Recording - Click the red mic button again to stop</span>
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">
