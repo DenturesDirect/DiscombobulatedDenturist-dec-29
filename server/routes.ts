@@ -8,6 +8,7 @@ import { setupLocalAuth, isAuthenticated, seedStaffAccounts } from "./localAuth"
 import { seedTestData } from "./test-data";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { sendCustomNotification, sendAppointmentReminder } from "./gmail";
+import { sendPatientNotification } from "./notifications";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupLocalAuth(app);
@@ -81,6 +82,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           priority: "high",
           status: "pending"
         });
+        
+        // Send notification when CDCP estimate is set
+        if (patient.isCDCP) {
+          await sendPatientNotification(patient.id, "cdcp_estimate_set");
+        }
+      }
+      
+      // Check for bite blocks complete
+      const lastStepLower = patient.lastStepCompleted?.toLowerCase() || "";
+      const nextStepLower = patient.nextStep?.toLowerCase() || "";
+      const wasBiteBlocks = (currentPatient.lastStepCompleted?.toLowerCase() || "").includes("bite block");
+      const isBiteBlocks = lastStepLower.includes("bite block") || nextStepLower.includes("bite block");
+      
+      if (!wasBiteBlocks && isBiteBlocks && (lastStepLower.includes("complete") || lastStepLower.includes("done") || lastStepLower.includes("finished"))) {
+        await sendPatientNotification(patient.id, "bite_blocks_complete");
       }
       
       res.json(patient);
@@ -615,6 +631,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         content: validatedData.content,
         createdBy: userName
       } as any);
+      
+      // Check for insurance-related notifications in admin notes
+      const contentLower = validatedData.content.toLowerCase();
+      
+      if (contentLower.includes("insurance approval") || contentLower.includes("approved by insurance") || contentLower.includes("claim approved")) {
+        await sendPatientNotification(validatedData.patientId, "insurance_approval_received");
+      } else if (contentLower.includes("insurance denial") || contentLower.includes("denied by insurance") || contentLower.includes("claim denied")) {
+        await sendPatientNotification(validatedData.patientId, "insurance_denial_received");
+      } else if (contentLower.includes("insurance") && (contentLower.includes("request") || contentLower.includes("need") || contentLower.includes("require"))) {
+        await sendPatientNotification(validatedData.patientId, "insurance_info_requested");
+      } else if (contentLower.includes("insurance") && (contentLower.includes("submitted") || contentLower.includes("sent") || contentLower.includes("provided"))) {
+        await sendPatientNotification(validatedData.patientId, "insurance_info_submitted");
+      }
+      
       res.json(note);
     } catch (error: any) {
       console.error("Error creating admin note:", error);
@@ -725,6 +755,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const updates = req.body;
       
+      // Get prescription before update to check if status is changing to "sent"
+      const currentPrescription = await storage.getLabPrescription(req.params.id);
+      const isBeingMarkedAsSent = updates.status === "sent" && currentPrescription?.status !== "sent";
+      
       // If marking as sent, set the sentAt timestamp
       if (updates.status === "sent" && !updates.sentAt) {
         updates.sentAt = new Date();
@@ -732,6 +766,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const prescription = await storage.updateLabPrescription(req.params.id, updates);
       if (!prescription) return res.status(404).json({ error: "Prescription not found" });
+      
+      // Send notification when casting is sent out
+      if (isBeingMarkedAsSent && prescription.fabricationStage === "framework_only") {
+        await sendPatientNotification(prescription.patientId, "casting_sent");
+      }
+      
       res.json(prescription);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
