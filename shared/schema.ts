@@ -217,6 +217,16 @@ export const insertLabPrescriptionSchema = createInsertSchema(labPrescriptions).
   id: true,
   createdAt: true,
   sentAt: true,
+}).extend({
+  deadline: z.union([z.date(), z.string()]).transform((val) => {
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    if (typeof val === 'string' && val.trim().length > 0) {
+      const date = new Date(val);
+      return isNaN(date.getTime()) ? null : date;
+    }
+    return null;
+  }).nullable().optional(),
 });
 
 export type InsertLabPrescription = z.infer<typeof insertLabPrescriptionSchema>;
