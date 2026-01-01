@@ -320,6 +320,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const hasSupabase = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
     const serviceType = objectStorageService?.constructor?.name || "Unknown";
     
+    // Get ALL environment variables that start with SUPABASE (for debugging)
+    const supabaseEnvVars: Record<string, string> = {};
+    Object.keys(process.env).forEach(key => {
+      if (key.toUpperCase().startsWith('SUPABASE')) {
+        const value = process.env[key];
+        if (value) {
+          // Show first 10 chars and last 4 chars for security
+          supabaseEnvVars[key] = value.length > 14 
+            ? `${value.substring(0, 10)}...${value.substring(value.length - 4)}`
+            : "***";
+        } else {
+          supabaseEnvVars[key] = "(empty)";
+        }
+      }
+    });
+    
+    // Also check for common typos
+    const commonTypos = [
+      'SUPABASEURL',
+      'SUPABASE_URL_',
+      'SUPABASE_SERVICE_KEY',
+      'SUPABASE_SERVICE_ROLE',
+      'SUPABASE_KEY',
+    ];
+    const foundTypos: Record<string, boolean> = {};
+    commonTypos.forEach(typo => {
+      foundTypos[typo] = !!process.env[typo];
+    });
+    
     res.json({
       hasSupabase,
       serviceType,
@@ -327,6 +356,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? "✅ Set" : "❌ Missing",
       bucket: process.env.SUPABASE_STORAGE_BUCKET || "patient-files (default)",
       urlPrefix: process.env.SUPABASE_URL?.substring(0, 20) || "N/A",
+      allSupabaseEnvVars: supabaseEnvVars,
+      possibleTypos: foundTypos,
+      rawUrlValue: process.env.SUPABASE_URL || null,
+      rawKeyExists: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     });
   });
   
