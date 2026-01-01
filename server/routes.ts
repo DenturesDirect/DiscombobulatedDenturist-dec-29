@@ -317,7 +317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Debug endpoint to check configuration
   app.get("/api/debug/storage", isAuthenticated, (req, res) => {
-    const hasSupabase = !!(process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY));
+    const hasSupabase = !!((process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL) && (process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY));
     const serviceType = objectStorageService?.constructor?.name || "Unknown";
     
     // Get ALL environment variables that start with SUPABASE (for debugging)
