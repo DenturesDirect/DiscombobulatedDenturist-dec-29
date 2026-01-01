@@ -20,13 +20,17 @@ function getGeminiConfig() {
   return genAI;
 }
 
-const getModel = () => getGeminiConfig().getGenerativeModel({ 
-  model: "gemini-pro", // Using stable gemini-pro model
-  generationConfig: {
-    maxOutputTokens: 4096,
-    temperature: 0.7,
-  }
-});
+const getModel = () => {
+  // Try gemini-1.5-flash first (most available), fall back to gemini-pro
+  const modelName = "gemini-1.5-flash";
+  return getGeminiConfig().getGenerativeModel({ 
+    model: modelName,
+    generationConfig: {
+      maxOutputTokens: 4096,
+      temperature: 0.7,
+    }
+  });
+};
 
 export interface ClinicalNoteResponse {
   formattedNote: string;
