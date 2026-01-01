@@ -39,6 +39,9 @@ Thumbs.db
 *.md
 !README.md
 
+# Replit config (might confuse Railway)
+.replit
+
 # Misc
 .cache/
 .temp/
