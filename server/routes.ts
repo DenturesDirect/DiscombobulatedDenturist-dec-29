@@ -284,27 +284,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Object storage upload URL generation
   // Use Supabase Storage if configured, otherwise fall back to Replit storage
   let objectStorageService: any;
-  try {
-    if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      const { SupabaseStorageService } = await import("./supabaseStorage");
-      objectStorageService = new SupabaseStorageService();
-      console.log("💾 Using Supabase Storage for file uploads");
-    } else {
+  
+  // Function to get or initialize storage service (checks at runtime, not just startup)
+  async function getStorageService() {
+    const hasSupabase = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (hasSupabase && (!objectStorageService || objectStorageService.constructor.name === "ObjectStorageService")) {
+      try {
+        const { SupabaseStorageService } = await import("./supabaseStorage");
+        objectStorageService = new SupabaseStorageService();
+        console.log("💾 Using Supabase Storage for file uploads");
+        console.log("🔍 SUPABASE_URL:", process.env.SUPABASE_URL ? "✅ Set" : "❌ Missing");
+        console.log("🔍 SUPABASE_SERVICE_ROLE_KEY:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "✅ Set" : "❌ Missing");
+        console.log("🔍 SUPABASE_STORAGE_BUCKET:", process.env.SUPABASE_STORAGE_BUCKET || "patient-files (default)");
+      } catch (error: any) {
+        console.warn("⚠️  Failed to initialize Supabase Storage:", error.message);
+        objectStorageService = new ObjectStorageService();
+        console.log("💾 Using Replit Object Storage (fallback)");
+      }
+    } else if (!objectStorageService) {
       objectStorageService = new ObjectStorageService();
       console.log("💾 Using Replit Object Storage (fallback - Supabase not configured)");
+      console.log("🔍 SUPABASE_URL:", process.env.SUPABASE_URL ? "✅ Set" : "❌ Missing");
+      console.log("🔍 SUPABASE_SERVICE_ROLE_KEY:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "✅ Set" : "❌ Missing");
     }
-  } catch (error: any) {
-    console.warn("⚠️  Failed to initialize Supabase Storage, using fallback:", error.message);
-    objectStorageService = new ObjectStorageService();
-    console.log("💾 Using Replit Object Storage (fallback)");
+    
+    return objectStorageService;
   }
+  
+  // Initialize on startup
+  getStorageService().catch(console.error);
+  
+  // Debug endpoint to check configuration
+  app.get("/api/debug/storage", isAuthenticated, (req, res) => {
+    const hasSupabase = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const serviceType = objectStorageService?.constructor?.name || "Unknown";
+    
+    res.json({
+      hasSupabase,
+      serviceType,
+      supabaseUrl: process.env.SUPABASE_URL ? "✅ Set" : "❌ Missing",
+      supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? "✅ Set" : "❌ Missing",
+      bucket: process.env.SUPABASE_STORAGE_BUCKET || "patient-files (default)",
+      urlPrefix: process.env.SUPABASE_URL?.substring(0, 20) || "N/A",
+    });
+  });
   
   app.post("/api/objects/upload", isAuthenticated, async (req, res) => {
     try {
-      const signedUrl = await objectStorageService.getObjectEntityUploadURL();
+      const service = await getStorageService(); // Check at runtime
+      const signedUrl = await service.getObjectEntityUploadURL();
       res.json({ uploadURL: signedUrl });
     } catch (error: any) {
       console.error("❌ Photo upload error:", error.message);
+      console.error("❌ Error stack:", error.stack);
       
       // Check if Supabase is configured
       const hasSupabase = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -315,7 +348,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         res.status(500).json({ 
-          error: `Photo upload error: ${error.message}. Please check that the Supabase Storage bucket 'patient-files' exists and your service_role key has the correct permissions.`
+          error: `Photo upload error: ${error.message}. Please check that the Supabase Storage bucket '${process.env.SUPABASE_STORAGE_BUCKET || "patient-files"}' exists and your service_role key has the correct permissions.`
         });
       }
     }
