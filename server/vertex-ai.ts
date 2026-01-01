@@ -21,8 +21,12 @@ function getGeminiConfig() {
 }
 
 const getModel = () => {
-  // Use gemini-pro - the stable, widely available model
-  const modelName = "gemini-pro";
+  // Try different model names - the error said to call ListModels
+  // For Google AI Studio (not Vertex AI), try these in order:
+  const modelName = process.env.GEMINI_MODEL || "models/gemini-pro";
+  
+  console.log(`🤖 Attempting to use model: ${modelName}`);
+  
   return getGeminiConfig().getGenerativeModel({ 
     model: modelName,
     generationConfig: {
