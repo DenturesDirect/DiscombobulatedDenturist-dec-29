@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 
 // Determine which API key to use: prioritize Replit AI Integrations, fall back to direct OpenAI key
+// Force Railway to rebuild and pick up OPENAI_API_KEY
 function getOpenAIConfig(): { apiKey: string; baseURL?: string } {
   // First try Replit AI Integrations
   if (process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
@@ -27,6 +28,9 @@ function getOpenAIConfig(): { apiKey: string; baseURL?: string } {
 }
 
 const config = getOpenAIConfig();
+// #region agent log
+fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'openai.ts:30',message:'OpenAI config initialized',data:{hasApiKey:!!config.apiKey,apiKeyLength:config.apiKey?.length||0,hasBaseURL:!!config.baseURL,baseURL:config.baseURL||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+// #endregion
 const openai = new OpenAI(config);
 
 export interface ClinicalNoteResponse {
@@ -134,8 +138,15 @@ interface PatientContext {
 }
 
 export async function processClinicalNote(plainTextNote: string, patientContext: PatientContext): Promise<ClinicalNoteResponse> {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'openai.ts:136',message:'processClinicalNote entry',data:{hasApiKey:!!config.apiKey,apiKeyLength:config.apiKey?.length||0,hasBaseURL:!!config.baseURL,baseURL:config.baseURL||null,patientName:patientContext.name,noteLength:plainTextNote.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  
   // Check for API key configuration first
   if (!config.apiKey) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'openai.ts:139',message:'API key missing',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     throw new Error("OpenAI API key not configured. Please add AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY to your secrets.");
   }
 
@@ -167,6 +178,10 @@ export async function processClinicalNote(plainTextNote: string, patientContext:
     console.log("📝 Patient:", patientContext.name);
     console.log("📋 Note length:", plainTextNote.length, "characters");
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'openai.ts:170',message:'Before API call',data:{model:'gpt-4o',contextStringLength:contextString.length,noteLength:plainTextNote.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
+
     const response = await openai.chat.completions.create({
       model: "gpt-4o", // Using gpt-4o for reliability
       messages: [
@@ -180,25 +195,48 @@ export async function processClinicalNote(plainTextNote: string, patientContext:
       max_tokens: 4096,
     });
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'openai.ts:183',message:'After API call',data:{hasResponse:!!response,hasChoices:!!response.choices,choicesLength:response.choices?.length||0,hasFirstChoice:!!response.choices?.[0],hasMessage:!!response.choices?.[0]?.message,hasContent:!!response.choices?.[0]?.message?.content,contentLength:response.choices?.[0]?.message?.content?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+
     const content = response.choices[0]?.message?.content;
     
     if (!content) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'openai.ts:186',message:'Empty content error',data:{responseStructure:JSON.stringify(response).substring(0,500)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       console.error("❌ OpenAI returned empty content");
       throw new Error("OpenAI returned an empty response. Please try again.");
     }
 
     console.log("✅ OpenAI response received:", content.length, "characters");
     
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'openai.ts:192',message:'Before JSON parse',data:{contentLength:content.length,contentPreview:content.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    
     const result = JSON.parse(content) as ClinicalNoteResponse;
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'openai.ts:195',message:'After JSON parse',data:{hasFormattedNote:!!result.formattedNote,formattedNoteLength:result.formattedNote?.length||0,hasFollowUpPrompt:!!result.followUpPrompt,resultKeys:Object.keys(result)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     
     if (!result.formattedNote) {
       console.error("❌ Parsed response missing formattedNote:", result);
       throw new Error("AI response was missing the formatted note. Please try again.");
     }
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'openai.ts:199',message:'Success exit',data:{formattedNoteLength:result.formattedNote.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+
     console.log("✅ Clinical note processed successfully");
     return result;
   } catch (error: any) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'openai.ts:201',message:'Error caught',data:{errorType:error?.constructor?.name,errorMessage:error?.message,errorStatus:error?.status,errorCode:error?.code,errorResponse:error?.response?.status,hasResponse:!!error?.response,errorKeys:Object.keys(error||{})},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
+    
     console.error("❌ Error processing clinical note:", error);
     
     // Provide specific error messages based on error type
