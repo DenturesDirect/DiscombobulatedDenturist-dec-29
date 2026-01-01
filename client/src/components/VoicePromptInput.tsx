@@ -19,8 +19,16 @@ export default function VoicePromptInput({ onSubmit, disabled, placeholder = "Sp
   const [interimText, setInterimText] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
+  // Always default to today's date
   const [noteDate, setNoteDate] = useState<Date>(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  
+  // Reset to today's date when component mounts or when text is cleared
+  useEffect(() => {
+    if (!text && !interimText) {
+      setNoteDate(new Date());
+    }
+  }, [text, interimText]);
   const recognitionRef = useRef<any>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
@@ -166,38 +174,42 @@ export default function VoicePromptInput({ onSubmit, disabled, placeholder = "Sp
         </div>
       )}
 
-      <div className="flex items-center gap-3 py-2">
-        <Label className="text-sm text-muted-foreground whitespace-nowrap">Note Date:</Label>
-        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 font-normal"
-              disabled={disabled}
-              data-testid="button-select-date"
-            >
-              <Calendar className="w-4 h-4" />
-              {format(noteDate, 'MMM d, yyyy')}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <CalendarComponent
-              mode="single"
-              selected={noteDate}
-              onSelect={(date) => {
-                if (date) {
-                  setNoteDate(date);
-                  setIsCalendarOpen(false);
-                }
-              }}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
-        <span className="text-xs text-muted-foreground">
-          (Change to backdate entries for old records)
-        </span>
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <Label className="text-sm text-muted-foreground whitespace-nowrap">Note Date:</Label>
+          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 font-normal"
+                disabled={disabled}
+                data-testid="button-select-date"
+              >
+                <Calendar className="w-4 h-4" />
+                {format(noteDate, 'MMM d, yyyy')}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarComponent
+                mode="single"
+                selected={noteDate}
+                onSelect={(date) => {
+                  if (date) {
+                    setNoteDate(date);
+                    setIsCalendarOpen(false);
+                  }
+                }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+        {noteDate.toDateString() !== new Date().toDateString() && (
+          <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-2 py-1 rounded">
+            ⚠️ Backdating is temporary - for catch-up only. New entries should use today's date.
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2">
