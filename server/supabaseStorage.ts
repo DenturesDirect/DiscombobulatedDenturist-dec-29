@@ -84,31 +84,48 @@ export class SupabaseStorageService {
 
     // Remove /objects/ prefix
     const filePath = objectPath.slice(9); // "/objects/".length = 9
+    console.log("🔍 Looking for file in Supabase:", filePath);
 
     const supabase = getSupabaseClient();
     
-    // Check if file exists by trying to get its metadata
-    const pathParts = filePath.split("/");
-    const fileName = pathParts.pop() || "";
-    const folderPath = pathParts.join("/");
-
-    const { data, error } = await supabase.storage
+    // For Supabase, the path should be exactly as stored (e.g., "uploads/uuid")
+    // Try to get the file directly first
+    const { data: fileData, error: fileError } = await supabase.storage
       .from(this.bucketName)
-      .list(folderPath || "", {
+      .list(filePath.split('/').slice(0, -1).join('/') || '', {
         limit: 1000,
+        search: filePath.split('/').pop() || '',
       });
 
-    if (error) {
-      throw new ObjectNotFoundError();
+    // If that doesn't work, try listing the folder
+    if (fileError || !fileData || fileData.length === 0) {
+      const pathParts = filePath.split("/");
+      const fileName = pathParts.pop() || "";
+      const folderPath = pathParts.join("/");
+
+      console.log("🔍 Trying folder listing:", folderPath, "filename:", fileName);
+
+      const { data, error } = await supabase.storage
+        .from(this.bucketName)
+        .list(folderPath || "", {
+          limit: 1000,
+        });
+
+      if (error) {
+        console.error("❌ Supabase list error:", error);
+        throw new ObjectNotFoundError();
+      }
+
+      // Check if file exists in the list
+      const fileExists = data?.some((item) => item.name === fileName && !item.id); // files don't have id, folders do
+
+      if (!fileExists) {
+        console.error("❌ File not found in list. Available files:", data?.map(f => f.name));
+        throw new ObjectNotFoundError();
+      }
     }
 
-    // Check if file exists in the list
-    const fileExists = data?.some((item) => item.name === fileName && !item.id); // files don't have id, folders do
-
-    if (!fileExists) {
-      throw new ObjectNotFoundError();
-    }
-
+    console.log("✅ File found, path:", filePath);
     return {
       path: filePath,
       bucket: this.bucketName,

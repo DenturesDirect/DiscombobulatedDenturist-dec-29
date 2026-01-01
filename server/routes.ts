@@ -392,13 +392,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/objects/*", isAuthenticated, async (req, res) => {
     try {
       const objectPath = `/objects/${req.params[0]}`;
-      const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
-      await objectStorageService.downloadObject(objectFile, res);
+      console.log("🔍 Attempting to retrieve file:", objectPath);
+      const service = await getStorageService();
+      const objectFile = await service.getObjectEntityFile(objectPath);
+      console.log("✅ File found:", objectFile);
+      await service.downloadObject(objectFile, res);
     } catch (error: any) {
+      console.error("❌ Error serving object:", error);
+      console.error("❌ Requested path:", `/objects/${req.params[0]}`);
       if (error.name === "ObjectNotFoundError") {
         return res.status(404).json({ error: "File not found" });
       }
-      console.error("Error serving object:", error);
       res.status(500).json({ error: error.message });
     }
   });
