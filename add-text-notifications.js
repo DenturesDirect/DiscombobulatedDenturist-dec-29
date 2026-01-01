@@ -8,7 +8,13 @@ const DATABASE_URL = process.env.DATABASE_URL;
 
 if (!DATABASE_URL) {
   console.error('❌ DATABASE_URL environment variable is required');
-  console.error('   Set it with: $env:DATABASE_URL="your-database-url"');
+  console.error('');
+  console.error('📋 How to get it:');
+  console.error('   1. Go to Railway → Postgres service → Variables tab');
+  console.error('   2. Copy DATABASE_PUBLIC_URL (or DATABASE_URL)');
+  console.error('   3. Run: $env:DATABASE_URL="paste-url-here"');
+  console.error('   4. Then run this script again: node add-text-notifications.js');
+  console.error('');
   process.exit(1);
 }
 
