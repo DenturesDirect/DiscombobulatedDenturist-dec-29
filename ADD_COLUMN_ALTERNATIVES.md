@@ -21,7 +21,9 @@ Since you can't find the SQL Editor, here are **3 ways** to add the column:
 
 1. **Get your DATABASE_URL from Railway:**
    - Go to **Postgres** service → **Variables** tab
-   - Copy the `DATABASE_URL` value (use the PUBLIC one, not internal)
+   - **For local scripts:** Use `DATABASE_PUBLIC_URL` (allows external connection)
+   - **For Railway services:** Use `DATABASE_URL` (private, no egress fees)
+   - **Note:** Railway warns about public URLs because they incur egress fees, but for a one-time script run, this is fine
 
 2. **Open PowerShell** on your computer:
    ```powershell

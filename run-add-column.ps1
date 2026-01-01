@@ -13,7 +13,8 @@ if (-not $env:DATABASE_URL) {
     Write-Host ""
     Write-Host "Get it from Railway:" -ForegroundColor Yellow
     Write-Host "  1. Go to Railway → Postgres service → Variables" -ForegroundColor White
-    Write-Host "  2. Copy the DATABASE_URL value" -ForegroundColor White
+    Write-Host "  2. Copy the DATABASE_PUBLIC_URL value (for local scripts)" -ForegroundColor White
+    Write-Host "     (Or DATABASE_URL if running from Railway Shell)" -ForegroundColor Gray
     Write-Host ""
     exit 1
 }
