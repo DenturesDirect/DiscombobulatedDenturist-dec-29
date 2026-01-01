@@ -37,6 +37,10 @@ export function getStaffInfo(email: string) {
 }
 
 export function getSession() {
+  if (!process.env.SESSION_SECRET) {
+    throw new Error('SESSION_SECRET environment variable is required. Add it to Railway Variables.');
+  }
+  
   const sessionTtl = 7 * 24 * 60 * 60 * 1000;
   
   let sessionStore;
@@ -47,17 +51,21 @@ export function getSession() {
     });
     console.log('🧠 Using in-memory session storage');
   } else {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL is required when not using in-memory storage. Add it to Railway Variables.');
+    }
     const pgStore = connectPg(session);
     sessionStore = new pgStore({
       conString: process.env.DATABASE_URL,
-      createTableIfMissing: false,
+      createTableIfMissing: true, // Changed to true to auto-create sessions table
       ttl: sessionTtl,
       tableName: "sessions",
     });
+    console.log('💾 Using PostgreSQL session storage');
   }
   
   return session({
-    secret: process.env.SESSION_SECRET!,
+    secret: process.env.SESSION_SECRET,
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
@@ -65,6 +73,7 @@ export function getSession() {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       maxAge: sessionTtl,
+      sameSite: 'lax', // Added for better compatibility
     },
   });
 }
@@ -259,28 +268,44 @@ export const isAdmin: RequestHandler = async (req, res, next) => {
 export async function seedStaffAccounts() {
   console.log('👥 Checking staff accounts...');
   
-  for (const staff of ALLOWED_STAFF) {
-    const existingUser = await storage.getUserByEmail(staff.email);
-    
-    if (!existingUser) {
-      const tempPassword = await hashPassword('TempPassword123!');
-      
-      await storage.upsertUser({
-        id: randomUUID(),
-        email: staff.email,
-        password: tempPassword,
-        firstName: staff.firstName,
-        lastName: staff.lastName,
-        role: staff.role,
-      });
-      
-      console.log(`  ✓ Created account for ${staff.email} (temp password: TempPassword123!)`);
-    } else if (!existingUser.password) {
-      const tempPassword = await hashPassword('TempPassword123!');
-      await storage.updateUserPassword(existingUser.id, tempPassword);
-      console.log(`  ✓ Set temp password for ${staff.email}`);
-    } else {
-      console.log(`  ✓ Account exists for ${staff.email}`);
+  // Check SESSION_SECRET first
+  if (!process.env.SESSION_SECRET) {
+    console.error('❌ SESSION_SECRET is not set! Login will not work.');
+    console.error('   Add SESSION_SECRET to Railway Variables');
+    return;
+  }
+  
+  try {
+    for (const staff of ALLOWED_STAFF) {
+      try {
+        const existingUser = await storage.getUserByEmail(staff.email);
+        
+        if (!existingUser) {
+          const tempPassword = await hashPassword('TempPassword123!');
+          
+          await storage.upsertUser({
+            id: randomUUID(),
+            email: staff.email,
+            password: tempPassword,
+            firstName: staff.firstName,
+            lastName: staff.lastName,
+            role: staff.role,
+          });
+          
+          console.log(`  ✓ Created account for ${staff.email} (temp password: TempPassword123!)`);
+        } else if (!existingUser.password) {
+          const tempPassword = await hashPassword('TempPassword123!');
+          await storage.updateUserPassword(existingUser.id, tempPassword);
+          console.log(`  ✓ Set temp password for ${staff.email}`);
+        } else {
+          console.log(`  ✓ Account exists for ${staff.email}`);
+        }
+      } catch (error: any) {
+        console.error(`  ❌ Error seeding account for ${staff.email}:`, error.message);
+      }
     }
+  } catch (error: any) {
+    console.error('❌ Error during staff account seeding:', error.message);
+    console.error('   This might indicate a database connection issue.');
   }
 }
