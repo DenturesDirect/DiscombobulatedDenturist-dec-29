@@ -85,7 +85,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Send notification when CDCP estimate is set
         if (patient.isCDCP) {
-          await sendPatientNotification(patient.id, "cdcp_estimate_set");
+          try {
+            await sendPatientNotification(patient.id, "cdcp_estimate_set");
+          } catch (error: any) {
+            console.error("❌ Failed to send CDCP notification:", error);
+            // Don't fail the request if notification fails
+          }
         }
       }
       
@@ -96,7 +101,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isBiteBlocks = lastStepLower.includes("bite block") || nextStepLower.includes("bite block");
       
       if (!wasBiteBlocks && isBiteBlocks && (lastStepLower.includes("complete") || lastStepLower.includes("done") || lastStepLower.includes("finished"))) {
-        await sendPatientNotification(patient.id, "bite_blocks_complete");
+        try {
+          await sendPatientNotification(patient.id, "bite_blocks_complete");
+        } catch (error: any) {
+          console.error("❌ Failed to send bite blocks notification:", error);
+          // Don't fail the request if notification fails
+        }
       }
       
       res.json(patient);
@@ -636,13 +646,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const contentLower = validatedData.content.toLowerCase();
       
       if (contentLower.includes("insurance approval") || contentLower.includes("approved by insurance") || contentLower.includes("claim approved")) {
-        await sendPatientNotification(validatedData.patientId, "insurance_approval_received");
+        try {
+          await sendPatientNotification(validatedData.patientId, "insurance_approval_received");
+        } catch (error: any) {
+          console.error("❌ Failed to send insurance approval notification:", error);
+        }
       } else if (contentLower.includes("insurance denial") || contentLower.includes("denied by insurance") || contentLower.includes("claim denied")) {
-        await sendPatientNotification(validatedData.patientId, "insurance_denial_received");
+        try {
+          await sendPatientNotification(validatedData.patientId, "insurance_denial_received");
+        } catch (error: any) {
+          console.error("❌ Failed to send insurance denial notification:", error);
+        }
       } else if (contentLower.includes("insurance") && (contentLower.includes("request") || contentLower.includes("need") || contentLower.includes("require"))) {
-        await sendPatientNotification(validatedData.patientId, "insurance_info_requested");
+        try {
+          await sendPatientNotification(validatedData.patientId, "insurance_info_requested");
+        } catch (error: any) {
+          console.error("❌ Failed to send insurance info requested notification:", error);
+        }
       } else if (contentLower.includes("insurance") && (contentLower.includes("submitted") || contentLower.includes("sent") || contentLower.includes("provided"))) {
-        await sendPatientNotification(validatedData.patientId, "insurance_info_submitted");
+        try {
+          await sendPatientNotification(validatedData.patientId, "insurance_info_submitted");
+        } catch (error: any) {
+          console.error("❌ Failed to send insurance info submitted notification:", error);
+        }
       }
       
       res.json(note);
@@ -738,6 +764,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: validatedData.status || "draft",
         createdBy: userName
       });
+      
+      // Send notification when casting is sent out (if status is "sent")
+      if (prescription.status === "sent") {
+        try {
+          await sendPatientNotification(prescription.patientId, "casting_sent");
+        } catch (error: any) {
+          console.error("❌ Failed to send casting notification:", error);
+          // Don't fail the request if notification fails
+        }
+      }
+      
       res.json(prescription);
     } catch (error: any) {
       console.error("❌ Error creating lab prescription:", error);
@@ -767,9 +804,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const prescription = await storage.updateLabPrescription(req.params.id, updates);
       if (!prescription) return res.status(404).json({ error: "Prescription not found" });
       
-      // Send notification when casting is sent out
-      if (isBeingMarkedAsSent && prescription.fabricationStage === "framework_only") {
-        await sendPatientNotification(prescription.patientId, "casting_sent");
+      // Send notification when casting is sent out (any fabrication stage)
+      if (isBeingMarkedAsSent) {
+        try {
+          await sendPatientNotification(prescription.patientId, "casting_sent");
+        } catch (error: any) {
+          console.error("❌ Failed to send casting notification:", error);
+          // Don't fail the request if notification fails
+        }
       }
       
       res.json(prescription);
