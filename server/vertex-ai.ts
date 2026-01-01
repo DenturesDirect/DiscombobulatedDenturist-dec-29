@@ -21,7 +21,7 @@ function getGeminiConfig() {
 }
 
 const getModel = () => getGeminiConfig().getGenerativeModel({ 
-  model: "gemini-1.5-flash", // Using flash for better availability, can change to "gemini-1.5-pro" if needed
+  model: "gemini-pro", // Using stable gemini-pro model
   generationConfig: {
     maxOutputTokens: 4096,
     temperature: 0.7,
