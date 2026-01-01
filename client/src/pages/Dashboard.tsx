@@ -594,13 +594,24 @@ export default function Dashboard() {
                           headers: { 'Content-Type': photo.type }
                         });
                         
-                        // Extract the object path from the GCS URL for our API
-                        // URL format: https://storage.googleapis.com/bucket/.private/uploads/uuid?params
-                        const gcsUrl = new URL(uploadURL);
-                        const pathParts = gcsUrl.pathname.split('/');
-                        // Find the "uploads" part and take everything after the bucket
+                        // Extract the object path from Supabase signed URL
+                        // Supabase URL format: https://[project].supabase.co/storage/v1/object/sign/[bucket]/uploads/[uuid]?...
+                        const uploadUrlObj = new URL(uploadURL);
+                        const pathParts = uploadUrlObj.pathname.split('/').filter(p => p); // Remove empty strings
+                        
+                        // Find "uploads" in the path (Supabase structure: /storage/v1/object/sign/bucket/uploads/uuid)
                         const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
-                        const objectId = uploadsIndex >= 0 ? pathParts.slice(uploadsIndex).join('/') : pathParts.slice(-2).join('/');
+                        let objectId = '';
+                        
+                        if (uploadsIndex >= 0) {
+                          // Take everything from "uploads" onwards
+                          objectId = pathParts.slice(uploadsIndex).join('/');
+                        } else {
+                          // Fallback: try to find the bucket and take what's after it
+                          // Or use last segment if it's a UUID
+                          objectId = pathParts[pathParts.length - 1] || 'unknown';
+                        }
+                        
                         const fileUrl = `/api/objects/${objectId}`;
                         
                         // Save file record to database

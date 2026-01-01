@@ -243,11 +243,23 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
                     if (result.successful && result.successful.length > 0) {
                       const uploadedFile = result.successful[0];
                       const rawUrl = uploadedFile.uploadURL as string;
-                      // Convert GCS URL to our API endpoint
-                      const gcsUrl = new URL(rawUrl);
-                      const pathParts = gcsUrl.pathname.split('/');
+                      // Extract path from Supabase signed URL
+                      // Supabase URL format: https://[project].supabase.co/storage/v1/object/sign/[bucket]/uploads/[uuid]?...
+                      const uploadUrlObj = new URL(rawUrl);
+                      const pathParts = uploadUrlObj.pathname.split('/').filter(p => p); // Remove empty strings
+                      
+                      // Find "uploads" in the path
                       const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
-                      const objectId = uploadsIndex >= 0 ? pathParts.slice(uploadsIndex).join('/') : pathParts.slice(-2).join('/');
+                      let objectId = '';
+                      
+                      if (uploadsIndex >= 0) {
+                        // Take everything from "uploads" onwards
+                        objectId = pathParts.slice(uploadsIndex).join('/');
+                      } else {
+                        // Fallback: use last segment
+                        objectId = pathParts[pathParts.length - 1] || 'unknown';
+                      }
+                      
                       const url = `/api/objects/${objectId}`;
                       setPhotoUrl(url);
                       toast({
