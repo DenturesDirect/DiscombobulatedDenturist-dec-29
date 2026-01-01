@@ -628,6 +628,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create lab prescription
   app.post("/api/lab-prescriptions", isAuthenticated, async (req: any, res) => {
     try {
+      console.log("📋 Creating lab prescription with data:", {
+        patientId: req.body.patientId,
+        labName: req.body.labName,
+        caseType: req.body.caseType,
+        arch: req.body.arch,
+        fabricationStage: req.body.fabricationStage,
+        hasDeadline: !!req.body.deadline,
+        digitalFiles: req.body.digitalFiles,
+        hasDesignInstructions: !!req.body.designInstructions
+      });
+      
       // Validate required fields before schema validation
       if (!req.body.patientId) {
         return res.status(400).json({ error: "Patient ID is required" });
@@ -674,8 +685,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       res.json(prescription);
     } catch (error: any) {
-      console.error("Error creating lab prescription:", error);
+      console.error("❌ Error creating lab prescription:", error);
+      console.error("❌ Error stack:", error.stack);
       if (error.errors) {
+        console.error("❌ Validation errors:", error.errors);
         return res.status(400).json({ error: `Validation error: ${error.errors.map((e: any) => e.message).join(", ")}` });
       }
       res.status(400).json({ error: error.message || "Failed to create lab prescription" });
