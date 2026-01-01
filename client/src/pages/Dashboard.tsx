@@ -429,44 +429,82 @@ export default function Dashboard() {
                   {patient.phone && `Phone: ${patient.phone}`}
                   {patient.email && ` • Email: ${patient.email}`}
                 </div>
-                {patient.email && (
-                  <div className="flex items-center gap-2 mb-4">
-                    <Switch
-                      id="email-notifications"
-                      checked={patient.emailNotifications}
-                      onCheckedChange={async (checked) => {
-                        try {
-                          await apiRequest('PATCH', `/api/patients/${patientId}/email-notifications`, { enabled: checked });
-                          queryClient.invalidateQueries({ queryKey: ['/api/patients', patientId] });
-                          toast({
-                            title: checked ? "Email Notifications Enabled" : "Email Notifications Disabled",
-                            description: checked 
-                              ? `${patient.name} will now receive email notifications.`
-                              : `${patient.name} will no longer receive email notifications.`
-                          });
-                        } catch (error: any) {
-                          toast({
-                            title: "Error",
-                            description: error.message || "Failed to update notification preference",
-                            variant: "destructive"
-                          });
-                        }
-                      }}
-                      data-testid="switch-email-notifications"
-                    />
-                    <label htmlFor="email-notifications" className="text-sm cursor-pointer flex items-center gap-1">
-                      {patient.emailNotifications ? (
-                        <>
-                          <Mail className="w-4 h-4 text-primary" />
-                          Email notifications enabled
-                        </>
-                      ) : (
-                        <>
-                          <MailX className="w-4 h-4 text-muted-foreground" />
-                          Email notifications disabled
-                        </>
-                      )}
-                    </label>
+                {(patient.email || patient.phone) && (
+                  <div className="space-y-3 mb-4">
+                    {patient.email && (
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="email-notifications"
+                          checked={patient.emailNotifications}
+                          onCheckedChange={async (checked) => {
+                            try {
+                              await apiRequest('PATCH', `/api/patients/${patientId}/email-notifications`, { enabled: checked });
+                              queryClient.invalidateQueries({ queryKey: ['/api/patients', patientId] });
+                              toast({
+                                title: checked ? "Email Notifications Enabled" : "Email Notifications Disabled",
+                                description: checked 
+                                  ? `${patient.name} will now receive email notifications.`
+                                  : `${patient.name} will no longer receive email notifications.`
+                              });
+                            } catch (error: any) {
+                              toast({
+                                title: "Error",
+                                description: error.message || "Failed to update notification preference",
+                                variant: "destructive"
+                              });
+                            }
+                          }}
+                          data-testid="switch-email-notifications"
+                        />
+                        <label htmlFor="email-notifications" className="text-sm cursor-pointer flex items-center gap-1">
+                          {patient.emailNotifications ? (
+                            <>
+                              <Mail className="w-4 h-4 text-primary" />
+                              Email notifications enabled
+                            </>
+                          ) : (
+                            <>
+                              <MailX className="w-4 h-4 text-muted-foreground" />
+                              Email notifications disabled
+                            </>
+                          )}
+                        </label>
+                      </div>
+                    )}
+                    {patient.phone && (
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="text-notifications"
+                          checked={patient.textNotifications || false}
+                          onCheckedChange={async (checked) => {
+                            try {
+                              await apiRequest('PATCH', `/api/patients/${patientId}/text-notifications`, { enabled: checked });
+                              queryClient.invalidateQueries({ queryKey: ['/api/patients', patientId] });
+                              toast({
+                                title: checked ? "Text Notifications Enabled" : "Text Notifications Disabled",
+                                description: checked 
+                                  ? `${patient.name} will now receive text notifications.`
+                                  : `${patient.name} will no longer receive text notifications.`
+                              });
+                            } catch (error: any) {
+                              toast({
+                                title: "Error",
+                                description: error.message || "Failed to update text notifications",
+                                variant: "destructive"
+                              });
+                            }
+                          }}
+                          data-testid="switch-text-notifications"
+                        />
+                        <label htmlFor="text-notifications" className="text-sm cursor-pointer flex items-center gap-1">
+                          {patient.textNotifications ? (
+                            <span className="text-primary font-medium">📱 Text notifications enabled</span>
+                          ) : (
+                            <span className="text-muted-foreground">📱 Text notifications disabled</span>
+                          )}
+                        </label>
+                      </div>
+                    )}
                   </div>
                 )}
                 <ClinicalDetailsCard patient={patient} />
