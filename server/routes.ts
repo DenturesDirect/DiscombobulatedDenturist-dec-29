@@ -287,14 +287,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Function to get or initialize storage service (checks at runtime, not just startup)
   async function getStorageService() {
-    const hasSupabase = process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const hasSupabase = (process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL) && (process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY);
     
     if (hasSupabase && (!objectStorageService || objectStorageService.constructor.name === "ObjectStorageService")) {
       try {
         const { SupabaseStorageService } = await import("./supabaseStorage");
         objectStorageService = new SupabaseStorageService();
         console.log("💾 Using Supabase Storage for file uploads");
-        console.log("🔍 SUPABASE_URL:", process.env.SUPABASE_URL ? "✅ Set" : "❌ Missing");
+        console.log("🔍 SUPABASE_URL:", (process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL) ? "✅ Set" : "❌ Missing");
         console.log("🔍 SUPABASE_SERVICE_ROLE:", (process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY) ? "✅ Set" : "❌ Missing");
         console.log("🔍 SUPABASE_STORAGE_BUCKET:", process.env.SUPABASE_STORAGE_BUCKET || "patient-files (default)");
       } catch (error: any) {
@@ -352,13 +352,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({
       hasSupabase,
       serviceType,
-      supabaseUrl: process.env.SUPABASE_URL ? "✅ Set" : "❌ Missing",
+      supabaseUrl: (process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL) ? "✅ Set" : "❌ Missing",
       supabaseKey: (process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY) ? "✅ Set" : "❌ Missing",
       bucket: process.env.SUPABASE_STORAGE_BUCKET || "patient-files (default)",
-      urlPrefix: process.env.SUPABASE_URL?.substring(0, 20) || "N/A",
+      urlPrefix: (process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL)?.substring(0, 20) || "N/A",
       allSupabaseEnvVars: supabaseEnvVars,
       possibleTypos: foundTypos,
-      rawUrlValue: process.env.SUPABASE_URL || null,
+      rawUrlValue: (process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL) || null,
       rawKeyExists: !!(process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY),
     });
   });
@@ -373,11 +373,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("❌ Error stack:", error.stack);
       
       // Check if Supabase is configured
-      const hasSupabase = process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY);
+      const hasSupabase = (process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL) && (process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY);
       
       if (!hasSupabase) {
         res.status(500).json({ 
-          error: "Photo upload is not configured. Please add SUPABASE_URL and SUPABASE_SERVICE_ROLE to Railway Variables. Photos are optional - you can continue without uploading photos."
+          error: "Photo upload is not configured. Please add SUPABASE_PROJECT_URL and SUPABASE_SERVICE_ROLE to Railway Variables. Photos are optional - you can continue without uploading photos."
         });
       } else {
         res.status(500).json({ 
