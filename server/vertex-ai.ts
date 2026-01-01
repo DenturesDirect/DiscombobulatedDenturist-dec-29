@@ -21,19 +21,25 @@ function getGeminiConfig() {
 }
 
 const getModel = () => {
-  // Try different model names - the error said to call ListModels
-  // For Google AI Studio (not Vertex AI), try these in order:
-  const modelName = process.env.GEMINI_MODEL || "models/gemini-pro";
+  // For Google AI Studio API, the model name should be just "gemini-pro" (not "models/gemini-pro")
+  // The SDK handles the "models/" prefix internally
+  const modelName = "gemini-pro";
   
-  console.log(`🤖 Attempting to use model: ${modelName}`);
+  console.log(`🤖 Using model: ${modelName}`);
   
-  return getGeminiConfig().getGenerativeModel({ 
-    model: modelName,
-    generationConfig: {
-      maxOutputTokens: 4096,
-      temperature: 0.7,
-    }
-  });
+  try {
+    return getGeminiConfig().getGenerativeModel({ 
+      model: modelName,
+      generationConfig: {
+        maxOutputTokens: 4096,
+        temperature: 0.7,
+      }
+    });
+  } catch (error: any) {
+    console.error(`❌ Failed to get model ${modelName}:`, error.message);
+    // If gemini-pro fails, the API might not be available for this key
+    throw new Error(`Model ${modelName} not available. Please check your API key has access to Generative Language API. Error: ${error.message}`);
+  }
 };
 
 export interface ClinicalNoteResponse {
