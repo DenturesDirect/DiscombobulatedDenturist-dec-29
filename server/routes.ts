@@ -145,7 +145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Save clinical note after clinician review/edit
   app.post("/api/clinical-notes/save", isAuthenticated, async (req: any, res) => {
     try {
-      const { patientId, content, noteDate } = req.body;
+      const { patientId, content, noteDate, suggestedTasks } = req.body;
       const patient = await storage.getPatient(patientId);
       if (!patient) return res.status(404).json({ error: "Patient not found" });
       
@@ -160,6 +160,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         noteDate: parsedNoteDate,
         createdBy: userName
       });
+      
+      // Create tasks from AI-extracted suggestedTasks (when clinician explicitly mentioned tasks)
+      if (suggestedTasks && Array.isArray(suggestedTasks) && suggestedTasks.length > 0) {
+        for (const task of suggestedTasks) {
+          try {
+            await storage.createTask({
+              title: task.title,
+              assignee: task.assignee || "All",
+              patientId: patient.id,
+              dueDate: task.dueDate ? new Date(task.dueDate) : null,
+              priority: task.priority || "normal",
+              status: "pending",
+              description: `Task extracted from clinical note dated ${parsedNoteDate.toLocaleDateString()}`
+            });
+          } catch (taskError: any) {
+            console.error(`Failed to create task "${task.title}":`, taskError);
+            // Continue creating other tasks even if one fails
+          }
+        }
+      }
       
       // CAROLINE INSURANCE EXCEPTION: Auto-create task if note mentions CDCP/insurance predetermination
       const lowerContent = content.toLowerCase();

@@ -41,6 +41,12 @@ export default function Dashboard() {
   const [currentClinicalNote, setCurrentClinicalNote] = useState("");
   const [pendingNoteDate, setPendingNoteDate] = useState<Date>(new Date());
   const [isReviewingNote, setIsReviewingNote] = useState(false);
+  const [pendingSuggestedTasks, setPendingSuggestedTasks] = useState<Array<{
+    title: string;
+    assignee: string;
+    dueDate: string;
+    priority: 'high' | 'normal' | 'low';
+  }> | null>(null);
 
   const { data: patient, isLoading: isLoadingPatient } = useQuery<Patient>({
     queryKey: ['/api/patients', patientId],
@@ -127,6 +133,13 @@ export default function Dashboard() {
       setPendingNoteDate(noteDate || new Date());
       setIsReviewingNote(true);
       
+      // Store suggested tasks if any were extracted
+      if (data.suggestedTasks && data.suggestedTasks.length > 0) {
+        setPendingSuggestedTasks(data.suggestedTasks);
+      } else {
+        setPendingSuggestedTasks(null);
+      }
+      
       if (data.followUpPrompt) {
         setFollowUpPrompt(data.followUpPrompt);
       }
@@ -164,7 +177,8 @@ export default function Dashboard() {
       const response = await apiRequest('POST', '/api/clinical-notes/save', {
         patientId: patientId,
         content: currentClinicalNote,
-        noteDate: pendingNoteDate.toISOString()
+        noteDate: pendingNoteDate.toISOString(),
+        suggestedTasks: pendingSuggestedTasks
       });
 
       const data = await response.json();
@@ -186,6 +200,7 @@ export default function Dashboard() {
       setCurrentClinicalNote("");
       setFollowUpPrompt("");
       setPendingNoteDate(new Date()); // Reset to today for next note
+      setPendingSuggestedTasks(null);
       
       toast({
         title: "Clinical Note Saved",
@@ -209,6 +224,7 @@ export default function Dashboard() {
     setGeneratedDocument("");
     setCurrentClinicalNote("");
     setFollowUpPrompt("");
+    setPendingSuggestedTasks(null);
     setIsReviewingNote(false);
     toast({
       title: "Note Discarded",
@@ -707,10 +723,6 @@ export default function Dashboard() {
                 <TabsTrigger value="photos" className="gap-1 text-xs" data-testid="tab-photos">
                   <Camera className="w-3 h-3" />
                   Photos
-                </TabsTrigger>
-                <TabsTrigger value="tasks" className="gap-1 text-xs" data-testid="tab-tasks">
-                  <Clock className="w-3 h-3" />
-                  Tasks
                 </TabsTrigger>
               </TabsList>
 
