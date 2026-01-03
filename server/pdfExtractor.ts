@@ -5,8 +5,14 @@
  */
 export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    // Use pdfjs-dist which is ESM-compatible and works with bundlers
-    const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    // Use pdfjs-dist - import from the legacy build which works in Node.js
+    // This path should resolve correctly when pdfjs-dist is in node_modules
+    const pdfjsModule = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const getDocument = pdfjsModule.getDocument || (pdfjsModule as any).default?.getDocument;
+    
+    if (!getDocument) {
+      throw new Error("Could not find getDocument in pdfjs-dist module");
+    }
     
     // Convert Buffer to Uint8Array for pdfjs-dist
     const uint8Array = new Uint8Array(buffer);
