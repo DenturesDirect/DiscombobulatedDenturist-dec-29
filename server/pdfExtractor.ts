@@ -1,44 +1,23 @@
 /**
- * Extracts text content from a PDF file buffer using pdfjs-dist (ESM-compatible)
+ * Extracts text content from a PDF file buffer using unpdf (serverless-friendly)
  * @param buffer - PDF file as Buffer
  * @returns Extracted text content
  */
 export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    // Use pdfjs-dist - try main entry point first, fallback to legacy build
-    let getDocument: any;
-    try {
-      const pdfjsLib = await import("pdfjs-dist");
-      getDocument = pdfjsLib.getDocument;
-    } catch (e) {
-      // Fallback to legacy build path
-      const pdfjsModule = await import("pdfjs-dist/legacy/build/pdf.mjs");
-      getDocument = pdfjsModule.getDocument || (pdfjsModule as any).default?.getDocument;
-    }
+    // Use unpdf which is designed for serverless/Node.js environments
+    const { extractText, getDocumentProxy } = await import("unpdf");
     
-    if (!getDocument || typeof getDocument !== 'function') {
-      throw new Error("Could not find getDocument function in pdfjs-dist module");
-    }
-    
-    // Convert Buffer to Uint8Array for pdfjs-dist
+    // Convert Buffer to Uint8Array
     const uint8Array = new Uint8Array(buffer);
     
     // Load the PDF document
-    const pdfDoc = await getDocument({ data: uint8Array }).promise;
+    const pdf = await getDocumentProxy(uint8Array);
     
-    let fullText = "";
+    // Extract text from all pages
+    const { text } = await extractText(pdf, { mergePages: true });
     
-    // Extract text from each page
-    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
-      const page = await pdfDoc.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(" ");
-      fullText += pageText + "\n";
-    }
-    
-    return fullText.trim();
+    return text || "";
   } catch (error: any) {
     if (error.message?.includes("Invalid PDF") || error.message?.includes("corrupted") || error.message?.includes("Invalid")) {
       throw new Error("The PDF file appears to be corrupted or invalid. Please try a different file.");
