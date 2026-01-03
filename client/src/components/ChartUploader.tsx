@@ -73,9 +73,17 @@ export default function ChartUploader({ patientId, patientName, onSummaryReady, 
         let errorMessage = "Failed to process chart";
         try {
           const error = await response.json();
-          errorMessage = error.error || error.message || errorMessage;
+          errorMessage = error.error || error.message || JSON.stringify(error) || errorMessage;
+          console.error("Server error response:", error);
         } catch (e) {
-          errorMessage = `Server error: ${response.status} ${response.statusText}`;
+          // If JSON parsing fails, try to get text response
+          try {
+            const text = await response.text();
+            console.error("Server error (text):", text);
+            errorMessage = text || `Server error: ${response.status} ${response.statusText}`;
+          } catch (textError) {
+            errorMessage = `Server error: ${response.status} ${response.statusText}`;
+          }
         }
         throw new Error(errorMessage);
       }
