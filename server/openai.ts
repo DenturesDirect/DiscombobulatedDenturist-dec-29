@@ -390,7 +390,7 @@ export async function summarizePatientChart(chartText: string, patientName: stri
         }
       ],
       response_format: { type: "json_object" },
-      max_tokens: 4096,
+      max_tokens: 8192, // Increased to allow for more comprehensive summaries
     });
 
     const content = response.choices[0]?.message?.content;
