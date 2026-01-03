@@ -55,6 +55,10 @@ export default function Dashboard() {
   // Fetch offices for name lookup
   const { data: offices = [] } = useQuery<Array<{ id: string; name: string }>>({
     queryKey: ['/api/offices'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/offices');
+      return response.json();
+    },
     enabled: canViewAllOffices,
   });
 

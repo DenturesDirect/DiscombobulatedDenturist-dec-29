@@ -131,14 +131,14 @@ export async function setupLocalAuth(app: Express) {
   });
 
   app.post('/api/auth/login', (req, res, next) => {
-    passport.authenticate('local', (err: any, user: any, info: any) => {
+    passport.authenticate('local', async (err: any, user: any, info: any) => {
       if (err) {
         return res.status(500).json({ message: 'Authentication error' });
       }
       if (!user) {
         return res.status(401).json({ message: info?.message || 'Invalid credentials' });
       }
-      req.logIn(user, (err) => {
+      req.logIn(user, async (err) => {
         if (err) {
           return res.status(500).json({ message: 'Login error' });
         }

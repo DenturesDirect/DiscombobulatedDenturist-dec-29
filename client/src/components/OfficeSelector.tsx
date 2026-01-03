@@ -21,6 +21,10 @@ export default function OfficeSelector({ selectedOfficeId, onOfficeChange, canVi
   // Fetch offices
   const { data: officesData } = useQuery<Office[]>({
     queryKey: ["/api/offices"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/offices');
+      return response.json();
+    },
     enabled: canViewAllOffices,
   });
 
