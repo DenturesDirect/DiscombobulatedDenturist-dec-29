@@ -732,7 +732,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("📋 Creating lab prescription with data:", {
         patientId: req.body.patientId,
         labName: req.body.labName,
-        caseType: req.body.caseType,
+        caseTypeUpper: req.body.caseTypeUpper,
+        caseTypeLower: req.body.caseTypeLower,
         arch: req.body.arch,
         fabricationStage: req.body.fabricationStage,
         hasDeadline: !!req.body.deadline,
@@ -747,8 +748,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.body.labName || req.body.labName.trim() === "") {
         return res.status(400).json({ error: "Lab name is required" });
       }
-      if (!req.body.caseType || req.body.caseType.trim() === "") {
-        return res.status(400).json({ error: "Case type is required" });
+      if (!req.body.caseTypeUpper && !req.body.caseTypeLower) {
+        return res.status(400).json({ error: "At least one case type (Upper or Lower) is required" });
       }
       if (!req.body.arch || req.body.arch.trim() === "") {
         return res.status(400).json({ error: "Arch (upper/lower/both) is required" });
@@ -760,7 +761,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertLabPrescriptionSchema.parse({
         ...req.body,
         labName: req.body.labName.trim(),
-        caseType: req.body.caseType.trim(),
+        caseTypeUpper: req.body.caseTypeUpper?.trim() || null,
+        caseTypeLower: req.body.caseTypeLower?.trim() || null,
         arch: req.body.arch.trim(),
         fabricationStage: req.body.fabricationStage.trim(),
         status: req.body.status || "draft"
@@ -771,7 +773,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const prescription = await storage.createLabPrescription({
         patientId: validatedData.patientId,
         labName: validatedData.labName,
-        caseType: validatedData.caseType,
+        caseType: null, // deprecated field
+        caseTypeUpper: validatedData.caseTypeUpper || null,
+        caseTypeLower: validatedData.caseTypeLower || null,
         arch: validatedData.arch,
         fabricationStage: validatedData.fabricationStage,
         deadline: validatedData.deadline,

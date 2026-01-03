@@ -197,7 +197,9 @@ export const labPrescriptions = pgTable("lab_prescriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   patientId: varchar("patient_id").notNull().references(() => patients.id),
   labName: text("lab_name").notNull(), // Vivi Labs, Vital Lab, Aesthetic Minds
-  caseType: text("case_type").notNull(), // cast partial, complete denture, implant-retained, repair, tooth addition
+  caseType: text("case_type"), // deprecated - kept for backward compatibility
+  caseTypeUpper: text("case_type_upper"), // cast partial, complete denture, implant-retained, repair, tooth addition (Max/Maxillary)
+  caseTypeLower: text("case_type_lower"), // cast partial, complete denture, implant-retained, repair, tooth addition (Mand)
   arch: text("arch").notNull(), // upper, lower, both
   fabricationStage: text("fabrication_stage").notNull(), // framework only, try-in, finish, repair
   deadline: timestamp("deadline"),

@@ -18,7 +18,8 @@ interface LabPrescriptionFormProps {
 
 export interface LabPrescriptionData {
   labName: string;
-  caseType: string;
+  caseTypeUpper?: string;
+  caseTypeLower?: string;
   arch: string;
   fabricationStage: string;
   deadline?: Date;
@@ -82,7 +83,8 @@ const SHIPPING_OPTIONS = [
 
 export default function LabPrescriptionForm({ patientName, onSubmit, disabled }: LabPrescriptionFormProps) {
   const [labName, setLabName] = useState("");
-  const [caseType, setCaseType] = useState("");
+  const [caseTypeUpper, setCaseTypeUpper] = useState("");
+  const [caseTypeLower, setCaseTypeLower] = useState("");
   const [arch, setArch] = useState("");
   const [fabricationStage, setFabricationStage] = useState("");
   const [deadline, setDeadline] = useState("");
@@ -188,7 +190,8 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
   const handleSubmit = () => {
     const prescription: LabPrescriptionData = {
       labName,
-      caseType,
+      caseTypeUpper: caseTypeUpper || undefined,
+      caseTypeLower: caseTypeLower || undefined,
       arch,
       fabricationStage,
       deadline: deadline ? new Date(deadline) : undefined,
@@ -202,7 +205,8 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
     onSubmit(prescription);
     
     setLabName("");
-    setCaseType("");
+    setCaseTypeUpper("");
+    setCaseTypeLower("");
     setArch("");
     setFabricationStage("");
     setDeadline("");
@@ -214,7 +218,7 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
     setSpecialNotes("");
   };
 
-  const isValid = labName && caseType && arch && fabricationStage;
+  const isValid = labName && (caseTypeUpper || caseTypeLower) && arch && fabricationStage;
 
   return (
     <div className="space-y-6">
@@ -231,28 +235,44 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
       </div>
 
       <div className="grid gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="lab-name">Lab Name *</Label>
+          <Select value={labName} onValueChange={setLabName}>
+            <SelectTrigger id="lab-name" data-testid="select-lab-name">
+              <SelectValue placeholder="Select lab..." />
+            </SelectTrigger>
+            <SelectContent>
+              {LABS.map(lab => (
+                <SelectItem key={lab.value} value={lab.value}>{lab.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="lab-name">Lab Name *</Label>
-            <Select value={labName} onValueChange={setLabName}>
-              <SelectTrigger id="lab-name" data-testid="select-lab-name">
-                <SelectValue placeholder="Select lab..." />
+            <Label htmlFor="case-type-upper">Case Type - Upper (Max/Maxillary)</Label>
+            <Select value={caseTypeUpper} onValueChange={setCaseTypeUpper}>
+              <SelectTrigger id="case-type-upper" data-testid="select-case-type-upper">
+                <SelectValue placeholder="Select upper case type..." />
               </SelectTrigger>
               <SelectContent>
-                {LABS.map(lab => (
-                  <SelectItem key={lab.value} value={lab.value}>{lab.label}</SelectItem>
+                <SelectItem value="">N/A</SelectItem>
+                {CASE_TYPES.map(ct => (
+                  <SelectItem key={ct.value} value={ct.value}>{ct.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="case-type">Case Type *</Label>
-            <Select value={caseType} onValueChange={setCaseType}>
-              <SelectTrigger id="case-type" data-testid="select-case-type">
-                <SelectValue placeholder="Select case type..." />
+            <Label htmlFor="case-type-lower">Case Type - Lower (Mand)</Label>
+            <Select value={caseTypeLower} onValueChange={setCaseTypeLower}>
+              <SelectTrigger id="case-type-lower" data-testid="select-case-type-lower">
+                <SelectValue placeholder="Select lower case type..." />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="">N/A</SelectItem>
                 {CASE_TYPES.map(ct => (
                   <SelectItem key={ct.value} value={ct.value}>{ct.label}</SelectItem>
                 ))}
@@ -260,6 +280,9 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
             </Select>
           </div>
         </div>
+        {!caseTypeUpper && !caseTypeLower && (
+          <p className="text-sm text-destructive">At least one case type (Upper or Lower) is required</p>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">

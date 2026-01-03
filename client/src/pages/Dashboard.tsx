@@ -912,7 +912,15 @@ export default function Dashboard() {
                           </span>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-sm mb-3">
-                          <div><span className="text-muted-foreground">Case Type:</span> {rx.caseType.replace(/_/g, ' ')}</div>
+                          {rx.caseTypeUpper && (
+                            <div><span className="text-muted-foreground">Case Type - Upper:</span> {rx.caseTypeUpper.replace(/_/g, ' ')}</div>
+                          )}
+                          {rx.caseTypeLower && (
+                            <div><span className="text-muted-foreground">Case Type - Lower:</span> {rx.caseTypeLower.replace(/_/g, ' ')}</div>
+                          )}
+                          {rx.caseType && !rx.caseTypeUpper && !rx.caseTypeLower && (
+                            <div><span className="text-muted-foreground">Case Type:</span> {rx.caseType.replace(/_/g, ' ')}</div>
+                          )}
                           <div><span className="text-muted-foreground">Arch:</span> {rx.arch}</div>
                           <div><span className="text-muted-foreground">Stage:</span> {rx.fabricationStage.replace(/_/g, ' ')}</div>
                           {rx.deadline && <div><span className="text-muted-foreground">Deadline:</span> {new Date(rx.deadline).toLocaleDateString()}</div>}
