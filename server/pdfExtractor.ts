@@ -1,5 +1,3 @@
-import pdfParse from "@cedrugs/pdf-parse";
-
 /**
  * Extracts text content from a PDF file buffer
  * @param buffer - PDF file as Buffer
@@ -7,6 +5,14 @@ import pdfParse from "@cedrugs/pdf-parse";
  */
 export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
+    // Dynamic import to avoid bundling issues - load at runtime
+    const pdfParseModule = await import("@cedrugs/pdf-parse");
+    const pdfParse = pdfParseModule.default || pdfParseModule;
+    
+    if (typeof pdfParse !== 'function') {
+      throw new Error(`pdf-parse is not a function. Please ensure @cedrugs/pdf-parse is installed.`);
+    }
+    
     const data = await pdfParse(buffer);
     return data.text;
   } catch (error: any) {
