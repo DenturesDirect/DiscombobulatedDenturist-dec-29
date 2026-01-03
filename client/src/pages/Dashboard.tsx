@@ -30,7 +30,7 @@ import ShadeReminderModal from "@/components/ShadeReminderModal";
 import TaskForm from "@/components/TaskForm";
 import ChartUploader from "@/components/ChartUploader";
 import OfficeSelector from "@/components/OfficeSelector";
-import { FileText, Camera, Clock, Loader2, Mail, MailX, FlaskConical, ClipboardList, Pill, Save, X, Edit3, CheckSquare, Trash2 } from "lucide-react";
+import { FileText, Camera, Clock, Loader2, Mail, MailX, FlaskConical, ClipboardList, Pill, Save, X, Edit3, CheckSquare, Trash2, Upload } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -741,7 +741,13 @@ export default function Dashboard() {
                 </div>
                 
                 <Tabs value={activeInputTab} onValueChange={(v) => setActiveInputTab(v as any)} className="w-full">
-                  <TabsList className="grid grid-cols-5 w-full mb-4">
+                  <TabsList className={`grid ${canViewAllOffices ? 'grid-cols-6' : 'grid-cols-5'} w-full mb-4`}>
+                    {canViewAllOffices && (
+                      <TabsTrigger value="chart" className="text-xs gap-1" data-testid="tab-input-chart">
+                        <Upload className="w-3 h-3" />
+                        Chart
+                      </TabsTrigger>
+                    )}
                     <TabsTrigger value="clinical" className="text-xs gap-1" data-testid="tab-input-clinical">
                       <FileText className="w-3 h-3" />
                       Clinical
@@ -764,6 +770,19 @@ export default function Dashboard() {
                     </TabsTrigger>
                   </TabsList>
 
+                  {canViewAllOffices && (
+                    <TabsContent value="chart" className="mt-0">
+                      <ChartUploader
+                        patientId={patientId}
+                        patientName={patient.name}
+                        onSummaryReady={() => {
+                          // Refresh clinical notes after summary is ready
+                          queryClient.invalidateQueries({ queryKey: ['/api/clinical-notes', patientId] });
+                        }}
+                      />
+                    </TabsContent>
+                  )}
+                  
                   <TabsContent value="clinical" className="mt-0">
                     <VoicePromptInput 
                       onSubmit={handleClinicalNoteSubmit}
