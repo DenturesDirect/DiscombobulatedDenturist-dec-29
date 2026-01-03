@@ -5,13 +5,19 @@
  */
 export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    // Use pdfjs-dist - import from the legacy build which works in Node.js
-    // This path should resolve correctly when pdfjs-dist is in node_modules
-    const pdfjsModule = await import("pdfjs-dist/legacy/build/pdf.mjs");
-    const getDocument = pdfjsModule.getDocument || (pdfjsModule as any).default?.getDocument;
+    // Use pdfjs-dist - try main entry point first, fallback to legacy build
+    let getDocument: any;
+    try {
+      const pdfjsLib = await import("pdfjs-dist");
+      getDocument = pdfjsLib.getDocument;
+    } catch (e) {
+      // Fallback to legacy build path
+      const pdfjsModule = await import("pdfjs-dist/legacy/build/pdf.mjs");
+      getDocument = pdfjsModule.getDocument || (pdfjsModule as any).default?.getDocument;
+    }
     
-    if (!getDocument) {
-      throw new Error("Could not find getDocument in pdfjs-dist module");
+    if (!getDocument || typeof getDocument !== 'function') {
+      throw new Error("Could not find getDocument function in pdfjs-dist module");
     }
     
     // Convert Buffer to Uint8Array for pdfjs-dist
