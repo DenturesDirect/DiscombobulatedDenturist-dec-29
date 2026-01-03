@@ -304,12 +304,20 @@ export async function processClinicalNote(plainTextNote: string, patientContext:
 const CHART_SUMMARIZATION_PROMPT = `You are an AI clinical documentation assistant for Dentures Direct.
 
 YOUR TASK:
-Summarize a complete patient chart (from an old system) into ONE comprehensive clinical note that captures the entire treatment history.
+Summarize a complete patient chart (from an old system) into ONE comprehensive clinical note that captures the ENTIRE treatment history, including ALL notes from beginning to end.
+
+CRITICAL REQUIREMENTS:
+- You MUST include ALL notes from the chart, especially the MOST RECENT notes at the end
+- Recent notes are often the most important - they represent the current treatment status
+- Do NOT skip or summarize away recent entries - they are critical for continuity of care
+- If the chart text is truncated, prioritize the END of the chart (most recent entries) over the beginning
+- Every clinical note, appointment, and treatment entry should be represented
 
 CORE OBJECTIVE:
 Create a single, chronological clinical note that:
-- Summarizes all relevant treatment history from the chart
-- Identifies the current treatment status/step
+- Summarizes ALL treatment history from the chart (beginning to end)
+- Prioritizes recent notes - they indicate current status
+- Identifies the current treatment status/step based on the most recent entries
 - Maintains chronological order of events
 - Follows clinical charting standards
 - Is ready for review and editing by the clinician
@@ -321,12 +329,13 @@ CLINICAL CHARTING RULES:
 - Include dates when available from the chart
 - Document treatment progress, procedures performed, and current status
 - Note any important limitations, delays, or dependencies
+- Pay special attention to the LAST entries in the chart - they show where treatment currently stands
 
 FORMATTING:
 - Output in plain text only (no markdown, no code blocks)
-- Use clear section breaks if needed (e.g., "Initial Consultation:", "Treatment Progress:", "Current Status:")
+- Use clear section breaks if needed (e.g., "Initial Consultation:", "Treatment Progress:", "Most Recent Visits:", "Current Status:")
 - Each section should be chronological
-- End with a clear statement of current treatment status
+- End with a clear statement of current treatment status based on the most recent chart entries
 
 IMPORTANT:
 - DO NOT create tasks automatically
@@ -334,6 +343,7 @@ IMPORTANT:
 - DO NOT make assumptions about treatment plans
 - Focus on summarizing what IS in the chart, not what should happen next
 - The clinician will review and edit this note, then manually set current/next steps
+- REMEMBER: Recent notes are critical - include them all
 
 Return your response as JSON with this structure:
 {
@@ -357,10 +367,18 @@ export async function summarizePatientChart(chartText: string, patientName: stri
     console.log("📋 Chart text length:", chartText.length, "characters");
 
     // Truncate if too long (OpenAI has token limits)
-    const maxLength = 50000; // Roughly 12,500 tokens
-    const truncatedText = chartText.length > maxLength 
-      ? chartText.substring(0, maxLength) + "\n\n[Chart continues beyond this point...]"
-      : chartText;
+    // IMPORTANT: If truncating, prioritize the END of the chart (most recent notes)
+    const maxLength = 100000; // Increased to ~25,000 tokens to capture more content
+    let textToSummarize: string;
+    
+    if (chartText.length > maxLength) {
+      // Take the END of the chart (most recent entries) instead of the beginning
+      const startIndex = chartText.length - maxLength;
+      textToSummarize = "[Chart begins earlier...]\n\n" + chartText.substring(startIndex);
+      console.log(`⚠️ Chart truncated: Using last ${maxLength} characters (most recent entries)`);
+    } else {
+      textToSummarize = chartText;
+    }
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -368,7 +386,7 @@ export async function summarizePatientChart(chartText: string, patientName: stri
         { role: "system", content: CHART_SUMMARIZATION_PROMPT },
         { 
           role: "user", 
-          content: `Patient: ${patientName}\n\nPatient Chart Content:\n${truncatedText}\n\nPlease summarize this entire chart into one comprehensive clinical note that captures the treatment history and current status.` 
+          content: `Patient: ${patientName}\n\nPatient Chart Content:\n${textToSummarize}\n\nPlease summarize this ENTIRE chart into one comprehensive clinical note. CRITICAL: Include ALL notes, especially the MOST RECENT entries at the end of the chart. These recent notes show the current treatment status and are essential for continuity of care.` 
         }
       ],
       response_format: { type: "json_object" },
