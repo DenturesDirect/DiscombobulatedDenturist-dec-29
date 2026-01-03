@@ -70,8 +70,14 @@ export default function ChartUploader({ patientId, patientName, onSummaryReady, 
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to process chart");
+        let errorMessage = "Failed to process chart";
+        try {
+          const error = await response.json();
+          errorMessage = error.error || error.message || errorMessage;
+        } catch (e) {
+          errorMessage = `Server error: ${response.status} ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
@@ -87,8 +93,13 @@ export default function ChartUploader({ patientId, patientName, onSummaryReady, 
       });
     } catch (error: any) {
       console.error("Chart upload error:", error);
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       toast({
-        title: "Error",
+        title: "Error Processing Chart",
         description: error.message || "Failed to process chart. Please try again.",
         variant: "destructive",
       });

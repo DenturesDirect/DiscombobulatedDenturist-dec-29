@@ -345,7 +345,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("❌ Error processing chart upload:", error);
-      res.status(500).json({ error: error.message || "Failed to process chart upload" });
+      console.error("❌ Error stack:", error.stack);
+      
+      // Provide more specific error messages
+      let errorMessage = "Failed to process chart upload";
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.toString) {
+        errorMessage = error.toString();
+      }
+      
+      // Check for specific error types
+      if (errorMessage.includes("pdf") || errorMessage.includes("PDF")) {
+        errorMessage = `PDF Error: ${errorMessage}`;
+      } else if (errorMessage.includes("OpenAI") || errorMessage.includes("API key")) {
+        errorMessage = `AI Processing Error: ${errorMessage}`;
+      }
+      
+      res.status(500).json({ error: errorMessage });
     }
   });
 
