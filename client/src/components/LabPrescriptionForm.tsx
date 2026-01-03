@@ -252,12 +252,12 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="case-type-upper">Case Type - Upper (Max/Maxillary)</Label>
-            <Select value={caseTypeUpper} onValueChange={setCaseTypeUpper}>
+            <Select value={caseTypeUpper || undefined} onValueChange={(val) => setCaseTypeUpper(val === "none" ? "" : val || "")}>
               <SelectTrigger id="case-type-upper" data-testid="select-case-type-upper">
                 <SelectValue placeholder="Select upper case type..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">N/A</SelectItem>
+                <SelectItem value="none">N/A</SelectItem>
                 {CASE_TYPES.map(ct => (
                   <SelectItem key={ct.value} value={ct.value}>{ct.label}</SelectItem>
                 ))}
@@ -267,12 +267,12 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
 
           <div className="space-y-2">
             <Label htmlFor="case-type-lower">Case Type - Lower (Mand)</Label>
-            <Select value={caseTypeLower} onValueChange={setCaseTypeLower}>
+            <Select value={caseTypeLower || undefined} onValueChange={(val) => setCaseTypeLower(val === "none" ? "" : val || "")}>
               <SelectTrigger id="case-type-lower" data-testid="select-case-type-lower">
                 <SelectValue placeholder="Select lower case type..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">N/A</SelectItem>
+                <SelectItem value="none">N/A</SelectItem>
                 {CASE_TYPES.map(ct => (
                   <SelectItem key={ct.value} value={ct.value}>{ct.label}</SelectItem>
                 ))}
