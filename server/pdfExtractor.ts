@@ -1,5 +1,3 @@
-import pdfParse from "pdf-parse";
-
 /**
  * Extracts text content from a PDF file buffer
  * @param buffer - PDF file as Buffer
@@ -7,6 +5,8 @@ import pdfParse from "pdf-parse";
  */
 export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
+    // Dynamic import for ES modules compatibility
+    const pdfParse = (await import("pdf-parse")).default;
     const data = await pdfParse(buffer);
     return data.text;
   } catch (error: any) {
