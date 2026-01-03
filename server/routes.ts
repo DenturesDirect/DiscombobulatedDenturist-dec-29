@@ -283,7 +283,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Extract text from PDF
       console.log(`📄 Extracting text from PDF for patient ${patient.name}...`);
-      const chartText = await extractTextFromPDF(req.file.buffer);
+      console.log(`📄 File size: ${req.file.size} bytes, type: ${req.file.mimetype}`);
+      
+      let chartText: string;
+      try {
+        chartText = await extractTextFromPDF(req.file.buffer);
+      } catch (pdfError: any) {
+        console.error("❌ PDF extraction failed:", pdfError);
+        console.error("❌ PDF error stack:", pdfError.stack);
+        return res.status(400).json({ 
+          error: `PDF Extraction Error: ${pdfError.message || "Failed to extract text from PDF. The file may be image-based, corrupted, or password-protected."}` 
+        });
+      }
 
       if (!chartText || chartText.trim().length === 0) {
         return res.status(400).json({ error: "Could not extract text from PDF. The file may be image-based or corrupted." });
@@ -293,7 +304,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Summarize chart using AI
       console.log(`🤖 Summarizing chart for patient ${patient.name}...`);
-      const summary = await summarizePatientChart(chartText, patient.name);
+      let summary;
+      try {
+        summary = await summarizePatientChart(chartText, patient.name);
+      } catch (aiError: any) {
+        console.error("❌ AI summarization failed:", aiError);
+        console.error("❌ AI error stack:", aiError.stack);
+        return res.status(500).json({ 
+          error: `AI Summarization Error: ${aiError.message || "Failed to summarize chart. Please check your OpenAI API key configuration."}` 
+        });
+      }
 
       // Optionally save the PDF as a patient file for reference
       try {
