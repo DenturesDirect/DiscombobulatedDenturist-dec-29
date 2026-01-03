@@ -43,6 +43,7 @@ import { ObjectUploader } from "./ObjectUploader";
 import type { UploadResult } from "@uppy/core";
 import { useQuery } from "@tanstack/react-query";
 import { FormDescription } from "@/components/ui/form";
+import ChartUploader from "./ChartUploader";
 
 interface NewPatientDialogProps {
   open: boolean;
@@ -67,6 +68,9 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
   const { user } = useAuth();
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined);
   const [uploadedPatientId, setUploadedPatientId] = useState<string | undefined>(undefined);
+  const [showChartUpload, setShowChartUpload] = useState(false);
+  const [createdPatientId, setCreatedPatientId] = useState<string | null>(null);
+  const [createdPatientName, setCreatedPatientName] = useState<string>("");
 
   const canViewAllOffices = user?.canViewAllOffices ?? false;
 
@@ -106,15 +110,23 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
       if (photoUrl) {
         setUploadedPatientId(data.id);
       } else {
-        toast({
-          title: "Patient Created",
-          description: `${data.name} has been added to your patient list.`,
-        });
-        form.reset();
-        setPhotoUrl(undefined);
-        onOpenChange(false);
-        if (onSuccess) {
-          onSuccess(data.id);
+        // Check if user is from Dentures Direct (can view all offices)
+        if (canViewAllOffices) {
+          // Show chart upload option for Dentures Direct users
+          setCreatedPatientId(data.id);
+          setCreatedPatientName(data.name);
+          setShowChartUpload(true);
+        } else {
+          toast({
+            title: "Patient Created",
+            description: `${data.name} has been added to your patient list.`,
+          });
+          form.reset();
+          setPhotoUrl(undefined);
+          onOpenChange(false);
+          if (onSuccess) {
+            onSuccess(data.id);
+          }
         }
       }
     },
@@ -134,16 +146,27 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/patients'] });
-      toast({
-        title: "Patient Created",
-        description: `${data.name} has been added with photo.`,
-      });
-      form.reset();
-      setPhotoUrl(undefined);
-      setUploadedPatientId(undefined);
-      onOpenChange(false);
-      if (onSuccess) {
-        onSuccess(data.id);
+      
+      // Check if user is from Dentures Direct (can view all offices)
+      if (canViewAllOffices) {
+        // Show chart upload option for Dentures Direct users
+        setCreatedPatientId(data.id);
+        setCreatedPatientName(data.name);
+        setShowChartUpload(true);
+        setPhotoUrl(undefined);
+        setUploadedPatientId(undefined);
+      } else {
+        toast({
+          title: "Patient Created",
+          description: `${data.name} has been added with photo.`,
+        });
+        form.reset();
+        setPhotoUrl(undefined);
+        setUploadedPatientId(undefined);
+        onOpenChange(false);
+        if (onSuccess) {
+          onSuccess(data.id);
+        }
       }
     },
     onError: (error: any) => {
@@ -179,12 +202,34 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-new-patient">
         <DialogHeader>
-          <DialogTitle>New Patient</DialogTitle>
+          <DialogTitle>{showChartUpload ? "Upload Patient Chart" : "New Patient"}</DialogTitle>
           <DialogDescription>
-            Add basic contact information. Clinical details can be added after the first consultation.
+            {showChartUpload 
+              ? `Upload a PDF chart from the old system for ${createdPatientName}`
+              : "Add basic contact information. Clinical details can be added after the first consultation."
+            }
           </DialogDescription>
         </DialogHeader>
 
+        {showChartUpload && createdPatientId ? (
+          <ChartUploader
+            patientId={createdPatientId}
+            patientName={createdPatientName}
+            onCancel={() => {
+              setShowChartUpload(false);
+              setCreatedPatientId(null);
+              setCreatedPatientName("");
+              form.reset();
+              onOpenChange(false);
+              if (onSuccess) {
+                onSuccess(createdPatientId);
+              }
+            }}
+            onSummaryReady={() => {
+              // Summary is ready, user can review and save
+            }}
+          />
+        ) : (
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -356,6 +401,7 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
             </div>
           </form>
         </Form>
+        )}
       </DialogContent>
     </Dialog>
   );

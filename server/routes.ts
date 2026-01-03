@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { processClinicalNote, generateReferralLetter } from "./openai";
+import { processClinicalNote, generateReferralLetter, summarizePatientChart } from "./openai";
 // Force redeploy to pick up Supabase bucket name
 import { storage } from "./storage";
 import { insertPatientSchema, insertLabNoteSchema, insertAdminNoteSchema, insertLabPrescriptionSchema } from "@shared/schema";
@@ -9,6 +9,8 @@ import { seedTestData } from "./test-data";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { sendCustomNotification, sendAppointmentReminder } from "./gmail";
 import { sendPatientNotification } from "./notifications";
+import multer from "multer";
+import { extractTextFromPDF } from "./pdfExtractor";
 
 // Helper function to get user office context from request
 async function getUserOfficeContext(req: any): Promise<{ officeId: string | null; canViewAllOffices: boolean }> {
@@ -228,6 +230,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Upload and summarize patient chart PDF (Dentures Direct only)
+  const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype === 'application/pdf') {
+        cb(null, true);
+      } else {
+        cb(new Error('Only PDF files are allowed'));
+      }
+    }
+  });
+
+  app.post("/api/patients/:id/chart-upload", isAuthenticated, upload.single('chart'), async (req: any, res) => {
+    try {
+      const officeContext = await getUserOfficeContext(req);
+      
+      // Verify user can access this patient
+      const patient = await storage.getPatient(
+        req.params.id,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
+      if (!patient) return res.status(404).json({ error: "Patient not found" });
+
+      // Check if user is from Dentures Direct office
+      // Users with canViewAllOffices are Dentures Direct users
+      // Otherwise, check their office name
+      let isDenturesDirect = officeContext.canViewAllOffices;
+      
+      if (!isDenturesDirect && officeContext.officeId) {
+        const { offices } = await import("@shared/schema");
+        const { ensureDb } = await import("./db");
+        const { eq } = await import("drizzle-orm");
+        const db = ensureDb();
+        if (db) {
+          const office = await db.select().from(offices).where(eq(offices.id, officeContext.officeId)).limit(1);
+          if (office[0]?.name === "Dentures Direct") {
+            isDenturesDirect = true;
+          }
+        }
+      }
+
+      if (!isDenturesDirect) {
+        return res.status(403).json({ error: "Chart upload is only available for Dentures Direct office." });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: "No PDF file uploaded" });
+      }
+
+      // Extract text from PDF
+      console.log(`📄 Extracting text from PDF for patient ${patient.name}...`);
+      const chartText = await extractTextFromPDF(req.file.buffer);
+
+      if (!chartText || chartText.trim().length === 0) {
+        return res.status(400).json({ error: "Could not extract text from PDF. The file may be image-based or corrupted." });
+      }
+
+      console.log(`✅ Extracted ${chartText.length} characters from PDF`);
+
+      // Summarize chart using AI
+      console.log(`🤖 Summarizing chart for patient ${patient.name}...`);
+      const summary = await summarizePatientChart(chartText, patient.name);
+
+      // Optionally save the PDF as a patient file for reference
+      try {
+        const service = await getStorageService();
+        // Get upload URL and upload the file
+        const uploadUrl = await service.getObjectEntityUploadURL();
+        
+        // Upload file to the signed URL
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'PUT',
+          body: req.file.buffer,
+          headers: {
+            'Content-Type': 'application/pdf',
+          },
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error(`Failed to upload file: ${uploadResponse.statusText}`);
+        }
+        
+        // Extract the object path from the upload URL
+        // Supabase URL format: https://[project].supabase.co/storage/v1/object/sign/[bucket]/uploads/[uuid]?...
+        const uploadUrlObj = new URL(uploadUrl);
+        const pathParts = uploadUrlObj.pathname.split('/').filter(p => p);
+        const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
+        const objectPath = uploadsIndex >= 0 
+          ? pathParts.slice(uploadsIndex).join('/')
+          : `uploads/${Date.now()}.pdf`;
+        
+        const fileUrl = `/api/objects/${objectPath}`;
+        
+        await storage.createPatientFile({
+          patientId: patient.id,
+          filename: req.file.originalname || `chart-${Date.now()}.pdf`,
+          fileUrl: fileUrl,
+          fileType: 'application/pdf',
+          description: 'Patient chart (uploaded for migration)'
+        });
+        console.log(`✅ Saved PDF as patient file for reference`);
+      } catch (fileError: any) {
+        console.warn(`⚠️  Could not save PDF file: ${fileError.message}`);
+        // Don't fail the request if file saving fails
+      }
+
+      // Return summary for review (does NOT auto-save the clinical note)
+      res.json({
+        summary: summary.formattedNote,
+        followUpPrompt: summary.followUpPrompt || null
+      });
+    } catch (error: any) {
+      console.error("❌ Error processing chart upload:", error);
+      res.status(500).json({ error: error.message || "Failed to process chart upload" });
+    }
+  });
+
   // Save clinical note after clinician review/edit
   app.post("/api/clinical-notes/save", isAuthenticated, async (req: any, res) => {
     try {

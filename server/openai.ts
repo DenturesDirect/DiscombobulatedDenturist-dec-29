@@ -301,6 +301,118 @@ export async function processClinicalNote(plainTextNote: string, patientContext:
   }
 }
 
+const CHART_SUMMARIZATION_PROMPT = `You are an AI clinical documentation assistant for Dentures Direct.
+
+YOUR TASK:
+Summarize a complete patient chart (from an old system) into ONE comprehensive clinical note that captures the entire treatment history.
+
+CORE OBJECTIVE:
+Create a single, chronological clinical note that:
+- Summarizes all relevant treatment history from the chart
+- Identifies the current treatment status/step
+- Maintains chronological order of events
+- Follows clinical charting standards
+- Is ready for review and editing by the clinician
+
+CLINICAL CHARTING RULES:
+- All documentation must be: Accurate, Defensible, Chronological, Readable by a third party
+- Use professional, objective, neutral language
+- Distinguish between patient-reported information and clinical observations
+- Include dates when available from the chart
+- Document treatment progress, procedures performed, and current status
+- Note any important limitations, delays, or dependencies
+
+FORMATTING:
+- Output in plain text only (no markdown, no code blocks)
+- Use clear section breaks if needed (e.g., "Initial Consultation:", "Treatment Progress:", "Current Status:")
+- Each section should be chronological
+- End with a clear statement of current treatment status
+
+IMPORTANT:
+- DO NOT create tasks automatically
+- DO NOT infer next steps - just document what has happened
+- DO NOT make assumptions about treatment plans
+- Focus on summarizing what IS in the chart, not what should happen next
+- The clinician will review and edit this note, then manually set current/next steps
+
+Return your response as JSON with this structure:
+{
+  "formattedNote": "The comprehensive clinical note summary in plain text",
+  "followUpPrompt": null (always null for chart summaries - clinician will set steps manually)
+}`;
+
+/**
+ * Summarizes a patient chart (from old system) into a comprehensive clinical note
+ * @param chartText - Extracted text from the patient chart PDF
+ * @param patientName - Name of the patient
+ * @returns Formatted clinical note summary
+ */
+export async function summarizePatientChart(chartText: string, patientName: string): Promise<ClinicalNoteResponse> {
+  if (!config.apiKey) {
+    throw new Error("OpenAI API key not configured. Please add AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY to your secrets.");
+  }
+
+  try {
+    console.log("🧠 Summarizing patient chart for:", patientName);
+    console.log("📋 Chart text length:", chartText.length, "characters");
+
+    // Truncate if too long (OpenAI has token limits)
+    const maxLength = 50000; // Roughly 12,500 tokens
+    const truncatedText = chartText.length > maxLength 
+      ? chartText.substring(0, maxLength) + "\n\n[Chart continues beyond this point...]"
+      : chartText;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: CHART_SUMMARIZATION_PROMPT },
+        { 
+          role: "user", 
+          content: `Patient: ${patientName}\n\nPatient Chart Content:\n${truncatedText}\n\nPlease summarize this entire chart into one comprehensive clinical note that captures the treatment history and current status.` 
+        }
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 4096,
+    });
+
+    const content = response.choices[0]?.message?.content;
+    
+    if (!content) {
+      console.error("❌ OpenAI returned empty content");
+      throw new Error("OpenAI returned an empty response. Please try again.");
+    }
+
+    console.log("✅ Chart summary received:", content.length, "characters");
+    
+    const result = JSON.parse(content) as ClinicalNoteResponse;
+    
+    if (!result.formattedNote) {
+      console.error("❌ Parsed response missing formattedNote:", result);
+      throw new Error("AI response was missing the formatted note. Please try again.");
+    }
+
+    console.log("✅ Chart summarized successfully");
+    return result;
+  } catch (error: any) {
+    console.error("❌ Error summarizing chart:", error);
+    
+    if (error.status === 401) {
+      throw new Error("OpenAI authentication failed. Please check your API key configuration.");
+    }
+    if (error.status === 429) {
+      throw new Error("Rate limit exceeded. Please wait a moment and try again.");
+    }
+    if (error.status === 500 || error.status === 503) {
+      throw new Error("OpenAI service is temporarily unavailable. Please try again in a few minutes.");
+    }
+    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      throw new Error("Unable to connect to OpenAI. Please check your internet connection.");
+    }
+    
+    throw new Error(error.message || "Failed to summarize patient chart. Please try again.");
+  }
+}
+
 export async function generateReferralLetter(
   patientName: string,
   clinicalNote: string,

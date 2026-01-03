@@ -28,6 +28,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import ClinicalPhotoGrid from "@/components/ClinicalPhotoGrid";
 import ShadeReminderModal from "@/components/ShadeReminderModal";
 import TaskForm from "@/components/TaskForm";
+import ChartUploader from "@/components/ChartUploader";
 import OfficeSelector from "@/components/OfficeSelector";
 import { FileText, Camera, Clock, Loader2, Mail, MailX, FlaskConical, ClipboardList, Pill, Save, X, Edit3, CheckSquare, Trash2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -704,6 +705,32 @@ export default function Dashboard() {
                   </div>
                 )}
                 <ClinicalDetailsCard patient={patient} />
+                
+                {/* Chart Upload for Dentures Direct users */}
+                {canViewAllOffices && (
+                  <div className="mt-4">
+                    {!showChartUpload ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowChartUpload(true)}
+                        className="w-full"
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        Upload Patient Chart (Migrate from Old System)
+                      </Button>
+                    ) : (
+                      <ChartUploader
+                        patientId={patientId}
+                        patientName={patient.name}
+                        onCancel={() => setShowChartUpload(false)}
+                        onSummaryReady={() => {
+                          // Refresh clinical notes after summary is ready
+                          queryClient.invalidateQueries({ queryKey: ['/api/clinical-notes', patientId] });
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
 
               <Card className="p-6">
