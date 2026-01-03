@@ -141,6 +141,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         delete req.body.officeId; // Remove officeId from update if user can't change it
       }
       
+      // If lastStepCompleted is being updated, automatically set lastStepDate to today
+      if (req.body.lastStepCompleted !== undefined && req.body.lastStepCompleted !== currentPatient.lastStepCompleted) {
+        req.body.lastStepDate = new Date();
+      }
+      
       const patient = await storage.updatePatient(req.params.id, req.body);
       if (!patient) return res.status(404).json({ error: "Patient not found" });
       

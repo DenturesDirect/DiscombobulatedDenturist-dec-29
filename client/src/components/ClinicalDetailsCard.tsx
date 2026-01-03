@@ -51,6 +51,8 @@ const clinicalDetailsSchema = z.object({
   lowerDentureType: z.string().optional(),
   isCDCP: z.boolean().optional(),
   workInsurance: z.boolean().optional(),
+  lastStepCompleted: z.string().optional(),
+  nextStep: z.string().optional(),
 });
 
 type ClinicalDetailsFormData = z.infer<typeof clinicalDetailsSchema>;
@@ -69,6 +71,8 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
       lowerDentureType: patient.lowerDentureType || "None",
       isCDCP: patient.isCDCP || false,
       workInsurance: patient.workInsurance || false,
+      lastStepCompleted: patient.lastStepCompleted || "",
+      nextStep: patient.nextStep || "",
     },
   });
 
@@ -83,6 +87,8 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
         lowerDentureType: patient.lowerDentureType || "None",
         isCDCP: patient.isCDCP || false,
         workInsurance: patient.workInsurance || false,
+        lastStepCompleted: patient.lastStepCompleted || "",
+        nextStep: patient.nextStep || "",
       });
     }
   }, [patient, form, isEditing]);
@@ -102,6 +108,8 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
         lowerDentureType: updatedPatient.lowerDentureType || "None",
         isCDCP: updatedPatient.isCDCP || false,
         workInsurance: updatedPatient.workInsurance || false,
+        lastStepCompleted: updatedPatient.lastStepCompleted || "",
+        nextStep: updatedPatient.nextStep || "",
       });
       
       queryClient.invalidateQueries({ queryKey: ['/api/patients', patient.id] });
@@ -201,6 +209,21 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
                 <p className="text-muted-foreground">Lower Denture</p>
                 <p className="font-medium" data-testid="text-lower-denture">
                   {patient.lowerDentureType || "None"}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-muted-foreground">Current Step</p>
+                <p className="font-medium" data-testid="text-current-step">
+                  {patient.lastStepCompleted || "Not set"}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Next Step</p>
+                <p className="font-medium" data-testid="text-next-step">
+                  {patient.nextStep || "Not set"}
                 </p>
               </div>
             </div>
@@ -357,6 +380,46 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
                           ))}
                         </SelectContent>
                       </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="lastStepCompleted"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Current Step</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., Impressions Complete"
+                          {...field}
+                          value={field.value || ""}
+                          data-testid="input-edit-current-step"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="nextStep"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Next Step</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., Bite Blocks"
+                          {...field}
+                          value={field.value || ""}
+                          data-testid="input-edit-next-step"
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
