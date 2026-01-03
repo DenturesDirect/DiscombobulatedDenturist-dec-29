@@ -243,7 +243,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/patients/:id/chart-upload", isAuthenticated, upload.single('chart'), async (req: any, res) => {
+  // Error handler for multer errors
+  const handleMulterError = (err: any, req: any, res: any, next: any) => {
+    if (err) {
+      console.error("❌ Multer error:", err);
+      console.error("❌ Multer error message:", err.message);
+      console.error("❌ Multer error code:", err.code);
+      return res.status(400).json({ 
+        error: `File Upload Error: ${err.message || "Failed to upload file. Please ensure you're uploading a PDF file under 10MB."}` 
+      });
+    }
+    next();
+  };
+
+  app.post("/api/patients/:id/chart-upload", isAuthenticated, upload.single('chart'), handleMulterError, async (req: any, res) => {
     try {
       const officeContext = await getUserOfficeContext(req);
       
