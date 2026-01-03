@@ -6,7 +6,9 @@
 export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
     // Dynamic import for ES modules compatibility
-    const pdfParse = (await import("pdf-parse")).default;
+    const pdfParseModule = await import("pdf-parse");
+    // pdf-parse exports as default, but may need to access it differently
+    const pdfParse = pdfParseModule.default || pdfParseModule;
     const data = await pdfParse(buffer);
     return data.text;
   } catch (error: any) {
