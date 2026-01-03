@@ -4,7 +4,7 @@ import { processClinicalNote, generateReferralLetter } from "./openai";
 // Force redeploy to pick up Supabase bucket name
 import { storage } from "./storage";
 import { insertPatientSchema, insertLabNoteSchema, insertAdminNoteSchema, insertLabPrescriptionSchema } from "@shared/schema";
-import { setupLocalAuth, isAuthenticated, seedStaffAccounts } from "./localAuth";
+import { setupLocalAuth, isAuthenticated, isAdmin, seedStaffAccounts } from "./localAuth";
 import { seedTestData } from "./test-data";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { sendCustomNotification, sendAppointmentReminder } from "./gmail";
@@ -408,6 +408,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update clinical note
+  app.patch("/api/clinical-notes/:id", isAuthenticated, async (req, res) => {
+    try {
+      const officeContext = await getUserOfficeContext(req);
+      const noteId = req.params.id;
+      
+      // Get the note by searching through all accessible patients' notes
+      const patients = await storage.listPatients(officeContext.officeId, officeContext.canViewAllOffices);
+      let note = null;
+      for (const patient of patients) {
+        const notes = await storage.listClinicalNotes(patient.id, officeContext.officeId, officeContext.canViewAllOffices);
+        const foundNote = notes.find(n => n.id === noteId);
+        if (foundNote) {
+          note = foundNote;
+          break;
+        }
+      }
+      
+      if (!note) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+
+      // Check if note was created today (same day edit restriction)
+      const noteDate = note.noteDate ? new Date(note.noteDate) : new Date(note.createdAt);
+      const today = new Date();
+      const isSameDay = noteDate.toDateString() === today.toDateString();
+      
+      if (!isSameDay) {
+        return res.status(403).json({ error: "Notes can only be edited on the same day they were created" });
+      }
+
+      const updated = await storage.updateClinicalNote(noteId, req.body);
+      if (!updated) return res.status(404).json({ error: "Note not found" });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Delete clinical note (admin only)
+  app.delete("/api/clinical-notes/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const officeContext = await getUserOfficeContext(req);
+      const noteId = req.params.id;
+      
+      // Get the note to verify it exists by searching through all accessible patients' notes
+      const patients = await storage.listPatients(officeContext.officeId, officeContext.canViewAllOffices);
+      let note = null;
+      for (const patient of patients) {
+        const notes = await storage.listClinicalNotes(patient.id, officeContext.officeId, officeContext.canViewAllOffices);
+        const foundNote = notes.find(n => n.id === noteId);
+        if (foundNote) {
+          note = foundNote;
+          break;
+        }
+      }
+      
+      if (!note) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+
+      const success = await storage.deleteClinicalNote(noteId);
+      if (!success) return res.status(404).json({ error: "Note not found" });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Patient files
   app.get("/api/patients/:id/files", isAuthenticated, async (req, res) => {
     try {
@@ -790,6 +859,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.status(400).json({ error: "Failed to create lab note. Please check the server logs." });
+    }
+  });
+
+  // Update lab note
+  app.patch("/api/lab-notes/:id", isAuthenticated, async (req, res) => {
+    try {
+      const officeContext = await getUserOfficeContext(req);
+      const noteId = req.params.id;
+      
+      // Get the note by searching through all accessible patients' notes
+      const patients = await storage.listPatients(officeContext.officeId, officeContext.canViewAllOffices);
+      let note = null;
+      for (const patient of patients) {
+        const notes = await storage.listLabNotes(patient.id, officeContext.officeId, officeContext.canViewAllOffices);
+        const foundNote = notes.find(n => n.id === noteId);
+        if (foundNote) {
+          note = foundNote;
+          break;
+        }
+      }
+      
+      if (!note) {
+        return res.status(404).json({ error: "Note not found" });
+      }
+
+      // Check if note was created today (same day edit restriction)
+      const noteDate = new Date(note.createdAt);
+      const today = new Date();
+      const isSameDay = noteDate.toDateString() === today.toDateString();
+      
+      if (!isSameDay) {
+        return res.status(403).json({ error: "Notes can only be edited on the same day they were created" });
+      }
+
+      const updated = await storage.updateLabNote(noteId, req.body);
+      if (!updated) return res.status(404).json({ error: "Note not found" });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 

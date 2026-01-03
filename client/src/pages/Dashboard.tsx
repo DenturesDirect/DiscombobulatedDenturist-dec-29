@@ -6,6 +6,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import TopNav from "@/components/TopNav";
 import ClinicalDetailsCard from "@/components/ClinicalDetailsCard";
 import VoicePromptInput from "@/components/VoicePromptInput";
@@ -19,7 +29,7 @@ import ClinicalPhotoGrid from "@/components/ClinicalPhotoGrid";
 import ShadeReminderModal from "@/components/ShadeReminderModal";
 import TaskForm from "@/components/TaskForm";
 import OfficeSelector from "@/components/OfficeSelector";
-import { FileText, Camera, Clock, Loader2, Mail, MailX, FlaskConical, ClipboardList, Pill, Save, X, Edit3, CheckSquare } from "lucide-react";
+import { FileText, Camera, Clock, Loader2, Mail, MailX, FlaskConical, ClipboardList, Pill, Save, X, Edit3, CheckSquare, Trash2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -49,6 +59,12 @@ export default function Dashboard() {
     priority: 'high' | 'normal' | 'low';
   }> | null>(null);
   const [selectedOfficeId, setSelectedOfficeId] = useState<string | null>(null);
+  const [editingClinicalNoteId, setEditingClinicalNoteId] = useState<string | null>(null);
+  const [editingClinicalNoteContent, setEditingClinicalNoteContent] = useState<string>("");
+  const [editingLabNoteId, setEditingLabNoteId] = useState<string | null>(null);
+  const [editingLabNoteContent, setEditingLabNoteContent] = useState<string>("");
+  const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const canViewAllOffices = user?.canViewAllOffices ?? false;
 
@@ -256,6 +272,128 @@ export default function Dashboard() {
       title: "Note Discarded",
       description: "The formatted note was discarded without saving."
     });
+  };
+
+  // Check if note can be edited (same day)
+  const canEditNote = (note: ClinicalNote | LabNote) => {
+    const noteDate = 'noteDate' in note && note.noteDate 
+      ? new Date(note.noteDate) 
+      : new Date(note.createdAt);
+    const today = new Date();
+    return noteDate.toDateString() === today.toDateString();
+  };
+
+  // Handle edit clinical note
+  const handleEditClinicalNote = (note: ClinicalNote) => {
+    if (!canEditNote(note)) {
+      toast({
+        title: "Cannot Edit",
+        description: "Notes can only be edited on the same day they were created.",
+        variant: "destructive"
+      });
+      return;
+    }
+    setEditingClinicalNoteId(note.id);
+    setEditingClinicalNoteContent(note.content);
+  };
+
+  const handleSaveClinicalNoteEdit = async () => {
+    if (!editingClinicalNoteId) return;
+    
+    try {
+      await apiRequest('PATCH', `/api/clinical-notes/${editingClinicalNoteId}`, {
+        content: editingClinicalNoteContent
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['/api/clinical-notes', patientId] });
+      setEditingClinicalNoteId(null);
+      setEditingClinicalNoteContent("");
+      
+      toast({
+        title: "Note Updated",
+        description: "Clinical note has been updated successfully."
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update note",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleCancelClinicalNoteEdit = () => {
+    setEditingClinicalNoteId(null);
+    setEditingClinicalNoteContent("");
+  };
+
+  // Handle edit lab note
+  const handleEditLabNote = (note: LabNote) => {
+    if (!canEditNote(note)) {
+      toast({
+        title: "Cannot Edit",
+        description: "Notes can only be edited on the same day they were created.",
+        variant: "destructive"
+      });
+      return;
+    }
+    setEditingLabNoteId(note.id);
+    setEditingLabNoteContent(note.content);
+  };
+
+  const handleSaveLabNoteEdit = async () => {
+    if (!editingLabNoteId) return;
+    
+    try {
+      await apiRequest('PATCH', `/api/lab-notes/${editingLabNoteId}`, {
+        content: editingLabNoteContent
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['/api/lab-notes', patientId] });
+      setEditingLabNoteId(null);
+      setEditingLabNoteContent("");
+      
+      toast({
+        title: "Note Updated",
+        description: "Lab note has been updated successfully."
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update note",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleCancelLabNoteEdit = () => {
+    setEditingLabNoteId(null);
+    setEditingLabNoteContent("");
+  };
+
+  // Handle delete clinical note
+  const handleDeleteClinicalNote = async () => {
+    if (!deleteNoteId) return;
+    
+    try {
+      await apiRequest('DELETE', `/api/clinical-notes/${deleteNoteId}`);
+      
+      queryClient.invalidateQueries({ queryKey: ['/api/clinical-notes', patientId] });
+      setDeleteNoteId(null);
+      setShowDeleteDialog(false);
+      
+      toast({
+        title: "Note Deleted",
+        description: "Clinical note has been deleted successfully."
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete note",
+        variant: "destructive"
+      });
+      setShowDeleteDialog(false);
+    }
   };
 
   const handleGenerateReferralLetter = async () => {
@@ -846,19 +984,80 @@ export default function Dashboard() {
                   <div className="space-y-4">
                     {clinicalNotes.map((note) => (
                       <Card key={note.id} className="p-4" data-testid={`card-clinical-note-${note.id}`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="secondary" className="text-xs">
-                            <FileText className="w-3 h-3 mr-1" />
-                            Clinical Note
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {note.noteDate 
-                              ? new Date(note.noteDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-                              : new Date(note.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-                            } by {note.createdBy}
-                          </span>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-xs">
+                              <FileText className="w-3 h-3 mr-1" />
+                              Clinical Note
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {note.noteDate 
+                                ? new Date(note.noteDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                                : new Date(note.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                              } by {note.createdBy}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {editingClinicalNoteId === note.id ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={handleSaveClinicalNoteEdit}
+                                  data-testid={`button-save-edit-${note.id}`}
+                                >
+                                  <Save className="w-3 h-3 mr-1" />
+                                  Save
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={handleCancelClinicalNoteEdit}
+                                  data-testid={`button-cancel-edit-${note.id}`}
+                                >
+                                  <X className="w-3 h-3 mr-1" />
+                                  Cancel
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                {canEditNote(note) && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleEditClinicalNote(note)}
+                                    data-testid={`button-edit-${note.id}`}
+                                  >
+                                    <Edit3 className="w-3 h-3" />
+                                  </Button>
+                                )}
+                                {user?.role === 'admin' && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      setDeleteNoteId(note.id);
+                                      setShowDeleteDialog(true);
+                                    }}
+                                    data-testid={`button-delete-${note.id}`}
+                                  >
+                                    <Trash2 className="w-3 h-3 text-destructive" />
+                                  </Button>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                        {editingClinicalNoteId === note.id ? (
+                          <Textarea
+                            value={editingClinicalNoteContent}
+                            onChange={(e) => setEditingClinicalNoteContent(e.target.value)}
+                            className="min-h-[100px] text-sm"
+                            data-testid={`textarea-edit-${note.id}`}
+                          />
+                        ) : (
+                          <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                        )}
                       </Card>
                     ))}
                   </div>
@@ -880,16 +1079,64 @@ export default function Dashboard() {
                   <div className="space-y-4">
                     {labNotes.map((note) => (
                       <Card key={note.id} className="p-4" data-testid={`card-lab-note-${note.id}`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="secondary" className="text-xs">
-                            <FlaskConical className="w-3 h-3 mr-1" />
-                            Lab Note
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(note.createdAt).toLocaleDateString()} by {note.createdBy}
-                          </span>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-xs">
+                              <FlaskConical className="w-3 h-3 mr-1" />
+                              Lab Note
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(note.createdAt).toLocaleDateString()} by {note.createdBy}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {editingLabNoteId === note.id ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={handleSaveLabNoteEdit}
+                                  data-testid={`button-save-edit-lab-${note.id}`}
+                                >
+                                  <Save className="w-3 h-3 mr-1" />
+                                  Save
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={handleCancelLabNoteEdit}
+                                  data-testid={`button-cancel-edit-lab-${note.id}`}
+                                >
+                                  <X className="w-3 h-3 mr-1" />
+                                  Cancel
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                {canEditNote(note) && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleEditLabNote(note)}
+                                    data-testid={`button-edit-lab-${note.id}`}
+                                  >
+                                    <Edit3 className="w-3 h-3" />
+                                  </Button>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                        {editingLabNoteId === note.id ? (
+                          <Textarea
+                            value={editingLabNoteContent}
+                            onChange={(e) => setEditingLabNoteContent(e.target.value)}
+                            className="min-h-[100px] text-sm"
+                            data-testid={`textarea-edit-lab-${note.id}`}
+                          />
+                        ) : (
+                          <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                        )}
                       </Card>
                     ))}
                   </div>
@@ -1108,6 +1355,32 @@ export default function Dashboard() {
         }}
         patientName={patient.name}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Clinical Note</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this clinical note? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setDeleteNoteId(null);
+              setShowDeleteDialog(false);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteClinicalNote}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

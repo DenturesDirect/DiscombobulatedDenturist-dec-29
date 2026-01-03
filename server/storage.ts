@@ -35,6 +35,8 @@ export interface IStorage {
   // Clinical Notes
   createClinicalNote(note: InsertClinicalNote): Promise<ClinicalNote>;
   listClinicalNotes(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<ClinicalNote[]>;
+  updateClinicalNote(id: string, updates: Partial<InsertClinicalNote>): Promise<ClinicalNote | undefined>;
+  deleteClinicalNote(id: string): Promise<boolean>;
   
   // Tasks
   createTask(task: InsertTask): Promise<Task>;
@@ -49,6 +51,7 @@ export interface IStorage {
   // Lab Notes
   createLabNote(note: InsertLabNote): Promise<LabNote>;
   listLabNotes(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<LabNote[]>;
+  updateLabNote(id: string, updates: Partial<InsertLabNote>): Promise<LabNote | undefined>;
   
   // Admin Notes
   createAdminNote(note: InsertAdminNote): Promise<AdminNote>;
@@ -240,6 +243,18 @@ export class MemStorage implements IStorage {
     );
   }
 
+  async updateClinicalNote(id: string, updates: Partial<InsertClinicalNote>): Promise<ClinicalNote | undefined> {
+    const note = this.clinicalNotes.get(id);
+    if (!note) return undefined;
+    const updated = { ...note, ...updates };
+    this.clinicalNotes.set(id, updated);
+    return updated;
+  }
+
+  async deleteClinicalNote(id: string): Promise<boolean> {
+    return this.clinicalNotes.delete(id);
+  }
+
   async createTask(insertTask: InsertTask): Promise<Task> {
     const id = randomUUID();
     // Get patient to inherit officeId if task is patient-related
@@ -356,6 +371,14 @@ export class MemStorage implements IStorage {
     return Array.from(this.labNotesStore.values())
       .filter((note) => note.patientId === patientId)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async updateLabNote(id: string, updates: Partial<InsertLabNote>): Promise<LabNote | undefined> {
+    const note = this.labNotesStore.get(id);
+    if (!note) return undefined;
+    const updated = { ...note, ...updates };
+    this.labNotesStore.set(id, updated);
+    return updated;
   }
 
   // Admin Notes
@@ -561,6 +584,21 @@ export class DbStorage implements IStorage {
       .orderBy(desc(clinicalNotes.createdAt));
   }
 
+  async updateClinicalNote(id: string, updates: Partial<InsertClinicalNote>): Promise<ClinicalNote | undefined> {
+    const result = await ensureDb().update(clinicalNotes)
+      .set(updates)
+      .where(eq(clinicalNotes.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteClinicalNote(id: string): Promise<boolean> {
+    const result = await ensureDb().delete(clinicalNotes)
+      .where(eq(clinicalNotes.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
   async createTask(insertTask: InsertTask): Promise<Task> {
     // If officeId not provided and task is patient-related, get it from patient
     if (!insertTask.officeId && insertTask.patientId) {
@@ -695,6 +733,14 @@ export class DbStorage implements IStorage {
     return await ensureDb().select().from(labNotes)
       .where(eq(labNotes.patientId, patientId))
       .orderBy(desc(labNotes.createdAt));
+  }
+
+  async updateLabNote(id: string, updates: Partial<InsertLabNote>): Promise<LabNote | undefined> {
+    const result = await ensureDb().update(labNotes)
+      .set(updates)
+      .where(eq(labNotes.id, id))
+      .returning();
+    return result[0];
   }
 
   // Admin Notes
