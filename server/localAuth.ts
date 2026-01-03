@@ -12,10 +12,14 @@ import { USE_MEM_STORAGE } from "./config";
 const SALT_ROUNDS = 12;
 
 const ALLOWED_STAFF = [
-  { email: "damien@denturesdirect.ca", firstName: "Damien", lastName: "Hiorth", role: "admin" },
-  { email: "michael@denturesdirect.ca", firstName: "Michael", lastName: "", role: "staff" },
-  { email: "luisa@denturesdirect.ca", firstName: "Luisa", lastName: "", role: "staff" },
-  { email: "info@denturesdirect.ca", firstName: "Caroline", lastName: "", role: "staff" },
+  // Dentures Direct users
+  { email: "damien@denturesdirect.ca", firstName: "Damien", lastName: "Hiorth", role: "admin", officeName: "Dentures Direct", canViewAllOffices: true },
+  { email: "michael@denturesdirect.ca", firstName: "Michael", lastName: "", role: "staff", officeName: "Dentures Direct", canViewAllOffices: true },
+  { email: "luisa@denturesdirect.ca", firstName: "Luisa", lastName: "", role: "staff", officeName: "Dentures Direct", canViewAllOffices: true },
+  { email: "info@denturesdirect.ca", firstName: "Caroline", lastName: "", role: "staff", officeName: "Dentures Direct", canViewAllOffices: true },
+  // Toronto Smile Centre users
+  { email: "admin@torontosmilecentre.ca", firstName: "Admin", lastName: "", role: "admin", officeName: "Toronto Smile Centre", canViewAllOffices: false },
+  { email: "dentist@torontosmilecentre.ca", firstName: "Dentist", lastName: "", role: "staff", officeName: "Toronto Smile Centre", canViewAllOffices: false },
 ];
 
 export async function hashPassword(password: string): Promise<string> {
@@ -284,9 +288,29 @@ export async function seedStaffAccounts() {
   }
   
   try {
+    // Get office IDs from database
+    let officeMap: Record<string, string> = {};
+    if (!USE_MEM_STORAGE) {
+      try {
+        const { offices } = await import("@shared/schema");
+        const { ensureDb } = await import("./db");
+        const db = ensureDb();
+        if (db) {
+          const officesList = await db.select().from(offices);
+          for (const office of officesList) {
+            officeMap[office.name] = office.id;
+          }
+          console.log(`  📍 Found ${officesList.length} offices in database`);
+        }
+      } catch (error: any) {
+        console.warn(`  ⚠️  Could not fetch offices: ${error.message}`);
+      }
+    }
+    
     for (const staff of ALLOWED_STAFF) {
       try {
         const existingUser = await storage.getUserByEmail(staff.email);
+        const officeId = officeMap[staff.officeName] || null;
         
         if (!existingUser) {
           const tempPassword = await hashPassword('TempPassword123!');
@@ -298,15 +322,37 @@ export async function seedStaffAccounts() {
             firstName: staff.firstName,
             lastName: staff.lastName,
             role: staff.role,
+            officeId: officeId,
+            canViewAllOffices: staff.canViewAllOffices || false,
           });
           
-          console.log(`  ✓ Created account for ${staff.email} (temp password: TempPassword123!)`);
-        } else if (!existingUser.password) {
-          const tempPassword = await hashPassword('TempPassword123!');
-          await storage.updateUserPassword(existingUser.id, tempPassword);
-          console.log(`  ✓ Set temp password for ${staff.email}`);
+          console.log(`  ✓ Created account for ${staff.email} (${staff.officeName}${staff.canViewAllOffices ? ', can view all offices' : ''})`);
         } else {
-          console.log(`  ✓ Account exists for ${staff.email}`);
+          // Update existing user with office info if missing
+          const needsUpdate = existingUser.officeId !== officeId || 
+                             existingUser.canViewAllOffices !== (staff.canViewAllOffices || false);
+          
+          if (needsUpdate && officeId) {
+            await storage.upsertUser({
+              id: existingUser.id,
+              email: existingUser.email,
+              password: existingUser.password,
+              firstName: existingUser.firstName,
+              lastName: existingUser.lastName,
+              role: existingUser.role,
+              officeId: officeId,
+              canViewAllOffices: staff.canViewAllOffices || false,
+            });
+            console.log(`  ✓ Updated office assignment for ${staff.email}`);
+          }
+          
+          if (!existingUser.password) {
+            const tempPassword = await hashPassword('TempPassword123!');
+            await storage.updateUserPassword(existingUser.id, tempPassword);
+            console.log(`  ✓ Set temp password for ${staff.email}`);
+          } else {
+            console.log(`  ✓ Account exists for ${staff.email}`);
+          }
         }
       } catch (error: any) {
         console.error(`  ❌ Error seeding account for ${staff.email}:`, error.message);
