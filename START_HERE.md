@@ -59,7 +59,7 @@
 3. Click **"+ New Variable"** and add these:
 
    **First Variable:**
-   - Name: `SESSION_SECRET`
+   - Name: ``
    - Value: `my-super-secret-key-12345-change-this-later`
    - Click "Add"
 

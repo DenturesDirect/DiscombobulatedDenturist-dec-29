@@ -200,8 +200,10 @@ export const labPrescriptions = pgTable("lab_prescriptions", {
   caseType: text("case_type"), // deprecated - kept for backward compatibility
   caseTypeUpper: text("case_type_upper"), // cast partial, complete denture, implant-retained, repair, tooth addition (Max/Maxillary)
   caseTypeLower: text("case_type_lower"), // cast partial, complete denture, implant-retained, repair, tooth addition (Mand)
-  arch: text("arch").notNull(), // upper, lower, both
-  fabricationStage: text("fabrication_stage").notNull(), // framework only, try-in, finish, repair
+  arch: text("arch"), // deprecated - kept for backward compatibility
+  fabricationStage: text("fabrication_stage"), // deprecated - kept for backward compatibility
+  fabricationStageUpper: text("fabrication_stage_upper"), // framework only, try-in, finish, repair (for upper arch)
+  fabricationStageLower: text("fabrication_stage_lower"), // framework only, try-in, finish, repair (for lower arch)
   deadline: timestamp("deadline"),
   digitalFiles: text("digital_files").array(), // STL, PLY, bite scan, vestibular scan, etc.
   designInstructions: text("design_instructions"), // explicit design details

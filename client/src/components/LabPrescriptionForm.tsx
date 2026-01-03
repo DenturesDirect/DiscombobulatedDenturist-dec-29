@@ -20,8 +20,8 @@ export interface LabPrescriptionData {
   labName: string;
   caseTypeUpper?: string;
   caseTypeLower?: string;
-  arch: string;
-  fabricationStage: string;
+  fabricationStageUpper?: string;
+  fabricationStageLower?: string;
   deadline?: Date;
   digitalFiles?: string[];
   designInstructions?: string;
@@ -85,8 +85,8 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
   const [labName, setLabName] = useState("");
   const [caseTypeUpper, setCaseTypeUpper] = useState("");
   const [caseTypeLower, setCaseTypeLower] = useState("");
-  const [arch, setArch] = useState("");
-  const [fabricationStage, setFabricationStage] = useState("");
+  const [fabricationStageUpper, setFabricationStageUpper] = useState("");
+  const [fabricationStageLower, setFabricationStageLower] = useState("");
   const [deadline, setDeadline] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [designInstructions, setDesignInstructions] = useState("");
@@ -192,8 +192,8 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
       labName,
       caseTypeUpper: caseTypeUpper || undefined,
       caseTypeLower: caseTypeLower || undefined,
-      arch,
-      fabricationStage,
+      fabricationStageUpper: caseTypeUpper ? (fabricationStageUpper || undefined) : undefined,
+      fabricationStageLower: caseTypeLower ? (fabricationStageLower || undefined) : undefined,
       deadline: deadline ? new Date(deadline) : undefined,
       digitalFiles: selectedFiles.length > 0 ? selectedFiles : undefined,
       designInstructions: designInstructions || undefined,
@@ -207,8 +207,8 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
     setLabName("");
     setCaseTypeUpper("");
     setCaseTypeLower("");
-    setArch("");
-    setFabricationStage("");
+    setFabricationStageUpper("");
+    setFabricationStageLower("");
     setDeadline("");
     setSelectedFiles([]);
     setDesignInstructions("");
@@ -218,7 +218,10 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
     setSpecialNotes("");
   };
 
-  const isValid = labName && (caseTypeUpper || caseTypeLower) && arch && fabricationStage;
+  const isValid = labName && 
+    (caseTypeUpper || caseTypeLower) && 
+    (!caseTypeUpper || fabricationStageUpper) && 
+    (!caseTypeLower || fabricationStageLower);
 
   return (
     <div className="space-y-6">
@@ -250,69 +253,73 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="case-type-upper">Case Type - Upper (Max/Maxillary)</Label>
-            <Select value={caseTypeUpper || undefined} onValueChange={(val) => setCaseTypeUpper(val === "none" ? "" : val || "")}>
-              <SelectTrigger id="case-type-upper" data-testid="select-case-type-upper">
-                <SelectValue placeholder="Select upper case type..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">N/A</SelectItem>
-                {CASE_TYPES.map(ct => (
-                  <SelectItem key={ct.value} value={ct.value}>{ct.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="case-type-upper">Case Type - Upper (Max/Maxillary)</Label>
+              <Select value={caseTypeUpper || undefined} onValueChange={(val) => setCaseTypeUpper(val === "none" ? "" : val || "")}>
+                <SelectTrigger id="case-type-upper" data-testid="select-case-type-upper">
+                  <SelectValue placeholder="Select upper case type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">N/A</SelectItem>
+                  {CASE_TYPES.map(ct => (
+                    <SelectItem key={ct.value} value={ct.value}>{ct.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {caseTypeUpper && (
+              <div className="space-y-2">
+                <Label htmlFor="fabrication-stage-upper">Fabrication Stage - Upper *</Label>
+                <Select value={fabricationStageUpper || undefined} onValueChange={(val) => setFabricationStageUpper(val || "")}>
+                  <SelectTrigger id="fabrication-stage-upper" data-testid="select-fabrication-stage-upper">
+                    <SelectValue placeholder="Select stage..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FABRICATION_STAGES.map(fs => (
+                      <SelectItem key={fs.value} value={fs.value}>{fs.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="case-type-lower">Case Type - Lower (Mand)</Label>
-            <Select value={caseTypeLower || undefined} onValueChange={(val) => setCaseTypeLower(val === "none" ? "" : val || "")}>
-              <SelectTrigger id="case-type-lower" data-testid="select-case-type-lower">
-                <SelectValue placeholder="Select lower case type..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">N/A</SelectItem>
-                {CASE_TYPES.map(ct => (
-                  <SelectItem key={ct.value} value={ct.value}>{ct.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="case-type-lower">Case Type - Lower (Mand)</Label>
+              <Select value={caseTypeLower || undefined} onValueChange={(val) => setCaseTypeLower(val === "none" ? "" : val || "")}>
+                <SelectTrigger id="case-type-lower" data-testid="select-case-type-lower">
+                  <SelectValue placeholder="Select lower case type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">N/A</SelectItem>
+                  {CASE_TYPES.map(ct => (
+                    <SelectItem key={ct.value} value={ct.value}>{ct.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {caseTypeLower && (
+              <div className="space-y-2">
+                <Label htmlFor="fabrication-stage-lower">Fabrication Stage - Lower *</Label>
+                <Select value={fabricationStageLower || undefined} onValueChange={(val) => setFabricationStageLower(val || "")}>
+                  <SelectTrigger id="fabrication-stage-lower" data-testid="select-fabrication-stage-lower">
+                    <SelectValue placeholder="Select stage..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FABRICATION_STAGES.map(fs => (
+                      <SelectItem key={fs.value} value={fs.value}>{fs.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         </div>
         {!caseTypeUpper && !caseTypeLower && (
           <p className="text-sm text-destructive">At least one case type (Upper or Lower) is required</p>
         )}
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="arch">Arch *</Label>
-            <Select value={arch} onValueChange={setArch}>
-              <SelectTrigger id="arch" data-testid="select-arch">
-                <SelectValue placeholder="Select arch..." />
-              </SelectTrigger>
-              <SelectContent>
-                {ARCHES.map(a => (
-                  <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="fabrication-stage">Fabrication Stage *</Label>
-            <Select value={fabricationStage} onValueChange={setFabricationStage}>
-              <SelectTrigger id="fabrication-stage" data-testid="select-fabrication-stage">
-                <SelectValue placeholder="Select stage..." />
-              </SelectTrigger>
-              <SelectContent>
-                {FABRICATION_STAGES.map(fs => (
-                  <SelectItem key={fs.value} value={fs.value}>{fs.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
 
         <div className="space-y-2">
           <Label htmlFor="deadline">Deadline / Required Arrival Date</Label>

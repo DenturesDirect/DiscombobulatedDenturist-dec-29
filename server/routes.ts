@@ -734,8 +734,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         labName: req.body.labName,
         caseTypeUpper: req.body.caseTypeUpper,
         caseTypeLower: req.body.caseTypeLower,
-        arch: req.body.arch,
-        fabricationStage: req.body.fabricationStage,
+        fabricationStageUpper: req.body.fabricationStageUpper,
+        fabricationStageLower: req.body.fabricationStageLower,
         hasDeadline: !!req.body.deadline,
         digitalFiles: req.body.digitalFiles,
         hasDesignInstructions: !!req.body.designInstructions
@@ -751,11 +751,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.body.caseTypeUpper && !req.body.caseTypeLower) {
         return res.status(400).json({ error: "At least one case type (Upper or Lower) is required" });
       }
-      if (!req.body.arch || req.body.arch.trim() === "") {
-        return res.status(400).json({ error: "Arch (upper/lower/both) is required" });
+      if (req.body.caseTypeUpper && (!req.body.fabricationStageUpper || req.body.fabricationStageUpper.trim() === "")) {
+        return res.status(400).json({ error: "Fabrication stage is required for upper case type" });
       }
-      if (!req.body.fabricationStage || req.body.fabricationStage.trim() === "") {
-        return res.status(400).json({ error: "Fabrication stage is required" });
+      if (req.body.caseTypeLower && (!req.body.fabricationStageLower || req.body.fabricationStageLower.trim() === "")) {
+        return res.status(400).json({ error: "Fabrication stage is required for lower case type" });
       }
       
       const validatedData = insertLabPrescriptionSchema.parse({
@@ -763,8 +763,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         labName: req.body.labName.trim(),
         caseTypeUpper: req.body.caseTypeUpper?.trim() || null,
         caseTypeLower: req.body.caseTypeLower?.trim() || null,
-        arch: req.body.arch.trim(),
-        fabricationStage: req.body.fabricationStage.trim(),
+        fabricationStageUpper: req.body.fabricationStageUpper?.trim() || null,
+        fabricationStageLower: req.body.fabricationStageLower?.trim() || null,
         status: req.body.status || "draft"
       });
       const user = req.user as any;
@@ -776,8 +776,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         caseType: null, // deprecated field
         caseTypeUpper: validatedData.caseTypeUpper || null,
         caseTypeLower: validatedData.caseTypeLower || null,
-        arch: validatedData.arch,
-        fabricationStage: validatedData.fabricationStage,
+        arch: null, // deprecated field
+        fabricationStage: null, // deprecated field
+        fabricationStageUpper: validatedData.fabricationStageUpper || null,
+        fabricationStageLower: validatedData.fabricationStageLower || null,
         deadline: validatedData.deadline,
         digitalFiles: validatedData.digitalFiles,
         designInstructions: validatedData.designInstructions,
