@@ -1,3 +1,6 @@
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+
 /**
  * Extracts text content from a PDF file buffer
  * @param buffer - PDF file as Buffer
@@ -5,10 +8,8 @@
  */
 export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    // Dynamic import for ES modules compatibility
-    const pdfParseModule = await import("pdf-parse");
-    // pdf-parse exports as default, but may need to access it differently
-    const pdfParse = pdfParseModule.default || pdfParseModule;
+    // Use require for CommonJS module compatibility
+    const pdfParse = require("pdf-parse");
     const data = await pdfParse(buffer);
     return data.text;
   } catch (error: any) {
