@@ -33,6 +33,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { insertPatientSchema } from "@shared/schema";
 import type { InsertPatient } from "@shared/schema";
@@ -40,6 +41,8 @@ import { Loader2, Camera } from "lucide-react";
 import { z } from "zod";
 import { ObjectUploader } from "./ObjectUploader";
 import type { UploadResult } from "@uppy/core";
+import { useQuery } from "@tanstack/react-query";
+import { FormDescription } from "@/components/ui/form";
 
 interface NewPatientDialogProps {
   open: boolean;
@@ -61,18 +64,29 @@ const DENTURE_TYPES = [
 
 export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewPatientDialogProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined);
   const [uploadedPatientId, setUploadedPatientId] = useState<string | undefined>(undefined);
+
+  const canViewAllOffices = user?.canViewAllOffices ?? false;
+
+  // Fetch offices for selection
+  const { data: offices = [] } = useQuery<Array<{ id: string; name: string }>>({
+    queryKey: ['/api/offices'],
+    enabled: canViewAllOffices && open,
+  });
 
   const form = useForm<InsertPatient>({
     resolver: zodResolver(insertPatientSchema.extend({
       phone: z.string().optional(),
       email: z.string().optional(),
+      officeId: z.string().optional(),
     })),
     defaultValues: {
       name: "",
       phone: undefined,
       email: undefined,
+      officeId: user?.officeId || undefined,
     },
   });
 
@@ -152,6 +166,7 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
       name: data.name,
       phone: data.phone && typeof data.phone === 'string' ? data.phone.trim() : undefined,
       email: data.email && typeof data.email === 'string' ? data.email.trim() : undefined,
+      officeId: data.officeId || user?.officeId || undefined,
     };
     createPatientMutation.mutate(submissionData);
   };
@@ -224,6 +239,39 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
                 </FormItem>
               )}
             />
+
+            {canViewAllOffices && offices.length > 0 && (
+              <FormField
+                control={form.control}
+                name="officeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Office</FormLabel>
+                    <Select
+                      value={field.value || user?.officeId || ""}
+                      onValueChange={field.onChange}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select office..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {offices.map((office) => (
+                          <SelectItem key={office.id} value={office.id}>
+                            {office.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Select which office this patient belongs to
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div>
               <FormLabel>Patient Photo (Optional)</FormLabel>

@@ -20,6 +20,8 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   role: varchar("role").default("staff"),
+  officeId: varchar("office_id").references(() => offices.id),
+  canViewAllOffices: boolean("can_view_all_offices").default(false).notNull(),
   profileImageUrl: varchar("profile_image_url"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -36,8 +38,19 @@ export const loginAttempts = pgTable("login_attempts", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Offices - for multi-tenant support
+export const offices = pgTable("offices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // "Dentures Direct", "Toronto Smile Centre"
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Office = typeof offices.$inferSelect;
+export type InsertOffice = typeof offices.$inferInsert;
+
 export const patients = pgTable("patients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  officeId: varchar("office_id").references(() => offices.id).notNull(),
   name: text("name").notNull(),
   dateOfBirth: text("date_of_birth"),
   phone: text("phone"),
@@ -64,6 +77,7 @@ export const insertPatientSchema = createInsertSchema(patients).omit({
   id: true,
   createdAt: true,
 }).extend({
+  officeId: z.string().optional(), // Optional in request, will be auto-assigned from user's office if not provided
   lastStepDate: z.union([z.date(), z.string()]).transform((val) => {
     if (val instanceof Date) return val;
     if (typeof val === 'string' && val.trim().length > 0) return new Date(val);
@@ -77,6 +91,7 @@ export type Patient = typeof patients.$inferSelect;
 export const appointments = pgTable("appointments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   patientId: varchar("patient_id").notNull().references(() => patients.id),
+  officeId: varchar("office_id").references(() => offices.id), // Inherited from patient
   appointmentDate: timestamp("appointment_date").notNull(),
   appointmentType: text("appointment_type"),
   status: text("status").notNull().default("scheduled"),
@@ -96,6 +111,7 @@ export const clinicalNotes = pgTable("clinical_notes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   patientId: varchar("patient_id").notNull().references(() => patients.id),
   appointmentId: varchar("appointment_id").references(() => appointments.id),
+  officeId: varchar("office_id").references(() => offices.id), // Inherited from patient, stored for performance
   content: text("content").notNull(),
   noteDate: timestamp("note_date"),
   createdBy: text("created_by").notNull(),
@@ -122,6 +138,7 @@ export const tasks = pgTable("tasks", {
   description: text("description"),
   assignee: text("assignee").notNull(),
   patientId: varchar("patient_id").references(() => patients.id),
+  officeId: varchar("office_id").references(() => offices.id), // Inherited from patient if patientId exists
   dueDate: timestamp("due_date"),
   priority: text("priority").notNull().default("normal"),
   status: text("status").notNull().default("pending"),
@@ -139,6 +156,7 @@ export type Task = typeof tasks.$inferSelect;
 export const patientFiles = pgTable("patient_files", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   patientId: varchar("patient_id").notNull().references(() => patients.id),
+  officeId: varchar("office_id").references(() => offices.id), // Inherited from patient
   filename: text("filename").notNull(),
   fileUrl: text("file_url").notNull(),
   fileType: text("file_type"),
@@ -158,6 +176,7 @@ export type PatientFile = typeof patientFiles.$inferSelect;
 export const labNotes = pgTable("lab_notes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   patientId: varchar("patient_id").notNull().references(() => patients.id),
+  officeId: varchar("office_id").references(() => offices.id), // Inherited from patient
   content: text("content").notNull(),
   createdBy: text("created_by").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -177,6 +196,7 @@ export type LabNote = typeof labNotes.$inferSelect;
 export const adminNotes = pgTable("admin_notes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   patientId: varchar("patient_id").notNull().references(() => patients.id),
+  officeId: varchar("office_id").references(() => offices.id), // Inherited from patient
   content: text("content").notNull(),
   createdBy: text("created_by").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -196,6 +216,7 @@ export type AdminNote = typeof adminNotes.$inferSelect;
 export const labPrescriptions = pgTable("lab_prescriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   patientId: varchar("patient_id").notNull().references(() => patients.id),
+  officeId: varchar("office_id").references(() => offices.id), // Inherited from patient
   labName: text("lab_name").notNull(), // Vivi Labs, Vital Lab, Aesthetic Minds
   caseType: text("case_type"), // deprecated - kept for backward compatibility
   caseTypeUpper: text("case_type_upper"), // cast partial, complete denture, implant-retained, repair, tooth addition (Max/Maxillary)

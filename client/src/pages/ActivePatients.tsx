@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Search, Loader2, Plus } from "lucide-react";
 import PatientTimelineCard from "@/components/PatientTimelineCard";
 import NewPatientDialog from "@/components/NewPatientDialog";
+import OfficeSelector from "@/components/OfficeSelector";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Patient } from "@shared/schema";
 
@@ -16,11 +17,32 @@ export default function ActivePatients() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDark, setIsDark] = useState(false);
   const [isNewPatientDialogOpen, setIsNewPatientDialogOpen] = useState(false);
+  const [selectedOfficeId, setSelectedOfficeId] = useState<string | null>(null);
   const { user } = useAuth();
 
+  const canViewAllOffices = user?.canViewAllOffices ?? false;
+
   const { data: patients = [], isLoading } = useQuery<Patient[]>({
-    queryKey: ['/api/patients']
+    queryKey: ['/api/patients', selectedOfficeId],
+    queryFn: async () => {
+      const url = selectedOfficeId 
+        ? `/api/patients?officeId=${selectedOfficeId}`
+        : '/api/patients';
+      const response = await apiRequest('GET', url);
+      return response.json();
+    }
   });
+
+  // Fetch offices for name lookup
+  const { data: offices = [] } = useQuery<Array<{ id: string; name: string }>>({
+    queryKey: ['/api/offices'],
+    enabled: canViewAllOffices,
+  });
+
+  const getOfficeName = (officeId: string | null) => {
+    if (!officeId) return null;
+    return offices.find(o => o.id === officeId)?.name || null;
+  };
 
   const filteredPatients = patients.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -75,6 +97,13 @@ export default function ActivePatients() {
         <div className="flex items-center justify-between gap-4 mb-4">
           <h1 className="text-3xl font-semibold">Active Patients</h1>
           <div className="flex items-center gap-3">
+            {canViewAllOffices && (
+              <OfficeSelector
+                selectedOfficeId={selectedOfficeId}
+                onOfficeChange={setSelectedOfficeId}
+                canViewAllOffices={canViewAllOffices}
+              />
+            )}
             <div className="relative w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -138,6 +167,7 @@ export default function ActivePatients() {
                     nextStep={nextStep}
                     assignee={assignee}
                     eta={eta}
+                    officeName={getOfficeName(patient.officeId)}
                     onClick={() => handlePatientClick(patient.id)}
                   />
                 );

@@ -28,36 +28,36 @@ export interface IStorage {
   
   // Patients
   createPatient(patient: InsertPatient): Promise<Patient>;
-  getPatient(id: string): Promise<Patient | undefined>;
-  listPatients(): Promise<Patient[]>;
+  getPatient(id: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<Patient | undefined>;
+  listPatients(userOfficeId?: string | null, canViewAllOffices?: boolean, selectedOfficeId?: string | null): Promise<Patient[]>;
   updatePatient(id: string, updates: Partial<InsertPatient>): Promise<Patient | undefined>;
   
   // Clinical Notes
   createClinicalNote(note: InsertClinicalNote): Promise<ClinicalNote>;
-  listClinicalNotes(patientId: string): Promise<ClinicalNote[]>;
+  listClinicalNotes(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<ClinicalNote[]>;
   
   // Tasks
   createTask(task: InsertTask): Promise<Task>;
-  listTasks(assignee?: string, patientId?: string): Promise<Task[]>;
+  listTasks(assignee?: string, patientId?: string, userOfficeId?: string | null, canViewAllOffices?: boolean, selectedOfficeId?: string | null): Promise<Task[]>;
   updateTaskStatus(id: string, status: string): Promise<Task | undefined>;
   
   // Files
   createPatientFile(file: InsertPatientFile): Promise<PatientFile>;
-  listPatientFiles(patientId: string): Promise<PatientFile[]>;
+  listPatientFiles(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<PatientFile[]>;
   deletePatientFile(id: string): Promise<boolean>;
   
   // Lab Notes
   createLabNote(note: InsertLabNote): Promise<LabNote>;
-  listLabNotes(patientId: string): Promise<LabNote[]>;
+  listLabNotes(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<LabNote[]>;
   
   // Admin Notes
   createAdminNote(note: InsertAdminNote): Promise<AdminNote>;
-  listAdminNotes(patientId: string): Promise<AdminNote[]>;
+  listAdminNotes(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<AdminNote[]>;
   
   // Lab Prescriptions
   createLabPrescription(prescription: InsertLabPrescription): Promise<LabPrescription>;
-  listLabPrescriptions(patientId: string): Promise<LabPrescription[]>;
-  getLabPrescription(id: string): Promise<LabPrescription | undefined>;
+  listLabPrescriptions(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<LabPrescription[]>;
+  getLabPrescription(id: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<LabPrescription | undefined>;
   updateLabPrescription(id: string, updates: Partial<InsertLabPrescription>): Promise<LabPrescription | undefined>;
 }
 
@@ -101,6 +101,8 @@ export class MemStorage implements IStorage {
       firstName: userData.firstName ?? null,
       lastName: userData.lastName ?? null,
       role: userData.role ?? existing?.role ?? 'staff',
+      officeId: userData.officeId ?? existing?.officeId ?? null,
+      canViewAllOffices: userData.canViewAllOffices ?? existing?.canViewAllOffices ?? false,
       profileImageUrl: userData.profileImageUrl ?? null,
       createdAt: existing?.createdAt ?? new Date(),
       updatedAt: new Date()
@@ -139,6 +141,7 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const patient: Patient = { 
       id,
+      officeId: insertPatient.officeId ?? null,
       name: insertPatient.name,
       dateOfBirth: insertPatient.dateOfBirth ?? null,
       phone: insertPatient.phone ?? null,
@@ -164,12 +167,33 @@ export class MemStorage implements IStorage {
     return patient;
   }
 
-  async getPatient(id: string): Promise<Patient | undefined> {
-    return this.patients.get(id);
+  async getPatient(id: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<Patient | undefined> {
+    const patient = this.patients.get(id);
+    if (!patient) return undefined;
+    
+    // If user can view all offices, return patient
+    if (canViewAllOffices) return patient;
+    
+    // If user has office restriction, check if patient belongs to their office
+    if (userOfficeId && patient.officeId !== userOfficeId) return undefined;
+    
+    return patient;
   }
 
-  async listPatients(): Promise<Patient[]> {
-    return Array.from(this.patients.values()).sort((a, b) => 
+  async listPatients(userOfficeId?: string | null, canViewAllOffices?: boolean, selectedOfficeId?: string | null): Promise<Patient[]> {
+    let allPatients = Array.from(this.patients.values());
+    
+    // If user can view all offices and has selected a specific office, filter by that
+    if (canViewAllOffices && selectedOfficeId) {
+      allPatients = allPatients.filter(p => p.officeId === selectedOfficeId);
+    }
+    // If user cannot view all offices, filter by their office
+    else if (!canViewAllOffices && userOfficeId) {
+      allPatients = allPatients.filter(p => p.officeId === userOfficeId);
+    }
+    // If user can view all offices and no office selected, return all
+    
+    return allPatients.sort((a, b) => 
       b.createdAt.getTime() - a.createdAt.getTime()
     );
   }
@@ -190,10 +214,13 @@ export class MemStorage implements IStorage {
 
   async createClinicalNote(insertNote: InsertClinicalNote): Promise<ClinicalNote> {
     const id = randomUUID();
+    // Get patient to inherit officeId
+    const patient = this.patients.get(insertNote.patientId);
     const note: ClinicalNote = { 
       id,
       patientId: insertNote.patientId,
       appointmentId: insertNote.appointmentId ?? null,
+      officeId: insertNote.officeId ?? patient?.officeId ?? null,
       content: insertNote.content,
       noteDate: insertNote.noteDate ?? null,
       createdBy: insertNote.createdBy,
@@ -203,7 +230,11 @@ export class MemStorage implements IStorage {
     return note;
   }
 
-  async listClinicalNotes(patientId: string): Promise<ClinicalNote[]> {
+  async listClinicalNotes(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<ClinicalNote[]> {
+    // First check if user can access this patient
+    const patient = await this.getPatient(patientId, userOfficeId, canViewAllOffices);
+    if (!patient) return [];
+    
     return Array.from(this.clinicalNotes.values()).filter(
       (note) => note.patientId === patientId
     );
@@ -211,12 +242,15 @@ export class MemStorage implements IStorage {
 
   async createTask(insertTask: InsertTask): Promise<Task> {
     const id = randomUUID();
+    // Get patient to inherit officeId if task is patient-related
+    const patient = insertTask.patientId ? this.patients.get(insertTask.patientId) : null;
     const task: Task = { 
       id,
       title: insertTask.title,
       description: insertTask.description ?? null,
       assignee: insertTask.assignee,
       patientId: insertTask.patientId ?? null,
+      officeId: insertTask.officeId ?? patient?.officeId ?? null,
       dueDate: insertTask.dueDate ?? null,
       priority: insertTask.priority ?? "normal",
       status: insertTask.status ?? "pending",
@@ -226,8 +260,30 @@ export class MemStorage implements IStorage {
     return task;
   }
 
-  async listTasks(assignee?: string, patientId?: string): Promise<Task[]> {
+  async listTasks(assignee?: string, patientId?: string, userOfficeId?: string | null, canViewAllOffices?: boolean, selectedOfficeId?: string | null): Promise<Task[]> {
     let allTasks = Array.from(this.tasks.values());
+    
+    // Filter by office
+    if (canViewAllOffices && selectedOfficeId) {
+      // User can view all but has selected a specific office
+      allTasks = allTasks.filter(task => {
+        if (task.patientId) {
+          const patient = this.patients.get(task.patientId);
+          return patient?.officeId === selectedOfficeId;
+        }
+        return task.officeId === selectedOfficeId;
+      });
+    } else if (!canViewAllOffices && userOfficeId) {
+      // User can only see their office
+      allTasks = allTasks.filter(task => {
+        if (task.patientId) {
+          const patient = this.patients.get(task.patientId);
+          return patient?.officeId === userOfficeId;
+        }
+        return task.officeId === userOfficeId;
+      });
+    }
+    
     if (assignee) {
       allTasks = allTasks.filter((task) => task.assignee === assignee);
     }
@@ -247,9 +303,11 @@ export class MemStorage implements IStorage {
 
   async createPatientFile(insertFile: InsertPatientFile): Promise<PatientFile> {
     const id = randomUUID();
+    const patient = this.patients.get(insertFile.patientId);
     const file: PatientFile = { 
       id,
       patientId: insertFile.patientId,
+      officeId: insertFile.officeId ?? patient?.officeId ?? null,
       filename: insertFile.filename,
       fileUrl: insertFile.fileUrl,
       fileType: insertFile.fileType ?? null,
@@ -260,7 +318,11 @@ export class MemStorage implements IStorage {
     return file;
   }
 
-  async listPatientFiles(patientId: string): Promise<PatientFile[]> {
+  async listPatientFiles(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<PatientFile[]> {
+    // First check if user can access this patient
+    const patient = await this.getPatient(patientId, userOfficeId, canViewAllOffices);
+    if (!patient) return [];
+    
     return Array.from(this.patientFiles.values()).filter(
       (file) => file.patientId === patientId
     );
@@ -273,9 +335,11 @@ export class MemStorage implements IStorage {
   // Lab Notes
   async createLabNote(insertNote: InsertLabNote): Promise<LabNote> {
     const id = randomUUID();
+    const patient = this.patients.get(insertNote.patientId);
     const note: LabNote = {
       id,
       patientId: insertNote.patientId,
+      officeId: insertNote.officeId ?? patient?.officeId ?? null,
       content: insertNote.content,
       createdBy: insertNote.createdBy,
       createdAt: new Date()
@@ -284,7 +348,11 @@ export class MemStorage implements IStorage {
     return note;
   }
 
-  async listLabNotes(patientId: string): Promise<LabNote[]> {
+  async listLabNotes(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<LabNote[]> {
+    // First check if user can access this patient
+    const patient = await this.getPatient(patientId, userOfficeId, canViewAllOffices);
+    if (!patient) return [];
+    
     return Array.from(this.labNotesStore.values())
       .filter((note) => note.patientId === patientId)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -293,9 +361,11 @@ export class MemStorage implements IStorage {
   // Admin Notes
   async createAdminNote(insertNote: InsertAdminNote): Promise<AdminNote> {
     const id = randomUUID();
+    const patient = this.patients.get(insertNote.patientId);
     const note: AdminNote = {
       id,
       patientId: insertNote.patientId,
+      officeId: insertNote.officeId ?? patient?.officeId ?? null,
       content: insertNote.content,
       createdBy: insertNote.createdBy,
       createdAt: new Date()
@@ -304,7 +374,11 @@ export class MemStorage implements IStorage {
     return note;
   }
 
-  async listAdminNotes(patientId: string): Promise<AdminNote[]> {
+  async listAdminNotes(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<AdminNote[]> {
+    // First check if user can access this patient
+    const patient = await this.getPatient(patientId, userOfficeId, canViewAllOffices);
+    if (!patient) return [];
+    
     return Array.from(this.adminNotesStore.values())
       .filter((note) => note.patientId === patientId)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -313,9 +387,11 @@ export class MemStorage implements IStorage {
   // Lab Prescriptions
   async createLabPrescription(insertPrescription: InsertLabPrescription): Promise<LabPrescription> {
     const id = randomUUID();
+    const patient = this.patients.get(insertPrescription.patientId);
     const prescription: LabPrescription = {
       id,
       patientId: insertPrescription.patientId,
+      officeId: insertPrescription.officeId ?? patient?.officeId ?? null,
       labName: insertPrescription.labName,
       caseType: insertPrescription.caseType ?? null,
       caseTypeUpper: insertPrescription.caseTypeUpper ?? null,
@@ -340,14 +416,25 @@ export class MemStorage implements IStorage {
     return prescription;
   }
 
-  async listLabPrescriptions(patientId: string): Promise<LabPrescription[]> {
+  async listLabPrescriptions(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<LabPrescription[]> {
+    // First check if user can access this patient
+    const patient = await this.getPatient(patientId, userOfficeId, canViewAllOffices);
+    if (!patient) return [];
+    
     return Array.from(this.labPrescriptionsStore.values())
       .filter((rx) => rx.patientId === patientId)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
-  async getLabPrescription(id: string): Promise<LabPrescription | undefined> {
-    return this.labPrescriptionsStore.get(id);
+  async getLabPrescription(id: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<LabPrescription | undefined> {
+    const prescription = this.labPrescriptionsStore.get(id);
+    if (!prescription) return undefined;
+    
+    // Check if user can access the patient this prescription belongs to
+    const patient = await this.getPatient(prescription.patientId, userOfficeId, canViewAllOffices);
+    if (!patient) return undefined;
+    
+    return prescription;
   }
 
   async updateLabPrescription(id: string, updates: Partial<InsertLabPrescription>): Promise<LabPrescription | undefined> {
@@ -381,6 +468,8 @@ export class DbStorage implements IStorage {
           firstName: userData.firstName,
           lastName: userData.lastName,
           role: userData.role,
+          officeId: userData.officeId,
+          canViewAllOffices: userData.canViewAllOffices,
           profileImageUrl: userData.profileImageUrl,
           updatedAt: new Date()
         }
@@ -411,13 +500,32 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getPatient(id: string): Promise<Patient | undefined> {
-    const result = await ensureDb().select().from(patients).where(eq(patients.id, id));
+  async getPatient(id: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<Patient | undefined> {
+    let query = ensureDb().select().from(patients).where(eq(patients.id, id));
+    
+    // Apply office filter if user cannot view all offices
+    if (!canViewAllOffices && userOfficeId) {
+      query = query.where(and(eq(patients.id, id), eq(patients.officeId, userOfficeId))) as any;
+    }
+    
+    const result = await query;
     return result[0];
   }
 
-  async listPatients(): Promise<Patient[]> {
-    return await ensureDb().select().from(patients).orderBy(desc(patients.createdAt));
+  async listPatients(userOfficeId?: string | null, canViewAllOffices?: boolean, selectedOfficeId?: string | null): Promise<Patient[]> {
+    let query = ensureDb().select().from(patients);
+    
+    // If user can view all offices and has selected a specific office, filter by that
+    if (canViewAllOffices && selectedOfficeId) {
+      query = query.where(eq(patients.officeId, selectedOfficeId)) as any;
+    }
+    // If user cannot view all offices, filter by their office
+    else if (!canViewAllOffices && userOfficeId) {
+      query = query.where(eq(patients.officeId, userOfficeId)) as any;
+    }
+    // If user can view all offices and no office selected, return all (no filter)
+    
+    return await query.orderBy(desc(patients.createdAt));
   }
 
   async updatePatient(id: string, updates: Partial<InsertPatient>): Promise<Patient | undefined> {
@@ -429,27 +537,52 @@ export class DbStorage implements IStorage {
   }
 
   async createClinicalNote(insertNote: InsertClinicalNote): Promise<ClinicalNote> {
+    // If officeId not provided, get it from patient
+    if (!insertNote.officeId) {
+      const patient = await this.getPatient(insertNote.patientId);
+      if (patient) {
+        insertNote.officeId = patient.officeId;
+      }
+    }
+    
     const result = await ensureDb().insert(clinicalNotes)
       .values(insertNote)
       .returning();
     return result[0];
   }
 
-  async listClinicalNotes(patientId: string): Promise<ClinicalNote[]> {
+  async listClinicalNotes(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<ClinicalNote[]> {
+    // First check if user can access this patient
+    const patient = await this.getPatient(patientId, userOfficeId, canViewAllOffices);
+    if (!patient) return [];
+    
     return await ensureDb().select().from(clinicalNotes)
       .where(eq(clinicalNotes.patientId, patientId))
       .orderBy(desc(clinicalNotes.createdAt));
   }
 
   async createTask(insertTask: InsertTask): Promise<Task> {
+    // If officeId not provided and task is patient-related, get it from patient
+    if (!insertTask.officeId && insertTask.patientId) {
+      const patient = await this.getPatient(insertTask.patientId);
+      if (patient) {
+        insertTask.officeId = patient.officeId;
+      }
+    }
+    
     const result = await ensureDb().insert(tasks)
       .values(insertTask)
       .returning();
     return result[0];
   }
 
-  async listTasks(assignee?: string, patientId?: string): Promise<Task[]> {
+  async listTasks(assignee?: string, patientId?: string, userOfficeId?: string | null, canViewAllOffices?: boolean, selectedOfficeId?: string | null): Promise<Task[]> {
     const conditions = [];
+    
+    // Office filtering - for tasks, we need to check patient's office
+    // This is complex with drizzle, so we'll filter after fetching if needed
+    let allTasks: Task[];
+    
     if (assignee) {
       conditions.push(eq(tasks.assignee, assignee));
     }
@@ -458,11 +591,44 @@ export class DbStorage implements IStorage {
     }
     
     if (conditions.length === 0) {
-      return await ensureDb().select().from(tasks).orderBy(desc(tasks.createdAt));
+      allTasks = await ensureDb().select().from(tasks).orderBy(desc(tasks.createdAt));
+    } else {
+      const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
+      allTasks = await ensureDb().select().from(tasks).where(whereClause!).orderBy(desc(tasks.createdAt));
     }
     
-    const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
-    return await ensureDb().select().from(tasks).where(whereClause!).orderBy(desc(tasks.createdAt));
+    // Apply office filtering
+    if (canViewAllOffices && selectedOfficeId) {
+      // Filter by selected office - need to check patient's office
+      const filteredTasks = [];
+      for (const task of allTasks) {
+        if (task.patientId) {
+          const patient = await this.getPatient(task.patientId);
+          if (patient?.officeId === selectedOfficeId) {
+            filteredTasks.push(task);
+          }
+        } else if (task.officeId === selectedOfficeId) {
+          filteredTasks.push(task);
+        }
+      }
+      return filteredTasks;
+    } else if (!canViewAllOffices && userOfficeId) {
+      // Filter by user's office
+      const filteredTasks = [];
+      for (const task of allTasks) {
+        if (task.patientId) {
+          const patient = await this.getPatient(task.patientId);
+          if (patient?.officeId === userOfficeId) {
+            filteredTasks.push(task);
+          }
+        } else if (task.officeId === userOfficeId) {
+          filteredTasks.push(task);
+        }
+      }
+      return filteredTasks;
+    }
+    
+    return allTasks;
   }
 
   async updateTaskStatus(id: string, status: string): Promise<Task | undefined> {
@@ -474,13 +640,25 @@ export class DbStorage implements IStorage {
   }
 
   async createPatientFile(insertFile: InsertPatientFile): Promise<PatientFile> {
+    // If officeId not provided, get it from patient
+    if (!insertFile.officeId) {
+      const patient = await this.getPatient(insertFile.patientId);
+      if (patient) {
+        insertFile.officeId = patient.officeId;
+      }
+    }
+    
     const result = await ensureDb().insert(patientFiles)
       .values(insertFile)
       .returning();
     return result[0];
   }
 
-  async listPatientFiles(patientId: string): Promise<PatientFile[]> {
+  async listPatientFiles(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<PatientFile[]> {
+    // First check if user can access this patient
+    const patient = await this.getPatient(patientId, userOfficeId, canViewAllOffices);
+    if (!patient) return [];
+    
     return await ensureDb().select().from(patientFiles)
       .where(eq(patientFiles.patientId, patientId))
       .orderBy(desc(patientFiles.uploadedAt));
@@ -495,13 +673,25 @@ export class DbStorage implements IStorage {
 
   // Lab Notes
   async createLabNote(insertNote: InsertLabNote): Promise<LabNote> {
+    // If officeId not provided, get it from patient
+    if (!insertNote.officeId) {
+      const patient = await this.getPatient(insertNote.patientId);
+      if (patient) {
+        insertNote.officeId = patient.officeId;
+      }
+    }
+    
     const result = await ensureDb().insert(labNotes)
       .values(insertNote)
       .returning();
     return result[0];
   }
 
-  async listLabNotes(patientId: string): Promise<LabNote[]> {
+  async listLabNotes(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<LabNote[]> {
+    // First check if user can access this patient
+    const patient = await this.getPatient(patientId, userOfficeId, canViewAllOffices);
+    if (!patient) return [];
+    
     return await ensureDb().select().from(labNotes)
       .where(eq(labNotes.patientId, patientId))
       .orderBy(desc(labNotes.createdAt));
@@ -509,13 +699,25 @@ export class DbStorage implements IStorage {
 
   // Admin Notes
   async createAdminNote(insertNote: InsertAdminNote): Promise<AdminNote> {
+    // If officeId not provided, get it from patient
+    if (!insertNote.officeId) {
+      const patient = await this.getPatient(insertNote.patientId);
+      if (patient) {
+        insertNote.officeId = patient.officeId;
+      }
+    }
+    
     const result = await ensureDb().insert(adminNotes)
       .values(insertNote)
       .returning();
     return result[0];
   }
 
-  async listAdminNotes(patientId: string): Promise<AdminNote[]> {
+  async listAdminNotes(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<AdminNote[]> {
+    // First check if user can access this patient
+    const patient = await this.getPatient(patientId, userOfficeId, canViewAllOffices);
+    if (!patient) return [];
+    
     return await ensureDb().select().from(adminNotes)
       .where(eq(adminNotes.patientId, patientId))
       .orderBy(desc(adminNotes.createdAt));
@@ -523,22 +725,41 @@ export class DbStorage implements IStorage {
 
   // Lab Prescriptions
   async createLabPrescription(insertPrescription: InsertLabPrescription): Promise<LabPrescription> {
+    // If officeId not provided, get it from patient
+    if (!insertPrescription.officeId) {
+      const patient = await this.getPatient(insertPrescription.patientId);
+      if (patient) {
+        insertPrescription.officeId = patient.officeId;
+      }
+    }
+    
     const result = await ensureDb().insert(labPrescriptions)
       .values(insertPrescription)
       .returning();
     return result[0];
   }
 
-  async listLabPrescriptions(patientId: string): Promise<LabPrescription[]> {
+  async listLabPrescriptions(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<LabPrescription[]> {
+    // First check if user can access this patient
+    const patient = await this.getPatient(patientId, userOfficeId, canViewAllOffices);
+    if (!patient) return [];
+    
     return await ensureDb().select().from(labPrescriptions)
       .where(eq(labPrescriptions.patientId, patientId))
       .orderBy(desc(labPrescriptions.createdAt));
   }
 
-  async getLabPrescription(id: string): Promise<LabPrescription | undefined> {
+  async getLabPrescription(id: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<LabPrescription | undefined> {
     const result = await ensureDb().select().from(labPrescriptions)
       .where(eq(labPrescriptions.id, id));
-    return result[0];
+    const prescription = result[0];
+    if (!prescription) return undefined;
+    
+    // Check if user can access the patient this prescription belongs to
+    const patient = await this.getPatient(prescription.patientId, userOfficeId, canViewAllOffices);
+    if (!patient) return undefined;
+    
+    return prescription;
   }
 
   async updateLabPrescription(id: string, updates: Partial<InsertLabPrescription>): Promise<LabPrescription | undefined> {

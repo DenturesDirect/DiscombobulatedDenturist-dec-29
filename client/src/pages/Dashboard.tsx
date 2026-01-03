@@ -18,6 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import ClinicalPhotoGrid from "@/components/ClinicalPhotoGrid";
 import ShadeReminderModal from "@/components/ShadeReminderModal";
 import TaskForm from "@/components/TaskForm";
+import OfficeSelector from "@/components/OfficeSelector";
 import { FileText, Camera, Clock, Loader2, Mail, MailX, FlaskConical, ClipboardList, Pill, Save, X, Edit3, CheckSquare } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,6 +48,20 @@ export default function Dashboard() {
     dueDate: string;
     priority: 'high' | 'normal' | 'low';
   }> | null>(null);
+  const [selectedOfficeId, setSelectedOfficeId] = useState<string | null>(null);
+
+  const canViewAllOffices = user?.canViewAllOffices ?? false;
+
+  // Fetch offices for name lookup
+  const { data: offices = [] } = useQuery<Array<{ id: string; name: string }>>({
+    queryKey: ['/api/offices'],
+    enabled: canViewAllOffices,
+  });
+
+  const getOfficeName = (officeId: string | null) => {
+    if (!officeId) return null;
+    return offices.find(o => o.id === officeId)?.name || null;
+  };
 
   const { data: patient, isLoading: isLoadingPatient } = useQuery<Patient>({
     queryKey: ['/api/patients', patientId],
@@ -64,7 +79,14 @@ export default function Dashboard() {
   });
 
   const { data: patientTasks = [], isLoading: isLoadingTasks } = useQuery<Task[]>({
-    queryKey: ['/api/tasks', { patientId }],
+    queryKey: ['/api/tasks', { patientId }, selectedOfficeId],
+    queryFn: async () => {
+      const url = selectedOfficeId 
+        ? `/api/tasks?patientId=${patientId}&officeId=${selectedOfficeId}`
+        : `/api/tasks?patientId=${patientId}`;
+      const response = await apiRequest('GET', url);
+      return response.json();
+    },
     enabled: !!patientId
   });
 
@@ -439,8 +461,24 @@ export default function Dashboard() {
       <div className="flex flex-1 overflow-hidden">
           <div className="flex-1 min-w-[500px] max-w-2xl p-6 overflow-y-auto border-r">
             <div className="space-y-6">
+              {canViewAllOffices && (
+                <div className="flex justify-end">
+                  <OfficeSelector
+                    selectedOfficeId={selectedOfficeId}
+                    onOfficeChange={setSelectedOfficeId}
+                    canViewAllOffices={canViewAllOffices}
+                  />
+                </div>
+              )}
               <div>
-                <h1 className="text-3xl font-semibold mb-2">{patient.name}</h1>
+                <div className="flex items-center gap-2 mb-2">
+                  <h1 className="text-3xl font-semibold">{patient.name}</h1>
+                  {patient.officeId && canViewAllOffices && (
+                    <Badge variant="secondary" className="text-xs">
+                      {getOfficeName(patient.officeId) || 'Office'}
+                    </Badge>
+                  )}
+                </div>
                 <div className="text-sm text-muted-foreground mb-2">
                   {patient.phone && `Phone: ${patient.phone}`}
                   {patient.email && ` • Email: ${patient.email}`}

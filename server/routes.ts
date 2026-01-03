@@ -10,13 +10,67 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { sendCustomNotification, sendAppointmentReminder } from "./gmail";
 import { sendPatientNotification } from "./notifications";
 
+// Helper function to get user office context from request
+async function getUserOfficeContext(req: any): Promise<{ officeId: string | null; canViewAllOffices: boolean }> {
+  const user = req.user as any;
+  if (!user?.id) {
+    return { officeId: null, canViewAllOffices: false };
+  }
+  
+  const dbUser = await storage.getUser(user.id);
+  if (!dbUser) {
+    return { officeId: null, canViewAllOffices: false };
+  }
+  
+  return {
+    officeId: dbUser.officeId ?? null,
+    canViewAllOffices: dbUser.canViewAllOffices ?? false
+  };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupLocalAuth(app);
   await seedStaffAccounts();
 
+  // Get offices list
+  app.get("/api/offices", isAuthenticated, async (req, res) => {
+    try {
+      const { offices } = await import("@shared/schema");
+      const { ensureDb } = await import("./db");
+      const db = ensureDb();
+      if (!db) {
+        return res.json([]); // Return empty if no database
+      }
+      const officesList = await db.select().from(offices);
+      // Sort by name manually since drizzle orderBy with text fields can be tricky
+      officesList.sort((a, b) => a.name.localeCompare(b.name));
+      res.json(officesList);
+    } catch (error: any) {
+      console.error("Error fetching offices:", error);
+      res.json([]); // Return empty array on error
+    }
+  });
+
   app.post("/api/patients", isAuthenticated, async (req, res) => {
     try {
+      const officeContext = await getUserOfficeContext(req);
       const validatedData = insertPatientSchema.parse(req.body);
+      
+      // Ensure officeId is always set (required in database)
+      // If user cannot view all offices, force officeId to their office
+      if (!officeContext.canViewAllOffices && officeContext.officeId) {
+        validatedData.officeId = officeContext.officeId;
+      }
+      // If user can view all offices but didn't specify officeId, use their default office
+      else if (!validatedData.officeId && officeContext.officeId) {
+        validatedData.officeId = officeContext.officeId;
+      }
+      
+      // Final check: officeId must be set (required in database)
+      if (!validatedData.officeId) {
+        return res.status(400).json({ error: "Office ID is required. Please select an office." });
+      }
+      
       const patient = await storage.createPatient(validatedData);
       res.json(patient);
     } catch (error: any) {
@@ -26,7 +80,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/patients", isAuthenticated, async (req, res) => {
     try {
-      const patients = await storage.listPatients();
+      const officeContext = await getUserOfficeContext(req);
+      const selectedOfficeId = req.query.officeId as string | undefined;
+      const patients = await storage.listPatients(
+        officeContext.officeId,
+        officeContext.canViewAllOffices,
+        selectedOfficeId || null
+      );
       res.json(patients);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -35,7 +95,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/patients/:id", isAuthenticated, async (req, res) => {
     try {
-      const patient = await storage.getPatient(req.params.id);
+      const officeContext = await getUserOfficeContext(req);
+      const patient = await storage.getPatient(
+        req.params.id,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
       if (!patient) return res.status(404).json({ error: "Patient not found" });
       res.json(patient);
     } catch (error: any) {
@@ -61,9 +126,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/patients/:id", isAuthenticated, async (req, res) => {
     try {
-      // Get current patient state before update
-      const currentPatient = await storage.getPatient(req.params.id);
+      const officeContext = await getUserOfficeContext(req);
+      
+      // Get current patient state before update (with office check)
+      const currentPatient = await storage.getPatient(
+        req.params.id,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
       if (!currentPatient) return res.status(404).json({ error: "Patient not found" });
+      
+      // If user cannot view all offices, prevent changing officeId
+      if (!officeContext.canViewAllOffices && req.body.officeId) {
+        delete req.body.officeId; // Remove officeId from update if user can't change it
+      }
       
       const patient = await storage.updatePatient(req.params.id, req.body);
       if (!patient) return res.status(404).json({ error: "Patient not found" });
@@ -118,8 +194,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Process clinical note with AI (does NOT save - gives clinician a chance to review/edit)
   app.post("/api/clinical-notes/process", isAuthenticated, async (req: any, res) => {
     try {
+      const officeContext = await getUserOfficeContext(req);
       const { plainTextNote, patientId } = req.body;
-      const patient = await storage.getPatient(patientId);
+      const patient = await storage.getPatient(
+        patientId,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
       if (!patient) return res.status(404).json({ error: "Patient not found" });
 
       const patientContext = {
@@ -145,8 +226,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Save clinical note after clinician review/edit
   app.post("/api/clinical-notes/save", isAuthenticated, async (req: any, res) => {
     try {
+      const officeContext = await getUserOfficeContext(req);
       const { patientId, content, noteDate, suggestedTasks } = req.body;
-      const patient = await storage.getPatient(patientId);
+      const patient = await storage.getPatient(
+        patientId,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
       if (!patient) return res.status(404).json({ error: "Patient not found" });
       
       const user = req.user as any;
@@ -189,7 +275,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (mentionsCDCPTask || patient.isCDCP || patient.workInsurance) {
         // Check if a similar task already exists
-        const existingTasks = await storage.listTasks('Caroline', patientId);
+        const existingTasks = await storage.listTasks(
+          'Caroline',
+          patientId,
+          officeContext.officeId,
+          officeContext.canViewAllOffices
+        );
         const hasInsuranceTask = existingTasks.some(t => 
           t.title.toLowerCase().includes('insurance') || 
           t.title.toLowerCase().includes('cdcp') ||
@@ -234,8 +325,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/tasks", isAuthenticated, async (req, res) => {
     try {
-      const { assignee, patientId } = req.query;
-      const tasks = await storage.listTasks(assignee as string, patientId as string);
+      const officeContext = await getUserOfficeContext(req);
+      const { assignee, patientId, officeId } = req.query;
+      const tasks = await storage.listTasks(
+        assignee as string,
+        patientId as string,
+        officeContext.officeId,
+        officeContext.canViewAllOffices,
+        officeId as string | null
+      );
       res.json(tasks);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -298,7 +396,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Clinical notes listing
   app.get("/api/clinical-notes/:patientId", isAuthenticated, async (req, res) => {
     try {
-      const notes = await storage.listClinicalNotes(req.params.patientId);
+      const officeContext = await getUserOfficeContext(req);
+      const notes = await storage.listClinicalNotes(
+        req.params.patientId,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
       res.json(notes);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -308,7 +411,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Patient files
   app.get("/api/patients/:id/files", isAuthenticated, async (req, res) => {
     try {
-      const files = await storage.listPatientFiles(req.params.id);
+      const officeContext = await getUserOfficeContext(req);
+      const files = await storage.listPatientFiles(
+        req.params.id,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
       res.json(files);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -317,6 +425,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/patients/:id/files", isAuthenticated, async (req, res) => {
     try {
+      const officeContext = await getUserOfficeContext(req);
+      // Verify user can access this patient before creating file
+      const patient = await storage.getPatient(
+        req.params.id,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
+      if (!patient) return res.status(404).json({ error: "Patient not found" });
+      
       const { filename, fileUrl, fileType, description } = req.body;
       const file = await storage.createPatientFile({
         patientId: req.params.id,
@@ -333,6 +450,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/patients/:id/files/:fileId", isAuthenticated, async (req, res) => {
     try {
+      const officeContext = await getUserOfficeContext(req);
+      // Verify user can access this patient before deleting file
+      const patient = await storage.getPatient(
+        req.params.id,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
+      if (!patient) return res.status(404).json({ error: "Patient not found" });
+      
       const success = await storage.deletePatientFile(req.params.fileId);
       if (!success) return res.status(404).json({ error: "File not found" });
       res.json({ success: true });
@@ -344,6 +470,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update patient photo
   app.patch("/api/patients/:id/photo", isAuthenticated, async (req, res) => {
     try {
+      const officeContext = await getUserOfficeContext(req);
+      // Verify user can access this patient
+      const existingPatient = await storage.getPatient(
+        req.params.id,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
+      if (!existingPatient) return res.status(404).json({ error: "Patient not found" });
+      
       const { photoUrl } = req.body;
       const patient = await storage.updatePatient(req.params.id, { photoUrl });
       if (!patient) return res.status(404).json({ error: "Patient not found" });
@@ -482,7 +617,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Patient email notifications
   app.post("/api/patients/:id/notify", isAuthenticated, async (req, res) => {
     try {
-      const patient = await storage.getPatient(req.params.id);
+      const officeContext = await getUserOfficeContext(req);
+      const patient = await storage.getPatient(
+        req.params.id,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
       if (!patient) return res.status(404).json({ error: "Patient not found" });
       
       if (!patient.email) {
@@ -513,12 +653,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Toggle text notifications for a patient
   app.patch("/api/patients/:id/text-notifications", isAuthenticated, async (req, res) => {
     try {
+      const officeContext = await getUserOfficeContext(req);
       const { enabled } = req.body;
       if (typeof enabled !== 'boolean') {
         return res.status(400).json({ error: "enabled must be a boolean" });
       }
       
-      const patient = await storage.getPatient(req.params.id);
+      const patient = await storage.getPatient(
+        req.params.id,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
       if (!patient) {
         return res.status(404).json({ error: "Patient not found" });
       }
@@ -538,13 +683,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Toggle email notifications for a patient
   app.patch("/api/patients/:id/email-notifications", isAuthenticated, async (req, res) => {
     try {
+      const officeContext = await getUserOfficeContext(req);
       const { enabled } = req.body;
       
       if (typeof enabled !== 'boolean') {
         return res.status(400).json({ error: "Invalid request: 'enabled' must be a boolean" });
       }
       
-      const patient = await storage.getPatient(req.params.id);
+      const patient = await storage.getPatient(
+        req.params.id,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
       
       if (!patient) return res.status(404).json({ error: "Patient not found" });
       
@@ -563,7 +713,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get lab notes for a patient
   app.get("/api/lab-notes/:patientId", isAuthenticated, async (req, res) => {
     try {
-      const notes = await storage.listLabNotes(req.params.patientId);
+      const officeContext = await getUserOfficeContext(req);
+      const notes = await storage.listLabNotes(
+        req.params.patientId,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
       res.json(notes);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -573,11 +728,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create lab note
   app.post("/api/lab-notes", isAuthenticated, async (req: any, res) => {
     try {
+      const officeContext = await getUserOfficeContext(req);
       console.log("Lab note request body:", JSON.stringify(req.body, null, 2));
       
       if (!req.body.patientId) {
         return res.status(400).json({ error: "Patient ID is required" });
       }
+      
+      // Verify user can access this patient
+      const patient = await storage.getPatient(
+        req.body.patientId,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
+      if (!patient) return res.status(404).json({ error: "Patient not found" });
+      
       if (!req.body.content || req.body.content.trim() === "") {
         return res.status(400).json({ error: "Lab note content cannot be empty" });
       }
@@ -632,7 +797,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get admin notes for a patient
   app.get("/api/admin-notes/:patientId", isAuthenticated, async (req, res) => {
     try {
-      const notes = await storage.listAdminNotes(req.params.patientId);
+      const officeContext = await getUserOfficeContext(req);
+      const notes = await storage.listAdminNotes(
+        req.params.patientId,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
       res.json(notes);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -642,9 +812,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create admin note
   app.post("/api/admin-notes", isAuthenticated, async (req: any, res) => {
     try {
+      const officeContext = await getUserOfficeContext(req);
+      
       if (!req.body.patientId) {
         return res.status(400).json({ error: "Patient ID is required" });
       }
+      
+      // Verify user can access this patient
+      const patient = await storage.getPatient(
+        req.body.patientId,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
+      if (!patient) return res.status(404).json({ error: "Patient not found" });
+      
       if (!req.body.content || req.body.content.trim() === "") {
         return res.status(400).json({ error: "Admin note content cannot be empty" });
       }
@@ -708,7 +889,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get lab prescriptions for a patient
   app.get("/api/lab-prescriptions/:patientId", isAuthenticated, async (req, res) => {
     try {
-      const prescriptions = await storage.listLabPrescriptions(req.params.patientId);
+      const officeContext = await getUserOfficeContext(req);
+      const prescriptions = await storage.listLabPrescriptions(
+        req.params.patientId,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
       res.json(prescriptions);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -718,7 +904,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get single lab prescription
   app.get("/api/lab-prescription/:id", isAuthenticated, async (req, res) => {
     try {
-      const prescription = await storage.getLabPrescription(req.params.id);
+      const officeContext = await getUserOfficeContext(req);
+      const prescription = await storage.getLabPrescription(
+        req.params.id,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
       if (!prescription) return res.status(404).json({ error: "Prescription not found" });
       res.json(prescription);
     } catch (error: any) {
@@ -729,6 +920,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create lab prescription
   app.post("/api/lab-prescriptions", isAuthenticated, async (req: any, res) => {
     try {
+      const officeContext = await getUserOfficeContext(req);
+      
       console.log("📋 Creating lab prescription with data:", {
         patientId: req.body.patientId,
         labName: req.body.labName,
@@ -745,6 +938,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.body.patientId) {
         return res.status(400).json({ error: "Patient ID is required" });
       }
+      
+      // Verify user can access this patient
+      const patient = await storage.getPatient(
+        req.body.patientId,
+        officeContext.officeId,
+        officeContext.canViewAllOffices
+      );
+      if (!patient) return res.status(404).json({ error: "Patient not found" });
       if (!req.body.labName || req.body.labName.trim() === "") {
         return res.status(400).json({ error: "Lab name is required" });
       }

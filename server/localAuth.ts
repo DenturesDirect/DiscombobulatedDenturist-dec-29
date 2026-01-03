@@ -142,12 +142,16 @@ export async function setupLocalAuth(app: Express) {
         if (err) {
           return res.status(500).json({ message: 'Login error' });
         }
+        // Get full user with office info
+        const dbUser = await storage.getUser(user.id);
         return res.json({ 
           id: user.id,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          role: user.role
+          role: user.role,
+          officeId: dbUser?.officeId ?? null,
+          canViewAllOffices: dbUser?.canViewAllOffices ?? false
         });
       });
     })(req, res, next);
@@ -162,17 +166,21 @@ export async function setupLocalAuth(app: Express) {
     });
   });
 
-  app.get('/api/auth/user', (req, res) => {
+  app.get('/api/auth/user', async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
     const user = req.user as any;
+    // Get full user with office info
+    const dbUser = await storage.getUser(user.id);
     res.json({
       id: user.id,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      role: user.role
+      role: user.role,
+      officeId: dbUser?.officeId ?? null,
+      canViewAllOffices: dbUser?.canViewAllOffices ?? false
     });
   });
 

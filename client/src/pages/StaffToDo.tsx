@@ -10,6 +10,7 @@ import { CheckCircle2, Clock, Loader2, User, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { Checkbox } from "@/components/ui/checkbox";
 import TopNav from "@/components/TopNav";
+import OfficeSelector from "@/components/OfficeSelector";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Task, Patient } from "@shared/schema";
 
@@ -21,15 +22,32 @@ export default function StaffToDo() {
   const [isDark, setIsDark] = useState(false);
   const { user } = useAuth();
 
+  const canViewAllOffices = user?.canViewAllOffices ?? false;
+  const [selectedOfficeId, setSelectedOfficeId] = useState<string | null>(null);
+
   const { data: tasks = [], isLoading, refetch } = useQuery<Task[]>({
-    queryKey: ['/api/tasks'],
+    queryKey: ['/api/tasks', selectedOfficeId],
+    queryFn: async () => {
+      const url = selectedOfficeId 
+        ? `/api/tasks?officeId=${selectedOfficeId}`
+        : '/api/tasks';
+      const response = await apiRequest('GET', url);
+      return response.json();
+    },
     refetchOnWindowFocus: true,
     refetchOnMount: true,
     staleTime: 30000, // Consider data stale after 30 seconds
   });
 
   const { data: patients = [] } = useQuery<Patient[]>({
-    queryKey: ['/api/patients']
+    queryKey: ['/api/patients', selectedOfficeId],
+    queryFn: async () => {
+      const url = selectedOfficeId 
+        ? `/api/patients?officeId=${selectedOfficeId}`
+        : '/api/patients';
+      const response = await apiRequest('GET', url);
+      return response.json();
+    }
   });
 
   const patientMap = patients.reduce((acc, p) => {
@@ -135,6 +153,16 @@ export default function StaffToDo() {
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
+        </div>
+        
+        <div className="flex items-center gap-4 mb-4">
+          {canViewAllOffices && (
+            <OfficeSelector
+              selectedOfficeId={selectedOfficeId}
+              onOfficeChange={setSelectedOfficeId}
+              canViewAllOffices={canViewAllOffices}
+            />
+          )}
         </div>
         
         <div className="flex gap-2 flex-wrap">
