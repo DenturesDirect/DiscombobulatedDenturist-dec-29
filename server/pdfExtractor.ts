@@ -1,4 +1,4 @@
-import pdf from "pdf-parse";
+import pdfParse from "pdf-parse";
 
 /**
  * Extracts text content from a PDF file buffer
@@ -7,7 +7,7 @@ import pdf from "pdf-parse";
  */
 export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    const data = await pdf(buffer);
+    const data = await pdfParse(buffer);
     return data.text;
   } catch (error: any) {
     if (error.message?.includes("Invalid PDF") || error.message?.includes("corrupted")) {

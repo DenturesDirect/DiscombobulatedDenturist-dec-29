@@ -66,6 +66,7 @@ export default function Dashboard() {
   const [editingLabNoteContent, setEditingLabNoteContent] = useState<string>("");
   const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showChartUpload, setShowChartUpload] = useState(false);
 
   const canViewAllOffices = user?.canViewAllOffices ?? false;
 
