@@ -1,6 +1,3 @@
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-
 /**
  * Extracts text content from a PDF file buffer
  * @param buffer - PDF file as Buffer
@@ -8,7 +5,9 @@ const require = createRequire(import.meta.url);
  */
 export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    // Use require for CommonJS module - this works with esbuild external packages
+    // Lazy-load createRequire at runtime to avoid esbuild bundling issues
+    const { createRequire } = await import("module");
+    const require = createRequire(import.meta.url);
     const pdfParse = require("pdf-parse");
     const data = await pdfParse(buffer);
     return data.text;
