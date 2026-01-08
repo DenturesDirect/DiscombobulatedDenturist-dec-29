@@ -620,6 +620,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create task endpoint (for manual task creation by clinician)
   app.post("/api/tasks", isAuthenticated, async (req, res) => {
     try {
+      const officeContext = await getUserOfficeContext(req);
+      
       console.log("📝 Creating task with data:", {
         title: req.body.title,
         assignee: req.body.assignee,
@@ -628,6 +630,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dueDateType: typeof req.body.dueDate,
         patientId: req.body.patientId
       });
+      
+      // Validate required fields
+      if (!req.body.title || !req.body.assignee) {
+        return res.status(400).json({ error: "Title and assignee are required" });
+      }
       
       // Convert dueDate from ISO string to Date if provided
       let dueDate: Date | null = null;
@@ -644,11 +651,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const taskData = {
-        ...req.body,
-        dueDate,
+      // Build task data - only include fields that exist in the schema
+      // Exclude completedBy and completedAt as they're only set when task is completed
+      const taskData: any = {
+        title: req.body.title,
+        description: req.body.description || null,
+        assignee: req.body.assignee,
+        priority: req.body.priority || "normal",
+        status: req.body.status || "pending",
+        dueDate: dueDate,
         patientId: req.body.patientId || null,
+        officeId: req.body.officeId || null,
       };
+      
+      // If patientId is provided, get the patient to inherit officeId
+      if (taskData.patientId && !taskData.officeId) {
+        try {
+          const patient = await storage.getPatient(
+            taskData.patientId,
+            officeContext.officeId,
+            officeContext.canViewAllOffices
+          );
+          if (patient?.officeId) {
+            taskData.officeId = patient.officeId;
+          }
+        } catch (error) {
+          console.warn("⚠️  Could not get patient for officeId inheritance:", error);
+        }
+      }
       
       const task = await storage.createTask(taskData);
       console.log("✅ Task created successfully:", task.id);
