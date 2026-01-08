@@ -148,11 +148,28 @@ You may include ONE gentle follow-up question in followUpPrompt, but ONLY if rel
 - If this was a referred patient: "Would you like me to draft an end-of-treatment report?"
 
 TASK EXTRACTION:
-If the clinician explicitly mentions assigning a task (e.g., "assign task to Caroline", "task for Michael", "remind me to...", "I need to..."), extract it as a suggestedTask.
-ONLY extract tasks when explicitly mentioned - do not infer or create tasks automatically.
+ONLY extract tasks when the clinician EXPLICITLY mentions assigning a task. Examples:
+- "assign task to Caroline"
+- "task for Michael"
+- "assigning a predetermination"
+- "remind me to..."
+- "I need to..."
+
+CRITICAL RULES:
+- DO NOT extract tasks unless explicitly mentioned
+- DO NOT infer tasks from context
+- DO NOT create tasks based on patient status (CDCP, insurance, etc.)
+- DO NOT suggest tasks - only extract what was explicitly stated
+
+PREDETERMINATION TASK ASSIGNMENT:
+- If the clinician mentions "assigning a predetermination" or "assign predetermination":
+  - For Dentures Direct office: assign to "Caroline"
+  - For Toronto Smile Centre office: assign to "Admin"
+  - The system will automatically correct the assignee based on the patient's office
+
 When extracting tasks, include:
-- title: Clear, actionable task description
-- assignee: Staff member name (Caroline, Michael, Damien, Luisa, Admin, Dr. Priyanka Chowdhury, or All)
+- title: Clear, actionable task description (exactly as mentioned)
+- assignee: Staff member name from the mention, or "All" if not specified (predetermination will be auto-corrected)
 - dueDate: ISO date string if mentioned, or null
 - priority: 'high', 'normal', or 'low' based on urgency indicators
 
@@ -163,6 +180,7 @@ DO NOT:
 - Assume CDCP status means anything specific
 - Push toward insurance estimates or any workflow step
 - Make any decisions for the clinician
+- Extract tasks based on keywords alone - must be explicit assignment request
 
 Return your response as JSON with this structure:
 {

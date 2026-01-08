@@ -30,7 +30,6 @@ import ClinicalPhotoGrid from "@/components/ClinicalPhotoGrid";
 import ShadeReminderModal from "@/components/ShadeReminderModal";
 import TaskForm from "@/components/TaskForm";
 import ChartUploader from "@/components/ChartUploader";
-import OfficeSelector from "@/components/OfficeSelector";
 import { FileText, Camera, Clock, Loader2, Mail, MailX, FlaskConical, ClipboardList, Pill, Save, X, Edit3, CheckSquare, Trash2, Upload } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -60,7 +59,6 @@ export default function Dashboard() {
     dueDate: string;
     priority: 'high' | 'normal' | 'low';
   }> | null>(null);
-  const [selectedOfficeId, setSelectedOfficeId] = useState<string | null>(null);
   const [editingClinicalNoteId, setEditingClinicalNoteId] = useState<string | null>(null);
   const [editingClinicalNoteContent, setEditingClinicalNoteContent] = useState<string>("");
   const [editingLabNoteId, setEditingLabNoteId] = useState<string | null>(null);
@@ -102,12 +100,9 @@ export default function Dashboard() {
   });
 
   const { data: patientTasks = [], isLoading: isLoadingTasks } = useQuery<Task[]>({
-    queryKey: ['/api/tasks', { patientId }, selectedOfficeId],
+    queryKey: ['/api/tasks', { patientId }],
     queryFn: async () => {
-      const url = selectedOfficeId 
-        ? `/api/tasks?patientId=${patientId}&officeId=${selectedOfficeId}`
-        : `/api/tasks?patientId=${patientId}`;
-      const response = await apiRequest('GET', url);
+      const response = await apiRequest('GET', `/api/tasks?patientId=${patientId}`);
       return response.json();
     },
     enabled: !!patientId
@@ -606,15 +601,6 @@ export default function Dashboard() {
       <div className="flex flex-1 overflow-hidden">
           <div className="flex-1 min-w-[500px] max-w-2xl p-6 overflow-y-auto border-r">
             <div className="space-y-6">
-              {canViewAllOffices && (
-                <div className="flex justify-end">
-                  <OfficeSelector
-                    selectedOfficeId={selectedOfficeId}
-                    onOfficeChange={setSelectedOfficeId}
-                    canViewAllOffices={canViewAllOffices}
-                  />
-                </div>
-              )}
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <h1 className="text-3xl font-semibold">{patient.name}</h1>

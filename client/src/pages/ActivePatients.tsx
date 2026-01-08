@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,8 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Search, Loader2, Plus } from "lucide-react";
 import PatientTimelineCard from "@/components/PatientTimelineCard";
 import NewPatientDialog from "@/components/NewPatientDialog";
+import OfficeSelector from "@/components/OfficeSelector";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Patient } from "@shared/schema";
+import type { Patient, Task } from "@shared/schema";
+
+const STORAGE_KEY = 'activePatients_selectedOfficeId';
 
 export default function ActivePatients() {
   const [, setLocation] = useLocation();
@@ -17,10 +20,85 @@ export default function ActivePatients() {
   const [isDark, setIsDark] = useState(false);
   const [isNewPatientDialogOpen, setIsNewPatientDialogOpen] = useState(false);
   const { user } = useAuth();
+  const canViewAllOffices = user?.canViewAllOffices ?? false;
+
+  // Load persisted office selection from localStorage
+  const [selectedOfficeId, setSelectedOfficeId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      return stored || null;
+    }
+    return null;
+  });
+
+  // Persist office selection to localStorage whenever it changes
+  useEffect(() => {
+    if (selectedOfficeId !== null) {
+      localStorage.setItem(STORAGE_KEY, selectedOfficeId);
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [selectedOfficeId]);
 
   const { data: patients = [], isLoading } = useQuery<Patient[]>({
-    queryKey: ['/api/patients']
+    queryKey: ['/api/patients', selectedOfficeId],
+    queryFn: async () => {
+      const url = selectedOfficeId 
+        ? `/api/patients?officeId=${selectedOfficeId}`
+        : '/api/patients';
+      const response = await apiRequest('GET', url);
+      return response.json();
+    }
   });
+
+  // Fetch all tasks to get assignees for each patient
+  const { data: tasks = [] } = useQuery<Task[]>({
+    queryKey: ['/api/tasks', selectedOfficeId],
+    queryFn: async () => {
+      const url = selectedOfficeId 
+        ? `/api/tasks?officeId=${selectedOfficeId}`
+        : '/api/tasks';
+      const response = await apiRequest('GET', url);
+      return response.json();
+    },
+  });
+
+  // Create a map of patientId -> unique assignees from pending tasks
+  const patientAssigneesMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    
+    if (!tasks || tasks.length === 0) {
+      return map;
+    }
+    
+    // Filter tasks that have a patientId and are pending (not completed)
+    const pendingTasksWithPatients = tasks.filter(task => {
+      // Must have both patientId and assignee
+      if (!task.patientId || !task.assignee) {
+        return false;
+      }
+      
+      // Check if task is completed (case-insensitive)
+      const status = (task.status || '').toLowerCase().trim();
+      // Include all tasks that are not explicitly completed
+      return status !== 'completed';
+    });
+    
+    // Build the map of patientId -> unique assignees
+    pendingTasksWithPatients.forEach(task => {
+      if (task.patientId && task.assignee) {
+        const patientId = String(task.patientId).trim();
+        const assignee = String(task.assignee).trim();
+        const existing = map.get(patientId) || [];
+        // Only add if assignee name is not already in the list
+        if (!existing.includes(assignee)) {
+          map.set(patientId, [...existing, assignee]);
+        }
+      }
+    });
+    
+    return map;
+  }, [tasks]);
 
   const filteredPatients = patients.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -75,6 +153,13 @@ export default function ActivePatients() {
         <div className="flex items-center justify-between gap-4 mb-4">
           <h1 className="text-3xl font-semibold">Active Patients</h1>
           <div className="flex items-center gap-3">
+            {canViewAllOffices && (
+              <OfficeSelector
+                selectedOfficeId={selectedOfficeId}
+                onOfficeChange={setSelectedOfficeId}
+                canViewAllOffices={canViewAllOffices}
+              />
+            )}
             <div className="relative w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -111,8 +196,7 @@ export default function ActivePatients() {
               filteredPatients.map(patient => {
                 const currentStep = patient.lastStepCompleted || 
                   (patient.isCDCP && !patient.copayDiscussed ? 'CDCP Copay Discussion' : 'New Patient');
-                const assignee = patient.assignedTo || 
-                  (patient.isCDCP && !patient.copayDiscussed ? 'Damien' : 'Unassigned');
+                const assignees = patientAssigneesMap.get(patient.id) || [];
                 const nextStep = patient.nextStep || 'Clinical Note';
                 const eta = patient.dueDate ? new Date(patient.dueDate) : undefined;
                 const lastActionDate = patient.lastStepDate ? new Date(patient.lastStepDate) : new Date(patient.createdAt);
@@ -136,7 +220,7 @@ export default function ActivePatients() {
                     currentStep={currentStep}
                     lastAction={lastAction}
                     nextStep={nextStep}
-                    assignee={assignee}
+                    assignees={assignees}
                     eta={eta}
                     onClick={() => handlePatientClick(patient.id)}
                   />

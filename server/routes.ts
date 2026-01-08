@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Response, Request } from "express";
 import { createServer, type Server } from "http";
 import { processClinicalNote, generateReferralLetter, summarizePatientChart } from "./openai";
 // Force redeploy to pick up Supabase bucket name
@@ -158,35 +158,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const patient = await storage.updatePatient(req.params.id, req.body);
       if (!patient) return res.status(404).json({ error: "Patient not found" });
       
-      // CAROLINE INSURANCE EXCEPTION: Auto-create insurance task when CDCP or work insurance is newly set
-      const wasInsurance = currentPatient.isCDCP || currentPatient.workInsurance;
-      const isInsurance = patient.isCDCP || patient.workInsurance;
-      
-      if (!wasInsurance && isInsurance) {
-        const insuranceType = patient.isCDCP ? "CDCP" : "Work Insurance";
-        const createdTask = await storage.createTask({
-          title: `Submit ${insuranceType} estimate for ${patient.name}`,
-          assignee: "Caroline",
-          patientId: patient.id,
-          dueDate: getNextBusinessDay(),
-          priority: "high",
-          status: "pending"
-        });
-        
-        // AUTO-UPDATE PREDETERMINATION STATUS: Insurance estimate tasks are predetermination-related
-        if (patient.predeterminationStatus !== "pending") {
-          try {
-            await storage.updatePatient(patient.id, {
-              predeterminationStatus: "pending"
-            });
-            console.log(`✅ Auto-updated predetermination status to "pending" for patient ${patient.name} (insurance task)`);
-          } catch (error: any) {
-            console.error("⚠️  Failed to auto-update predetermination status:", error.message);
-          }
-        }
-        
-        // Send notification when CDCP estimate is set
-        if (patient.isCDCP) {
+      // Send notification when CDCP estimate is set (but don't auto-create tasks)
+      if (patient.isCDCP) {
+        const wasCDCP = currentPatient.isCDCP;
+        if (!wasCDCP && patient.isCDCP) {
           try {
             await sendPatientNotification(patient.id, "cdcp_estimate_set");
           } catch (error: any) {
@@ -263,7 +238,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Error handler for multer errors
-  const handleMulterError = (err: any, req: any, res: any, next: any) => {
+  const handleMulterError = (err: any, req: Request, res: Response, next: any) => {
     if (err) {
       console.error("❌ Multer error:", err);
       console.error("❌ Multer error message:", err.message);
@@ -275,7 +250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   };
 
-  app.post("/api/patients/:id/chart-upload", isAuthenticated, upload.single('chart'), handleMulterError, async (req: any, res) => {
+  app.post("/api/patients/:id/chart-upload", isAuthenticated, upload.single('chart'), handleMulterError, async (req: any, res: Response) => {
     try {
       const officeContext = await getUserOfficeContext(req);
       
@@ -443,12 +418,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Create tasks from AI-extracted suggestedTasks (when clinician explicitly mentioned tasks)
+      // ONLY create predetermination tasks when explicitly mentioned, and assign based on office
       if (suggestedTasks && Array.isArray(suggestedTasks) && suggestedTasks.length > 0) {
+        // Get patient's office name to determine correct assignee for predetermination
+        let patientOfficeName: string | null = null;
+        if (patient.officeId) {
+          try {
+            const { offices } = await import("@shared/schema");
+            const { ensureDb } = await import("./db");
+            const db = ensureDb();
+            if (db) {
+              const { eq } = await import("drizzle-orm");
+              const officeList = await db.select().from(offices).where(eq(offices.id, patient.officeId)).limit(1);
+              if (officeList.length > 0) {
+                patientOfficeName = officeList[0].name;
+              }
+            }
+          } catch (error) {
+            console.error("Failed to get office name:", error);
+          }
+        }
+        
         for (const task of suggestedTasks) {
           try {
+            // Check if this is a predetermination task
+            const titleLower = (task.title || '').toLowerCase();
+            const isPredetermination = titleLower.includes("pre-d") || 
+                                      titleLower.includes("predetermination") || 
+                                      titleLower.includes("pre determination") ||
+                                      titleLower.includes("pre-d estimate") ||
+                                      titleLower.includes("predetermination estimate");
+            
+            // For predetermination tasks, assign based on office
+            let assignee = task.assignee || "All";
+            if (isPredetermination) {
+              if (patientOfficeName === "Dentures Direct") {
+                assignee = "Caroline";
+              } else if (patientOfficeName === "Toronto Smile Centre") {
+                assignee = "Admin";
+              }
+              // If office not found, use the AI-suggested assignee
+            }
+            
             const createdTask = await storage.createTask({
               title: task.title,
-              assignee: task.assignee || "All",
+              assignee: assignee,
               patientId: patient.id,
               dueDate: task.dueDate ? new Date(task.dueDate) : null,
               priority: task.priority || "normal",
@@ -457,73 +471,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
             
             // AUTO-UPDATE PREDETERMINATION STATUS: If a pre-D task is created, set predetermination status to "pending"
-            if (task.title) {
-              const titleLower = task.title.toLowerCase();
-              const isPreDRelated = titleLower.includes("pre-d") || 
-                                   titleLower.includes("predetermination") || 
-                                   titleLower.includes("pre determination") ||
-                                   titleLower.includes("pre-d estimate") ||
-                                   titleLower.includes("predetermination estimate");
-              
-              if (isPreDRelated && patient.predeterminationStatus !== "pending") {
-                try {
-                  await storage.updatePatient(patient.id, {
-                    predeterminationStatus: "pending"
-                  });
-                  console.log(`✅ Auto-updated predetermination status to "pending" for patient ${patient.name}`);
-                } catch (error: any) {
-                  console.error("⚠️  Failed to auto-update predetermination status:", error.message);
-                }
+            if (isPredetermination && patient.predeterminationStatus !== "pending") {
+              try {
+                await storage.updatePatient(patient.id, {
+                  predeterminationStatus: "pending"
+                });
+                console.log(`✅ Auto-updated predetermination status to "pending" for patient ${patient.name}`);
+              } catch (error: any) {
+                console.error("⚠️  Failed to auto-update predetermination status:", error.message);
               }
             }
           } catch (taskError: any) {
             console.error(`Failed to create task "${task.title}":`, taskError);
             // Continue creating other tasks even if one fails
-          }
-        }
-      }
-      
-      // CAROLINE INSURANCE EXCEPTION: Auto-create task if note mentions CDCP/insurance predetermination
-      const lowerContent = content.toLowerCase();
-      const mentionsCDCPTask = lowerContent.includes('cdcp') && 
-        (lowerContent.includes('predetermination') || lowerContent.includes('insurance') || 
-         lowerContent.includes('estimate') || lowerContent.includes('caroline'));
-      
-      if (mentionsCDCPTask || patient.isCDCP || patient.workInsurance) {
-        // Check if a similar task already exists
-        const existingTasks = await storage.listTasks(
-          'Caroline',
-          patientId,
-          officeContext.officeId,
-          officeContext.canViewAllOffices
-        );
-        const hasInsuranceTask = existingTasks.some(t => 
-          t.title.toLowerCase().includes('insurance') || 
-          t.title.toLowerCase().includes('cdcp') ||
-          t.title.toLowerCase().includes('estimate')
-        );
-        
-        if (!hasInsuranceTask) {
-          const insuranceType = patient.isCDCP ? "CDCP" : "Insurance";
-          const createdTask = await storage.createTask({
-            title: `Submit ${insuranceType} estimate/predetermination for ${patient.name}`,
-            assignee: "Caroline",
-            patientId: patient.id,
-            dueDate: getNextBusinessDay(),
-            priority: "high",
-            status: "pending"
-          });
-          
-          // AUTO-UPDATE PREDETERMINATION STATUS: This is a predetermination task, so set status to "pending"
-          if (patient.predeterminationStatus !== "pending") {
-            try {
-              await storage.updatePatient(patient.id, {
-                predeterminationStatus: "pending"
-              });
-              console.log(`✅ Auto-updated predetermination status to "pending" for patient ${patient.name} (insurance task)`);
-            } catch (error: any) {
-              console.error("⚠️  Failed to auto-update predetermination status:", error.message);
-            }
           }
         }
       }

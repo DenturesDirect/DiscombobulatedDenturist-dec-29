@@ -14,7 +14,7 @@ interface PatientTimelineCardProps {
   currentStep: string;
   lastAction: string;
   nextStep: string;
-  assignee: string;
+  assignees: string[];
   eta?: Date;
   isActive?: boolean;
   onClick?: () => void;
@@ -29,12 +29,14 @@ export default function PatientTimelineCard({
   currentStep,
   lastAction,
   nextStep,
-  assignee,
+  assignees,
   eta,
   isActive,
   onClick
 }: PatientTimelineCardProps) {
-  const assigneeInitials = assignee?.split(' ').map(n => n[0]).join('').toUpperCase() || 'NA';
+  const getInitials = (name: string) => {
+    return name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'NA';
+  };
 
   return (
     <Card
@@ -80,14 +82,45 @@ export default function PatientTimelineCard({
 
         <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
 
-        <div className="flex items-center gap-2 min-w-[100px]">
-          <Avatar className="w-7 h-7 cursor-pointer hover-elevate" data-testid={`avatar-assignee-${id}`}>
-            <AvatarFallback className="text-xs">{assigneeInitials}</AvatarFallback>
-          </Avatar>
-          <div className="flex-1">
-            <div className="text-xs text-muted-foreground">Assigned</div>
-            <div className="text-sm font-medium">{assignee}</div>
-          </div>
+        <div className="flex items-center gap-2 min-w-[120px]">
+          {assignees.length === 0 ? (
+            <>
+              <Avatar className="w-7 h-7 cursor-pointer hover-elevate" data-testid={`avatar-assignee-${id}`}>
+                <AvatarFallback className="text-xs">NA</AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <div className="text-xs text-muted-foreground">Assigned</div>
+                <div className="text-sm font-medium text-muted-foreground">Unassigned</div>
+              </div>
+            </>
+          ) : assignees.length === 1 ? (
+            <>
+              <Avatar className="w-7 h-7 cursor-pointer hover-elevate" data-testid={`avatar-assignee-${id}`}>
+                <AvatarFallback className="text-xs">{getInitials(assignees[0])}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <div className="text-xs text-muted-foreground">Assigned</div>
+                <div className="text-sm font-medium">{assignees[0]}</div>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1">
+              <div className="text-xs text-muted-foreground mb-1">Assigned</div>
+              <div className="flex items-center gap-1 flex-wrap">
+                {assignees.slice(0, 3).map((assignee, idx) => (
+                  <Avatar key={idx} className="w-6 h-6 cursor-pointer hover-elevate" data-testid={`avatar-assignee-${id}-${idx}`}>
+                    <AvatarFallback className="text-[10px]">{getInitials(assignee)}</AvatarFallback>
+                  </Avatar>
+                ))}
+                {assignees.length > 3 && (
+                  <span className="text-xs text-muted-foreground ml-1">+{assignees.length - 3}</span>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                {assignees.slice(0, 3).join(', ')}{assignees.length > 3 ? ` +${assignees.length - 3} more` : ''}
+              </div>
+            </div>
+          )}
         </div>
 
         {eta && (
