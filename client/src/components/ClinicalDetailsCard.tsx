@@ -56,7 +56,7 @@ const clinicalDetailsSchema = z.object({
   examPaid: z.enum(["yes", "no", "not applicable"]).nullable().optional(),
   repairPaid: z.enum(["yes", "no", "not applicable"]).nullable().optional(),
   newDenturePaid: z.enum(["yes", "no", "not applicable"]).nullable().optional(),
-  predeterminationStatus: z.enum(["not applicable", "pending", "approved", "not approved"]).nullable().optional(),
+  predeterminationStatus: z.enum(["not applicable", "pending", "approved", "not approved", "predeterminate", "predescent"]).nullable().optional(),
 });
 
 type ClinicalDetailsFormData = z.infer<typeof clinicalDetailsSchema>;
@@ -80,7 +80,7 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
       examPaid: (patient.examPaid as "yes" | "no" | "not applicable" | null) || null,
       repairPaid: (patient.repairPaid as "yes" | "no" | "not applicable" | null) || null,
       newDenturePaid: (patient.newDenturePaid as "yes" | "no" | "not applicable" | null) || null,
-      predeterminationStatus: (patient.predeterminationStatus as "not applicable" | "pending" | "approved" | "not approved" | null) || null,
+      predeterminationStatus: (patient.predeterminationStatus as "not applicable" | "pending" | "approved" | "not approved" | "predeterminate" | "predescent" | null) || null,
     },
   });
 
@@ -100,7 +100,7 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
         examPaid: (patient.examPaid as "yes" | "no" | "not applicable" | null) || null,
         repairPaid: (patient.repairPaid as "yes" | "no" | "not applicable" | null) || null,
         newDenturePaid: (patient.newDenturePaid as "yes" | "no" | "not applicable" | null) || null,
-        predeterminationStatus: (patient.predeterminationStatus as "not applicable" | "pending" | "approved" | "not approved" | null) || null,
+        predeterminationStatus: (patient.predeterminationStatus as "not applicable" | "pending" | "approved" | "not approved" | "predeterminate" | "predescent" | null) || null,
       });
     }
   }, [patient, form, isEditing]);
@@ -184,6 +184,10 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
                     ? "Pre-D Approved"
                     : patient.predeterminationStatus === "not approved"
                     ? "Pre-D Not Approved"
+                    : patient.predeterminationStatus === "predeterminate"
+                    ? "Predeterminate"
+                    : patient.predeterminationStatus === "predescent"
+                    ? "Predescent"
                     : patient.predeterminationStatus
                   : "Not set"}
               </p>
@@ -327,6 +331,24 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
                           data-testid="button-predetermination-not-approved"
                         >
                           Pre-D Not Approved
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={field.value === "predeterminate" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => field.onChange("predeterminate")}
+                          data-testid="button-predetermination-predeterminate"
+                        >
+                          Predeterminate
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={field.value === "predescent" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => field.onChange("predescent")}
+                          data-testid="button-predetermination-predescent"
+                        >
+                          Predescent
                         </Button>
                       </div>
                     </FormControl>

@@ -17,6 +17,10 @@ export default function PatientStatusCard({ patient }: PatientStatusCardProps) {
         return "Pre-D Approved";
       case "not approved":
         return "Pre-D Not Approved";
+      case "predeterminate":
+        return "Predeterminate";
+      case "predescent":
+        return "Predescent";
       default:
         return status;
     }
