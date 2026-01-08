@@ -158,6 +158,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const patient = await storage.updatePatient(req.params.id, req.body);
       if (!patient) return res.status(404).json({ error: "Patient not found" });
       
+      // AUTO-CREATE PREDETERMINATION TASK: When status is set to "pending", create task for appropriate staff
+      const wasPending = currentPatient.predeterminationStatus === "pending";
+      const isPending = patient.predeterminationStatus === "pending";
+      
+      if (!wasPending && isPending) {
+        try {
+          // Get patient's office name to determine correct assignee
+          let patientOfficeName: string | null = null;
+          if (patient.officeId) {
+            const { offices } = await import("@shared/schema");
+            const { ensureDb } = await import("./db");
+            const db = ensureDb();
+            if (db) {
+              const { eq } = await import("drizzle-orm");
+              const officeList = await db.select().from(offices).where(eq(offices.id, patient.officeId)).limit(1);
+              if (officeList.length > 0) {
+                patientOfficeName = officeList[0].name;
+              }
+            }
+          }
+          
+          // Determine assignee based on office
+          let assignee = "Caroline"; // Default to Caroline
+          if (patientOfficeName === "Toronto Smile Centre") {
+            assignee = "Admin";
+          }
+          
+          // Check if a similar predetermination task already exists
+          const existingTasks = await storage.listTasks(
+            assignee,
+            patient.id,
+            officeContext.officeId,
+            officeContext.canViewAllOffices
+          );
+          const hasPredeterminationTask = existingTasks.some(t => {
+            const titleLower = (t.title || '').toLowerCase();
+            return titleLower.includes("pre-d") || 
+                   titleLower.includes("predetermination") || 
+                   titleLower.includes("pre determination") ||
+                   titleLower.includes("pre-d estimate") ||
+                   titleLower.includes("predetermination estimate");
+          });
+          
+          if (!hasPredeterminationTask) {
+            const insuranceType = patient.isCDCP ? "CDCP" : (patient.workInsurance ? "Insurance" : "Insurance");
+            const createdTask = await storage.createTask({
+              title: `Submit ${insuranceType} predetermination for ${patient.name}`,
+              assignee: assignee,
+              patientId: patient.id,
+              dueDate: getNextBusinessDay(),
+              priority: "high",
+              status: "pending"
+            });
+            console.log(`✅ Auto-created predetermination task for ${patient.name} assigned to ${assignee}`);
+          }
+        } catch (error: any) {
+          console.error("⚠️  Failed to auto-create predetermination task:", error.message);
+          // Don't fail the request if task creation fails
+        }
+      }
+      
       // Send notification when CDCP estimate is set (but don't auto-create tasks)
       if (patient.isCDCP) {
         const wasCDCP = currentPatient.isCDCP;
