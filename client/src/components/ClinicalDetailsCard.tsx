@@ -53,6 +53,10 @@ const clinicalDetailsSchema = z.object({
   workInsurance: z.boolean().optional(),
   lastStepCompleted: z.string().optional(),
   nextStep: z.string().optional(),
+  examPaid: z.enum(["yes", "no", "not applicable"]).nullable().optional(),
+  repairPaid: z.enum(["yes", "no", "not applicable"]).nullable().optional(),
+  newDenturePaid: z.enum(["yes", "no", "not applicable"]).nullable().optional(),
+  predeterminationStatus: z.enum(["not applicable", "pending", "approved", "not approved"]).nullable().optional(),
 });
 
 type ClinicalDetailsFormData = z.infer<typeof clinicalDetailsSchema>;
@@ -73,6 +77,10 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
       workInsurance: patient.workInsurance || false,
       lastStepCompleted: patient.lastStepCompleted || "",
       nextStep: patient.nextStep || "",
+      examPaid: (patient.examPaid as "yes" | "no" | "not applicable" | null) || null,
+      repairPaid: (patient.repairPaid as "yes" | "no" | "not applicable" | null) || null,
+      newDenturePaid: (patient.newDenturePaid as "yes" | "no" | "not applicable" | null) || null,
+      predeterminationStatus: (patient.predeterminationStatus as "not applicable" | "pending" | "approved" | "not approved" | null) || null,
     },
   });
 
@@ -89,6 +97,10 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
         workInsurance: patient.workInsurance || false,
         lastStepCompleted: patient.lastStepCompleted || "",
         nextStep: patient.nextStep || "",
+        examPaid: (patient.examPaid as "yes" | "no" | "not applicable" | null) || null,
+        repairPaid: (patient.repairPaid as "yes" | "no" | "not applicable" | null) || null,
+        newDenturePaid: (patient.newDenturePaid as "yes" | "no" | "not applicable" | null) || null,
+        predeterminationStatus: (patient.predeterminationStatus as "not applicable" | "pending" | "approved" | "not approved" | null) || null,
       });
     }
   }, [patient, form, isEditing]);
@@ -110,6 +122,10 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
         workInsurance: updatedPatient.workInsurance || false,
         lastStepCompleted: updatedPatient.lastStepCompleted || "",
         nextStep: updatedPatient.nextStep || "",
+        examPaid: (updatedPatient.examPaid as "yes" | "no" | "not applicable" | null) || null,
+        repairPaid: (updatedPatient.repairPaid as "yes" | "no" | "not applicable" | null) || null,
+        newDenturePaid: (updatedPatient.newDenturePaid as "yes" | "no" | "not applicable" | null) || null,
+        predeterminationStatus: (updatedPatient.predeterminationStatus as "not applicable" | "pending" | "approved" | "not approved" | null) || null,
       });
       
       queryClient.invalidateQueries({ queryKey: ['/api/patients', patient.id] });
@@ -156,6 +172,22 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
       <CardContent>
         {!isEditing ? (
           <div className="space-y-3 text-sm">
+            <div className="pb-2 border-b">
+              <p className="text-muted-foreground mb-2">Predetermination Status</p>
+              <p className="font-medium" data-testid="text-predetermination-status">
+                {patient.predeterminationStatus 
+                  ? patient.predeterminationStatus === "not applicable" 
+                    ? "Not Applicable"
+                    : patient.predeterminationStatus === "pending"
+                    ? "Pre-D Pending"
+                    : patient.predeterminationStatus === "approved"
+                    ? "Pre-D Approved"
+                    : patient.predeterminationStatus === "not approved"
+                    ? "Pre-D Not Approved"
+                    : patient.predeterminationStatus
+                  : "Not set"}
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-muted-foreground">Date of Birth</p>
@@ -227,10 +259,82 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
                 </p>
               </div>
             </div>
+
+            <div className="space-y-3 pt-2 border-t">
+              <div>
+                <p className="text-muted-foreground mb-2">Exam Paid</p>
+                <p className="font-medium" data-testid="text-exam-paid">
+                  {patient.examPaid ? patient.examPaid.charAt(0).toUpperCase() + patient.examPaid.slice(1) : "Not set"}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground mb-2">Repair Paid</p>
+                <p className="font-medium" data-testid="text-repair-paid">
+                  {patient.repairPaid ? patient.repairPaid.charAt(0).toUpperCase() + patient.repairPaid.slice(1) : "Not set"}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground mb-2">New Denture Paid</p>
+                <p className="font-medium" data-testid="text-new-denture-paid">
+                  {patient.newDenturePaid ? patient.newDenturePaid.charAt(0).toUpperCase() + patient.newDenturePaid.slice(1) : "Not set"}
+                </p>
+              </div>
+            </div>
           </div>
         ) : (
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="predeterminationStatus"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Predetermination Status</FormLabel>
+                    <FormControl>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant={field.value === "not applicable" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => field.onChange("not applicable")}
+                          data-testid="button-predetermination-na"
+                        >
+                          Not Applicable
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={field.value === "pending" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => field.onChange("pending")}
+                          data-testid="button-predetermination-pending"
+                        >
+                          Pre-D Pending
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={field.value === "approved" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => field.onChange("approved")}
+                          data-testid="button-predetermination-approved"
+                        >
+                          Pre-D Approved
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={field.value === "not approved" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => field.onChange("not approved")}
+                          data-testid="button-predetermination-not-approved"
+                        >
+                          Pre-D Not Approved
+                        </Button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="dateOfBirth"
@@ -419,6 +523,134 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
                           value={field.value || ""}
                           data-testid="input-edit-next-step"
                         />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="space-y-4 pt-2 border-t">
+                <FormField
+                  control={form.control}
+                  name="examPaid"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Exam Paid</FormLabel>
+                      <FormControl>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant={field.value === "yes" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => field.onChange("yes")}
+                            data-testid="button-exam-paid-yes"
+                          >
+                            Yes
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={field.value === "no" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => field.onChange("no")}
+                            data-testid="button-exam-paid-no"
+                          >
+                            No
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={field.value === "not applicable" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => field.onChange("not applicable")}
+                            data-testid="button-exam-paid-na"
+                          >
+                            Not Applicable
+                          </Button>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="repairPaid"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Repair Paid</FormLabel>
+                      <FormControl>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant={field.value === "yes" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => field.onChange("yes")}
+                            data-testid="button-repair-paid-yes"
+                          >
+                            Yes
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={field.value === "no" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => field.onChange("no")}
+                            data-testid="button-repair-paid-no"
+                          >
+                            No
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={field.value === "not applicable" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => field.onChange("not applicable")}
+                            data-testid="button-repair-paid-na"
+                          >
+                            Not Applicable
+                          </Button>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="newDenturePaid"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>New Denture Paid</FormLabel>
+                      <FormControl>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant={field.value === "yes" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => field.onChange("yes")}
+                            data-testid="button-new-denture-paid-yes"
+                          >
+                            Yes
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={field.value === "no" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => field.onChange("no")}
+                            data-testid="button-new-denture-paid-no"
+                          >
+                            No
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={field.value === "not applicable" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => field.onChange("not applicable")}
+                            data-testid="button-new-denture-paid-na"
+                          >
+                            Not Applicable
+                          </Button>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>

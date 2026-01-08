@@ -70,6 +70,10 @@ export const patients = pgTable("patients", {
   lastStepDate: timestamp("last_step_date"),
   emailNotifications: boolean("email_notifications").default(false).notNull(),
   textNotifications: boolean("text_notifications").default(false).notNull(),
+  examPaid: text("exam_paid"), // "yes", "no", "not applicable"
+  repairPaid: text("repair_paid"), // "yes", "no", "not applicable"
+  newDenturePaid: text("new_denture_paid"), // "yes", "no", "not applicable"
+  predeterminationStatus: text("predetermination_status"), // "not applicable", "pending", "approved", "not approved"
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

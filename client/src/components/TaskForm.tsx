@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon, Send } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 interface TaskFormProps {
   patientId: string;
@@ -29,9 +30,40 @@ interface TaskFormProps {
   disabled?: boolean;
 }
 
-const STAFF_MEMBERS = ["Damien", "Caroline", "Michael", "Luisa"];
+const DENTURES_DIRECT_STAFF = ["Damien", "Caroline", "Michael", "Luisa"];
+const TORONTO_SMILE_CENTRE_STAFF = ["Admin", "Dr. Priyanka Chowdhury"];
 
 export default function TaskForm({ patientId, patientName, onSubmit, disabled }: TaskFormProps) {
+  const { user } = useAuth();
+  const canViewAllOffices = user?.canViewAllOffices ?? false;
+
+  // Determine user's office from email domain
+  const isDenturesDirectUser = useMemo(() => {
+    const email = user?.email?.toLowerCase() || '';
+    return email.includes('denturesdirect');
+  }, [user?.email]);
+
+  const isTorontoSmileCentreUser = useMemo(() => {
+    const email = user?.email?.toLowerCase() || '';
+    return email.includes('torontosmile');
+  }, [user?.email]);
+
+  // Filter staff members based on office
+  // Dentures Direct staff can see all staff, Toronto Smile Centre staff can only see their own
+  const STAFF_MEMBERS = useMemo(() => {
+    if (isDenturesDirectUser) {
+      // All Dentures Direct staff can see all staff (both offices)
+      return [...DENTURES_DIRECT_STAFF, ...TORONTO_SMILE_CENTRE_STAFF];
+    }
+    
+    if (isTorontoSmileCentreUser) {
+      // Toronto Smile Centre staff can only see their own staff
+      return TORONTO_SMILE_CENTRE_STAFF;
+    }
+    
+    // Default: show Dentures Direct staff (for backward compatibility)
+    return DENTURES_DIRECT_STAFF;
+  }, [isDenturesDirectUser, isTorontoSmileCentreUser]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assignee, setAssignee] = useState<string>("");

@@ -24,9 +24,16 @@ async function getUserOfficeContext(req: any): Promise<{ officeId: string | null
     return { officeId: null, canViewAllOffices: false };
   }
   
+  // Check if user is from Dentures Direct (all Dentures Direct staff can see all data)
+  const email = dbUser.email?.toLowerCase() || '';
+  const isDenturesDirectUser = email.includes('denturesdirect');
+  
+  // Dentures Direct staff can see all offices, Toronto Smile Centre staff can only see their own
+  const canViewAll = (dbUser.canViewAllOffices ?? false) || isDenturesDirectUser;
+  
   return {
     officeId: dbUser.officeId ?? null,
-    canViewAllOffices: dbUser.canViewAllOffices ?? false
+    canViewAllOffices: canViewAll
   };
 }
 
@@ -157,7 +164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!wasInsurance && isInsurance) {
         const insuranceType = patient.isCDCP ? "CDCP" : "Work Insurance";
-        await storage.createTask({
+        const createdTask = await storage.createTask({
           title: `Submit ${insuranceType} estimate for ${patient.name}`,
           assignee: "Caroline",
           patientId: patient.id,
@@ -165,6 +172,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           priority: "high",
           status: "pending"
         });
+        
+        // AUTO-UPDATE PREDETERMINATION STATUS: Insurance estimate tasks are predetermination-related
+        if (patient.predeterminationStatus !== "pending") {
+          try {
+            await storage.updatePatient(patient.id, {
+              predeterminationStatus: "pending"
+            });
+            console.log(`✅ Auto-updated predetermination status to "pending" for patient ${patient.name} (insurance task)`);
+          } catch (error: any) {
+            console.error("⚠️  Failed to auto-update predetermination status:", error.message);
+          }
+        }
         
         // Send notification when CDCP estimate is set
         if (patient.isCDCP) {
@@ -427,7 +446,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (suggestedTasks && Array.isArray(suggestedTasks) && suggestedTasks.length > 0) {
         for (const task of suggestedTasks) {
           try {
-            await storage.createTask({
+            const createdTask = await storage.createTask({
               title: task.title,
               assignee: task.assignee || "All",
               patientId: patient.id,
@@ -436,6 +455,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
               status: "pending",
               description: `Task extracted from clinical note dated ${parsedNoteDate.toLocaleDateString()}`
             });
+            
+            // AUTO-UPDATE PREDETERMINATION STATUS: If a pre-D task is created, set predetermination status to "pending"
+            if (task.title) {
+              const titleLower = task.title.toLowerCase();
+              const isPreDRelated = titleLower.includes("pre-d") || 
+                                   titleLower.includes("predetermination") || 
+                                   titleLower.includes("pre determination") ||
+                                   titleLower.includes("pre-d estimate") ||
+                                   titleLower.includes("predetermination estimate");
+              
+              if (isPreDRelated && patient.predeterminationStatus !== "pending") {
+                try {
+                  await storage.updatePatient(patient.id, {
+                    predeterminationStatus: "pending"
+                  });
+                  console.log(`✅ Auto-updated predetermination status to "pending" for patient ${patient.name}`);
+                } catch (error: any) {
+                  console.error("⚠️  Failed to auto-update predetermination status:", error.message);
+                }
+              }
+            }
           } catch (taskError: any) {
             console.error(`Failed to create task "${task.title}":`, taskError);
             // Continue creating other tasks even if one fails
@@ -465,7 +505,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (!hasInsuranceTask) {
           const insuranceType = patient.isCDCP ? "CDCP" : "Insurance";
-          await storage.createTask({
+          const createdTask = await storage.createTask({
             title: `Submit ${insuranceType} estimate/predetermination for ${patient.name}`,
             assignee: "Caroline",
             patientId: patient.id,
@@ -473,6 +513,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             priority: "high",
             status: "pending"
           });
+          
+          // AUTO-UPDATE PREDETERMINATION STATUS: This is a predetermination task, so set status to "pending"
+          if (patient.predeterminationStatus !== "pending") {
+            try {
+              await storage.updatePatient(patient.id, {
+                predeterminationStatus: "pending"
+              });
+              console.log(`✅ Auto-updated predetermination status to "pending" for patient ${patient.name} (insurance task)`);
+            } catch (error: any) {
+              console.error("⚠️  Failed to auto-update predetermination status:", error.message);
+            }
+          }
         }
       }
 
@@ -561,6 +613,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const task = await storage.createTask(taskData);
       console.log("✅ Task created successfully:", task.id);
+      
+      // AUTO-UPDATE PREDETERMINATION STATUS: If a pre-D task is assigned, set predetermination status to "pending"
+      if (taskData.patientId && taskData.title) {
+        const titleLower = taskData.title.toLowerCase();
+        const isPreDRelated = titleLower.includes("pre-d") || 
+                             titleLower.includes("predetermination") || 
+                             titleLower.includes("pre determination") ||
+                             titleLower.includes("pre-d estimate") ||
+                             titleLower.includes("predetermination estimate");
+        
+        if (isPreDRelated) {
+          try {
+            const patient = await storage.getPatient(taskData.patientId as string);
+            if (patient && patient.predeterminationStatus !== "pending") {
+              await storage.updatePatient(taskData.patientId as string, {
+                predeterminationStatus: "pending"
+              });
+              console.log(`✅ Auto-updated predetermination status to "pending" for patient ${patient.name}`);
+            }
+          } catch (error: any) {
+            console.error("⚠️  Failed to auto-update predetermination status:", error.message);
+            // Don't fail the task creation if this update fails
+          }
+        }
+      }
+      
       res.json(task);
     } catch (error: any) {
       console.error("❌ Error creating task:", error);

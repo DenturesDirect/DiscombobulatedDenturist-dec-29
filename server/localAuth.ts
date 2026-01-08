@@ -19,7 +19,7 @@ const ALLOWED_STAFF = [
   { email: "info@denturesdirect.ca", firstName: "Caroline", lastName: "", role: "staff", officeName: "Dentures Direct", canViewAllOffices: true },
   // Toronto Smile Centre users
   { email: "info@torontosmilecenter.ca", firstName: "Admin", lastName: "", role: "admin", officeName: "Toronto Smile Centre", canViewAllOffices: false },
-  { email: "dentist@torontosmilecentre.ca", firstName: "Dentist", lastName: "", role: "staff", officeName: "Toronto Smile Centre", canViewAllOffices: false },
+  { email: "dentist@torontosmilecentre.ca", firstName: "Priyanka", lastName: "Choudhary", role: "staff", officeName: "Toronto Smile Centre", canViewAllOffices: false },
 ];
 
 export async function hashPassword(password: string): Promise<string> {

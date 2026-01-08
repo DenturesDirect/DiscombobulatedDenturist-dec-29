@@ -152,7 +152,7 @@ If the clinician explicitly mentions assigning a task (e.g., "assign task to Car
 ONLY extract tasks when explicitly mentioned - do not infer or create tasks automatically.
 When extracting tasks, include:
 - title: Clear, actionable task description
-- assignee: Staff member name (Caroline, Michael, Damien, Luisa, or All)
+- assignee: Staff member name (Caroline, Michael, Damien, Luisa, Admin, Dr. Priyanka Chowdhury, or All)
 - dueDate: ISO date string if mentioned, or null
 - priority: 'high', 'normal', or 'low' based on urgency indicators
 

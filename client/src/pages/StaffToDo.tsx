@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,7 +14,8 @@ import OfficeSelector from "@/components/OfficeSelector";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Task, Patient } from "@shared/schema";
 
-const staffMembers = ['All', 'Damien', 'Caroline', 'Michael', 'Luisa'];
+const DENTURES_DIRECT_STAFF = ['Damien', 'Caroline', 'Michael', 'Luisa'];
+const TORONTO_SMILE_CENTRE_STAFF = ['Admin', 'Dr. Priyanka Chowdhury'];
 
 export default function StaffToDo() {
   const [, setLocation] = useLocation();
@@ -23,6 +24,35 @@ export default function StaffToDo() {
   const { user } = useAuth();
 
   const canViewAllOffices = user?.canViewAllOffices ?? false;
+
+  // Determine if user is from Dentures Direct or Toronto Smile Centre
+  const isDenturesDirectUser = useMemo(() => {
+    const email = user?.email?.toLowerCase() || '';
+    return email.includes('denturesdirect');
+  }, [user?.email]);
+
+  const isTorontoSmileCentreUser = useMemo(() => {
+    const email = user?.email?.toLowerCase() || '';
+    return email.includes('torontosmile');
+  }, [user?.email]);
+
+  // Filter staff members based on office
+  // Dentures Direct staff can see all staff, Toronto Smile Centre staff can only see their own
+  const staffMembers = useMemo(() => {
+    const base = ['All'];
+    if (isDenturesDirectUser) {
+      // All Dentures Direct staff can see all staff (both offices)
+      return [...base, ...DENTURES_DIRECT_STAFF, ...TORONTO_SMILE_CENTRE_STAFF];
+    }
+    
+    if (isTorontoSmileCentreUser) {
+      // Toronto Smile Centre staff can only see their own staff
+      return [...base, ...TORONTO_SMILE_CENTRE_STAFF];
+    }
+    
+    // Default: show Dentures Direct staff (for backward compatibility)
+    return [...base, ...DENTURES_DIRECT_STAFF];
+  }, [isDenturesDirectUser, isTorontoSmileCentreUser]);
   const [selectedOfficeId, setSelectedOfficeId] = useState<string | null>(null);
 
   const { data: tasks = [], isLoading, refetch } = useQuery<Task[]>({

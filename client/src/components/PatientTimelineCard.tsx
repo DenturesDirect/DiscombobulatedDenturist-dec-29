@@ -17,7 +17,6 @@ interface PatientTimelineCardProps {
   assignee: string;
   eta?: Date;
   isActive?: boolean;
-  officeName?: string | null;
   onClick?: () => void;
 }
 
@@ -33,7 +32,6 @@ export default function PatientTimelineCard({
   assignee,
   eta,
   isActive,
-  officeName,
   onClick
 }: PatientTimelineCardProps) {
   const assigneeInitials = assignee?.split(' ').map(n => n[0]).join('').toUpperCase() || 'NA';
@@ -48,13 +46,8 @@ export default function PatientTimelineCard({
         <PatientAvatar name={name} photoUrl={photoUrl} className="w-9 h-9 flex-shrink-0" />
 
         <div className="flex-1 min-w-[140px]">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             <div className="font-medium text-sm" data-testid={`text-name-${id}`}>{name}</div>
-            {officeName && (
-              <Badge variant="secondary" className="text-xs" data-testid={`badge-office-${id}`}>
-                {officeName}
-              </Badge>
-            )}
             {dentureType && (
               <Badge variant="outline" className="text-xs" data-testid={`badge-denture-type-${id}`}>
                 {dentureType}

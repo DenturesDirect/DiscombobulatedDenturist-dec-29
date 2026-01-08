@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedData } from "./seed";
+import { runMigrations } from "./migrate";
 
 const app = express();
 
@@ -55,6 +56,9 @@ console.log("  SUPABASE_STORAGE_BUCKET:", process.env.SUPABASE_STORAGE_BUCKET ||
 console.log("  All SUPABASE_* vars:", Object.keys(process.env).filter(k => k.toUpperCase().startsWith('SUPABASE')).join(', ') || 'None');
 
 (async () => {
+  // Run database migrations first
+  await runMigrations();
+  
   // Seed initial data
   await seedData();
   

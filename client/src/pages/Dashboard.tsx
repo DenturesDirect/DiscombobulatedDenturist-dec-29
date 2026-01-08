@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import TopNav from "@/components/TopNav";
 import ClinicalDetailsCard from "@/components/ClinicalDetailsCard";
+import PatientStatusCard from "@/components/PatientStatusCard";
 import VoicePromptInput from "@/components/VoicePromptInput";
 import SimpleNoteInput from "@/components/SimpleNoteInput";
 import LabPrescriptionForm, { type LabPrescriptionData } from "@/components/LabPrescriptionForm";
@@ -926,7 +927,8 @@ export default function Dashboard() {
 
           <div className="flex-1 p-6 overflow-y-auto">
             <Tabs defaultValue="clinical" className="h-full flex flex-col">
-              <TabsList className="mb-4 flex-wrap gap-1">
+              <div className="mb-4 flex items-center gap-4 flex-nowrap">
+                <TabsList className="flex-wrap gap-1 flex-1 min-w-0">
                 <TabsTrigger value="clinical" className="gap-1 text-xs" data-testid="tab-clinical-notes">
                   <FileText className="w-3 h-3" />
                   Clinical
@@ -951,7 +953,9 @@ export default function Dashboard() {
                   <Camera className="w-3 h-3" />
                   Photos
                 </TabsTrigger>
-              </TabsList>
+                </TabsList>
+                <PatientStatusCard patient={patient} />
+              </div>
 
               <TabsContent value="clinical" className="flex-1 overflow-y-auto">
                 {isLoadingNotes ? (
