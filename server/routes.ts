@@ -576,15 +576,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const officeContext = await getUserOfficeContext(req);
       const { assignee, patientId, officeId } = req.query;
-      const tasks = await storage.listTasks(
+      
+      // Debug: Check total tasks in database
+      try {
+        const { ensureDb } = await import("./db");
+        const { tasks: tasksTable } = await import("@shared/schema");
+        const db = ensureDb();
+        if (db) {
+          const allTasksInDb = await db.select().from(tasksTable);
+          console.log(`🔍 DEBUG: Total tasks in database: ${allTasksInDb.length}`);
+          if (allTasksInDb.length > 0) {
+            const statusCounts = allTasksInDb.reduce((acc: Record<string, number>, t: any) => {
+              const status = (t.status || 'null') as string;
+              acc[status] = (acc[status] || 0) + 1;
+              return acc;
+            }, {} as Record<string, number>);
+            console.log(`🔍 DEBUG: Task status breakdown:`, statusCounts);
+          }
+        }
+      } catch (debugError) {
+        console.warn("⚠️  Could not run debug query:", debugError);
+      }
+      
+      const taskList = await storage.listTasks(
         assignee as string,
         patientId as string,
         officeContext.officeId,
         officeContext.canViewAllOffices,
         officeId as string | null
       );
-      res.json(tasks);
+      console.log(`📋 Fetched ${taskList.length} tasks (assignee: ${assignee || 'all'}, patientId: ${patientId || 'all'})`);
+      res.json(taskList);
     } catch (error: any) {
+      console.error("❌ Error fetching tasks:", error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -680,8 +704,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const task = await storage.createTask(taskData);
-      console.log("✅ Task created successfully:", task.id);
+      let task;
+      try {
+        task = await storage.createTask(taskData);
+        console.log("✅ Task created successfully:", task.id);
+      } catch (createError: any) {
+        console.error("❌ Database error creating task:", createError);
+        console.error("❌ Task data attempted:", JSON.stringify(taskData, null, 2));
+        // If it's a column error, try without optional fields
+        if (createError.message?.includes("column") || createError.message?.includes("does not exist")) {
+          // Remove completedBy and completedAt if they're causing issues
+          const { completedBy, completedAt, ...cleanTaskData } = taskData;
+          try {
+            task = await storage.createTask(cleanTaskData);
+            console.log("✅ Task created successfully (retry):", task.id);
+          } catch (retryError: any) {
+            console.error("❌ Retry also failed:", retryError);
+            throw new Error(`Failed to create task: ${retryError.message || createError.message}`);
+          }
+        } else {
+          throw createError;
+        }
+      }
       
       // AUTO-UPDATE PREDETERMINATION STATUS: If a pre-D task is assigned, set predetermination status to "pending"
       if (taskData.patientId && taskData.title) {

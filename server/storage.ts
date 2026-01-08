@@ -12,7 +12,7 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { ensureDb } from "./db";
-import { eq, desc, and, ne } from "drizzle-orm";
+import { eq, desc, and, ne, or, isNull } from "drizzle-orm";
 import { USE_MEM_STORAGE } from "./config";
 
 export interface IStorage {
@@ -665,8 +665,13 @@ export class DbStorage implements IStorage {
     // This is complex with drizzle, so we'll filter after fetching if needed
     let allTasks: Task[];
     
-    // Exclude completed tasks
-    const baseConditions = [ne(tasks.status, "completed")];
+    // Exclude completed tasks - use or() to handle null status as well
+    const baseConditions = [
+      or(
+        ne(tasks.status, "completed"),
+        isNull(tasks.status)
+      )!
+    ];
     
     if (assignee) {
       baseConditions.push(eq(tasks.assignee, assignee));
