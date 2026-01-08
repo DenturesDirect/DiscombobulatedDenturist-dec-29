@@ -915,32 +915,34 @@ export default function Dashboard() {
             <Tabs defaultValue="clinical" className="h-full flex flex-col">
               <div className="mb-4 space-y-3">
                 {/* Tabs Row - All horizontal, can wrap to multiple rows */}
-                <TabsList className="inline-flex flex-wrap gap-1 w-full">
-                  <TabsTrigger value="clinical" className="gap-1 text-xs" data-testid="tab-clinical-notes">
-                    <FileText className="w-3 h-3" />
-                    Clinical
-                  </TabsTrigger>
-                  <TabsTrigger value="lab" className="gap-1 text-xs" data-testid="tab-lab-notes">
-                    <FlaskConical className="w-3 h-3" />
-                    Lab
-                  </TabsTrigger>
-                  <TabsTrigger value="admin" className="gap-1 text-xs" data-testid="tab-admin-notes">
-                    <ClipboardList className="w-3 h-3" />
-                    Admin
-                  </TabsTrigger>
-                  <TabsTrigger value="prescriptions" className="gap-1 text-xs" data-testid="tab-prescriptions">
-                    <Pill className="w-3 h-3" />
-                    Lab Rx
-                  </TabsTrigger>
-                  <TabsTrigger value="tasks" className="gap-1 text-xs" data-testid="tab-tasks">
-                    <CheckSquare className="w-3 h-3" />
-                    Tasks
-                  </TabsTrigger>
-                  <TabsTrigger value="photos" className="gap-1 text-xs" data-testid="tab-photos">
-                    <Camera className="w-3 h-3" />
-                    Photos
-                  </TabsTrigger>
-                </TabsList>
+                <div className="overflow-x-auto">
+                  <TabsList className="inline-flex flex-wrap gap-1 min-w-max">
+                    <TabsTrigger value="clinical" className="gap-1 text-xs flex-shrink-0" data-testid="tab-clinical-notes">
+                      <FileText className="w-3 h-3" />
+                      Clinical
+                    </TabsTrigger>
+                    <TabsTrigger value="lab" className="gap-1 text-xs flex-shrink-0" data-testid="tab-lab-notes">
+                      <FlaskConical className="w-3 h-3" />
+                      Lab
+                    </TabsTrigger>
+                    <TabsTrigger value="admin" className="gap-1 text-xs flex-shrink-0" data-testid="tab-admin-notes">
+                      <ClipboardList className="w-3 h-3" />
+                      Admin
+                    </TabsTrigger>
+                    <TabsTrigger value="prescriptions" className="gap-1 text-xs flex-shrink-0" data-testid="tab-prescriptions">
+                      <Pill className="w-3 h-3" />
+                      Lab Rx
+                    </TabsTrigger>
+                    <TabsTrigger value="tasks" className="gap-1 text-xs flex-shrink-0" data-testid="tab-tasks">
+                      <CheckSquare className="w-3 h-3" />
+                      Tasks
+                    </TabsTrigger>
+                    <TabsTrigger value="photos" className="gap-1 text-xs flex-shrink-0" data-testid="tab-photos">
+                      <Camera className="w-3 h-3" />
+                      Photos
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
                 
                 {/* Status Row - Payments and Pre-D Status */}
                 <div className="flex items-center flex-wrap">
