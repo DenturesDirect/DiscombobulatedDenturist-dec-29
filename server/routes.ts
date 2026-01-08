@@ -528,11 +528,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/tasks/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/tasks/:id", isAuthenticated, async (req: any, res) => {
     try {
       const { status } = req.body;
-      const task = await storage.updateTaskStatus(req.params.id, status);
+      const user = req.user as any;
+      const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown';
+      const task = await storage.updateTaskStatus(req.params.id, status, status === "completed" ? userName : undefined);
       res.json(task);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get archived (completed) tasks - admin only
+  app.get("/api/tasks/archived", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const officeContext = await getUserOfficeContext(req);
+      const selectedOfficeId = req.query.officeId as string | undefined;
+      const archivedTasks = await storage.listArchivedTasks(
+        officeContext.officeId,
+        officeContext.canViewAllOffices,
+        selectedOfficeId || null
+      );
+      res.json(archivedTasks);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

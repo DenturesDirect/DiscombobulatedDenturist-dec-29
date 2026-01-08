@@ -12,7 +12,7 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { ensureDb } from "./db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, ne } from "drizzle-orm";
 import { USE_MEM_STORAGE } from "./config";
 
 export interface IStorage {
@@ -41,7 +41,8 @@ export interface IStorage {
   // Tasks
   createTask(task: InsertTask): Promise<Task>;
   listTasks(assignee?: string, patientId?: string, userOfficeId?: string | null, canViewAllOffices?: boolean, selectedOfficeId?: string | null): Promise<Task[]>;
-  updateTaskStatus(id: string, status: string): Promise<Task | undefined>;
+  listArchivedTasks(userOfficeId?: string | null, canViewAllOffices?: boolean, selectedOfficeId?: string | null): Promise<Task[]>;
+  updateTaskStatus(id: string, status: string, completedBy?: string): Promise<Task | undefined>;
   
   // Files
   createPatientFile(file: InsertPatientFile): Promise<PatientFile>;
@@ -269,6 +270,8 @@ export class MemStorage implements IStorage {
       dueDate: insertTask.dueDate ?? null,
       priority: insertTask.priority ?? "normal",
       status: insertTask.status ?? "pending",
+      completedBy: null,
+      completedAt: null,
       createdAt: new Date()
     };
     this.tasks.set(id, task);
@@ -277,6 +280,9 @@ export class MemStorage implements IStorage {
 
   async listTasks(assignee?: string, patientId?: string, userOfficeId?: string | null, canViewAllOffices?: boolean, selectedOfficeId?: string | null): Promise<Task[]> {
     let allTasks = Array.from(this.tasks.values());
+    
+    // Exclude completed tasks from active task list
+    allTasks = allTasks.filter(task => task.status !== "completed");
     
     // Filter by office
     if (canViewAllOffices && selectedOfficeId) {
@@ -308,10 +314,48 @@ export class MemStorage implements IStorage {
     return allTasks.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
-  async updateTaskStatus(id: string, status: string): Promise<Task | undefined> {
+  async listArchivedTasks(userOfficeId?: string | null, canViewAllOffices?: boolean, selectedOfficeId?: string | null): Promise<Task[]> {
+    let allTasks = Array.from(this.tasks.values());
+    
+    // Only include completed tasks
+    allTasks = allTasks.filter(task => task.status === "completed");
+    
+    // Filter by office
+    if (canViewAllOffices && selectedOfficeId) {
+      allTasks = allTasks.filter(task => {
+        if (task.patientId) {
+          const patient = this.patients.get(task.patientId);
+          return patient?.officeId === selectedOfficeId;
+        }
+        return task.officeId === selectedOfficeId;
+      });
+    } else if (!canViewAllOffices && userOfficeId) {
+      allTasks = allTasks.filter(task => {
+        if (task.patientId) {
+          const patient = this.patients.get(task.patientId);
+          return patient?.officeId === userOfficeId;
+        }
+        return task.officeId === userOfficeId;
+      });
+    }
+    
+    return allTasks.sort((a, b) => {
+      // Sort by completedAt descending (most recent first), fallback to createdAt
+      const aDate = a.completedAt || a.createdAt;
+      const bDate = b.completedAt || b.createdAt;
+      return bDate.getTime() - aDate.getTime();
+    });
+  }
+
+  async updateTaskStatus(id: string, status: string, completedBy?: string): Promise<Task | undefined> {
     const task = this.tasks.get(id);
     if (!task) return undefined;
-    const updated = { ...task, status };
+    const updated: Task = { 
+      ...task, 
+      status,
+      completedBy: status === "completed" ? (completedBy || null) : null,
+      completedAt: status === "completed" ? new Date() : null
+    };
     this.tasks.set(id, updated);
     return updated;
   }
@@ -621,17 +665,20 @@ export class DbStorage implements IStorage {
     // This is complex with drizzle, so we'll filter after fetching if needed
     let allTasks: Task[];
     
+    // Exclude completed tasks
+    const baseConditions = [ne(tasks.status, "completed")];
+    
     if (assignee) {
-      conditions.push(eq(tasks.assignee, assignee));
+      baseConditions.push(eq(tasks.assignee, assignee));
     }
     if (patientId) {
-      conditions.push(eq(tasks.patientId, patientId));
+      baseConditions.push(eq(tasks.patientId, patientId));
     }
     
-    if (conditions.length === 0) {
-      allTasks = await ensureDb().select().from(tasks).orderBy(desc(tasks.createdAt));
+    if (baseConditions.length === 1) {
+      allTasks = await ensureDb().select().from(tasks).where(baseConditions[0]).orderBy(desc(tasks.createdAt));
     } else {
-      const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
+      const whereClause = and(...baseConditions);
       allTasks = await ensureDb().select().from(tasks).where(whereClause!).orderBy(desc(tasks.createdAt));
     }
     
@@ -669,9 +716,62 @@ export class DbStorage implements IStorage {
     return allTasks;
   }
 
-  async updateTaskStatus(id: string, status: string): Promise<Task | undefined> {
+  async listArchivedTasks(userOfficeId?: string | null, canViewAllOffices?: boolean, selectedOfficeId?: string | null): Promise<Task[]> {
+    // Only fetch completed tasks - order by completedAt if available, otherwise createdAt
+    let allTasks = await ensureDb().select().from(tasks)
+      .where(eq(tasks.status, "completed"));
+    
+    // Sort by completedAt descending (most recent first), fallback to createdAt
+    allTasks.sort((a, b) => {
+      const aDate = a.completedAt || a.createdAt;
+      const bDate = b.completedAt || b.createdAt;
+      return bDate.getTime() - aDate.getTime();
+    });
+    
+    // Apply office filtering
+    if (canViewAllOffices && selectedOfficeId) {
+      const filteredTasks = [];
+      for (const task of allTasks) {
+        if (task.patientId) {
+          const patient = await this.getPatient(task.patientId);
+          if (patient?.officeId === selectedOfficeId) {
+            filteredTasks.push(task);
+          }
+        } else if (task.officeId === selectedOfficeId) {
+          filteredTasks.push(task);
+        }
+      }
+      return filteredTasks;
+    } else if (!canViewAllOffices && userOfficeId) {
+      const filteredTasks = [];
+      for (const task of allTasks) {
+        if (task.patientId) {
+          const patient = await this.getPatient(task.patientId);
+          if (patient?.officeId === userOfficeId) {
+            filteredTasks.push(task);
+          }
+        } else if (task.officeId === userOfficeId) {
+          filteredTasks.push(task);
+        }
+      }
+      return filteredTasks;
+    }
+    
+    return allTasks;
+  }
+
+  async updateTaskStatus(id: string, status: string, completedBy?: string): Promise<Task | undefined> {
+    const updateData: any = { status };
+    if (status === "completed") {
+      updateData.completedBy = completedBy || null;
+      updateData.completedAt = new Date();
+    } else {
+      updateData.completedBy = null;
+      updateData.completedAt = null;
+    }
+    
     const result = await ensureDb().update(tasks)
-      .set({ status })
+      .set(updateData)
       .where(eq(tasks.id, id))
       .returning();
     return result[0];

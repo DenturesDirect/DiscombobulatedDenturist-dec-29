@@ -21,9 +21,11 @@ export default function StaffToDo() {
   const [, setLocation] = useLocation();
   const [selectedStaff, setSelectedStaff] = useState('All');
   const [isDark, setIsDark] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const { user } = useAuth();
 
   const canViewAllOffices = user?.canViewAllOffices ?? false;
+  const isAdmin = user?.role === 'admin' || canViewAllOffices;
 
   // Determine if user is from Dentures Direct or Toronto Smile Centre
   const isDenturesDirectUser = useMemo(() => {
@@ -67,6 +69,19 @@ export default function StaffToDo() {
     refetchOnWindowFocus: true,
     refetchOnMount: true,
     staleTime: 30000, // Consider data stale after 30 seconds
+    enabled: !showArchived,
+  });
+
+  const { data: archivedTasks = [], isLoading: isLoadingArchived } = useQuery<Task[]>({
+    queryKey: ['/api/tasks/archived', selectedOfficeId],
+    queryFn: async () => {
+      const url = selectedOfficeId 
+        ? `/api/tasks/archived?officeId=${selectedOfficeId}`
+        : '/api/tasks/archived';
+      const response = await apiRequest('GET', url);
+      return response.json();
+    },
+    enabled: showArchived && isAdmin,
   });
 
   const { data: patients = [] } = useQuery<Patient[]>({
@@ -122,18 +137,28 @@ export default function StaffToDo() {
   };
 
   // Sort tasks by due date (earliest first), then filter by staff
-  const sortedTasks = [...tasks].sort((a, b) => {
-    // Tasks without due dates go to the end
-    if (!a.dueDate && !b.dueDate) return 0;
-    if (!a.dueDate) return 1;
-    if (!b.dueDate) return -1;
-    return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-  });
+  const sortedTasks = showArchived 
+    ? [...archivedTasks].sort((a, b) => {
+        // Sort archived tasks by completedAt (most recent first)
+        const aDate = a.completedAt || a.createdAt;
+        const bDate = b.completedAt || b.createdAt;
+        return bDate.getTime() - aDate.getTime();
+      })
+    : [...tasks].sort((a, b) => {
+        // Tasks without due dates go to the end
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      });
 
   // Filter tasks by selected staff member (case-insensitive matching)
-  const filteredTasks = selectedStaff === 'All' 
-    ? sortedTasks 
-    : sortedTasks.filter(t => t.assignee?.toLowerCase() === selectedStaff.toLowerCase());
+  // For archived tasks, don't filter by staff
+  const filteredTasks = showArchived
+    ? sortedTasks
+    : selectedStaff === 'All' 
+      ? sortedTasks 
+      : sortedTasks.filter(t => t.assignee?.toLowerCase() === selectedStaff.toLowerCase());
 
   const toggleTask = (id: string, currentStatus: string) => {
     const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
@@ -172,17 +197,31 @@ export default function StaffToDo() {
       
       <div className="p-6 border-b">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-3xl font-semibold">Staff To-Do List</h1>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            disabled={isLoading}
-            className="gap-2"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+          <h1 className="text-3xl font-semibold">
+            {showArchived ? 'Archived Tasks' : 'Staff To-Do List'}
+          </h1>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button
+                variant={showArchived ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowArchived(!showArchived)}
+                className="gap-2"
+              >
+                {showArchived ? 'View Active' : 'View Archived'}
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => showArchived ? queryClient.invalidateQueries({ queryKey: ['/api/tasks/archived'] }) : refetch()}
+              disabled={showArchived ? isLoadingArchived : isLoading}
+              className="gap-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${(showArchived ? isLoadingArchived : isLoading) ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
         </div>
         
         <div className="flex items-center gap-4 mb-4">
@@ -195,117 +234,131 @@ export default function StaffToDo() {
           )}
         </div>
         
-        <div className="flex gap-2 flex-wrap">
-          {staffMembers.map(staff => {
-            const taskCount = staff === 'All' 
-              ? tasks.filter(t => t.status !== 'completed').length
-              : tasks.filter(t => t.assignee === staff && t.status !== 'completed').length;
-            const initials = staff === 'All' ? 'All' : staff.split(' ').map(n => n[0]).join('').toUpperCase();
+        {!showArchived && (
+          <div className="flex gap-2 flex-wrap">
+            {staffMembers.map(staff => {
+              const taskCount = staff === 'All' 
+                ? tasks.filter(t => t.status !== 'completed').length
+                : tasks.filter(t => t.assignee === staff && t.status !== 'completed').length;
+              const initials = staff === 'All' ? 'All' : staff.split(' ').map(n => n[0]).join('').toUpperCase();
 
-            return (
-              <button
-                key={staff}
-                onClick={() => setSelectedStaff(staff)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all hover-elevate active-elevate-2 ${
-                  selectedStaff === staff 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-card border'
-                }`}
-                data-testid={`filter-${staff.toLowerCase()}`}
-              >
-                <Avatar className="w-7 h-7">
-                  <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-                </Avatar>
-                <span className="font-medium">{staff}</span>
-                {taskCount > 0 && (
-                  <Badge className="ml-1 bg-background/20 text-inherit">
-                    {taskCount}
-                  </Badge>
-                )}
-              </button>
-            );
-          })}
-        </div>
+              return (
+                <button
+                  key={staff}
+                  onClick={() => setSelectedStaff(staff)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all hover-elevate active-elevate-2 ${
+                    selectedStaff === staff 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'bg-card border'
+                  }`}
+                  data-testid={`filter-${staff.toLowerCase()}`}
+                >
+                  <Avatar className="w-7 h-7">
+                    <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+                  </Avatar>
+                  <span className="font-medium">{staff}</span>
+                  {taskCount > 0 && (
+                    <Badge className="ml-1 bg-background/20 text-inherit">
+                      {taskCount}
+                    </Badge>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
-        {isLoading ? (
+        {(showArchived ? isLoadingArchived : isLoading) ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : (
           <div className="space-y-3 max-w-5xl">
-            {filteredTasks.map(task => (
-              <Card 
-                key={task.id} 
-                className={`p-4 ${task.status === 'completed' ? 'opacity-60' : ''}`}
-                data-testid={`task-${task.id}`}
-              >
-                <div className="flex items-start gap-4">
-                  <Checkbox
-                    checked={task.status === 'completed'}
-                    onCheckedChange={() => toggleTask(task.id, task.status)}
-                    className="mt-1"
-                    data-testid={`checkbox-${task.id}`}
-                  />
-
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between gap-4 mb-2">
-                      <div className="flex-1">
-                        {task.patientId && patientMap[task.patientId] && (
-                          <div className="flex items-center gap-1 text-sm text-primary font-medium mb-1" data-testid={`text-patient-${task.id}`}>
-                            <User className="w-3 h-3" />
-                            {patientMap[task.patientId]}
-                          </div>
-                        )}
-                        <div className={`font-medium mb-1 ${task.status === 'completed' ? 'line-through' : ''}`}>
-                          {task.title}
-                        </div>
-                        {task.description && (
-                          <div className="text-sm text-muted-foreground">
-                            {task.description}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Badge className={getPriorityColor(task.priority)} data-testid={`badge-priority-${task.id}`}>
-                          {task.priority}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 text-sm">
-                      <div className="flex items-center gap-2">
-                        <Avatar className="w-6 h-6">
-                          <AvatarFallback className="text-xs">
-                            {task.assignee.split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-muted-foreground">{task.assignee}</span>
-                      </div>
-
-                      {task.dueDate && (
-                        <div className={`flex items-center gap-2 ${isOverdue(task.dueDate) ? 'text-destructive font-medium' : isDueToday(task.dueDate) ? 'text-warning font-medium' : 'text-muted-foreground'}`}>
-                          <Clock className="w-4 h-4" />
-                          <span>
-                            Due {format(new Date(task.dueDate), 'MMM d, h:mm a')}
-                            {isOverdue(task.dueDate) && ' (Overdue)'}
-                            {isDueToday(task.dueDate) && !isOverdue(task.dueDate) && ' (Today)'}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            ))}
-
-            {filteredTasks.length === 0 && (
+            {filteredTasks.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <CheckCircle2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>No tasks assigned to {selectedStaff}</p>
+                <p>{showArchived ? 'No archived tasks yet' : `No tasks assigned to ${selectedStaff}`}</p>
               </div>
+            ) : (
+              filteredTasks.map(task => (
+                <Card 
+                  key={task.id} 
+                  className={`p-4 ${showArchived ? 'bg-muted/30' : task.status === 'completed' ? 'opacity-60' : ''}`}
+                  data-testid={`task-${task.id}`}
+                >
+                  <div className="flex items-start gap-4">
+                    {!showArchived && (
+                      <Checkbox
+                        checked={task.status === 'completed'}
+                        onCheckedChange={() => toggleTask(task.id, task.status)}
+                        className="mt-1"
+                        data-testid={`checkbox-${task.id}`}
+                      />
+                    )}
+
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between gap-4 mb-2">
+                        <div className="flex-1">
+                          {task.patientId && patientMap[task.patientId] && (
+                            <div className="flex items-center gap-1 text-sm text-primary font-medium mb-1" data-testid={`text-patient-${task.id}`}>
+                              <User className="w-3 h-3" />
+                              {patientMap[task.patientId]}
+                            </div>
+                          )}
+                          <div className={`font-medium mb-1 ${showArchived || task.status === 'completed' ? 'line-through' : ''}`}>
+                            {task.title}
+                          </div>
+                          {task.description && (
+                            <div className="text-sm text-muted-foreground">
+                              {task.description}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Badge className={getPriorityColor(task.priority)} data-testid={`badge-priority-${task.id}`}>
+                            {task.priority}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4 text-sm flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <Avatar className="w-6 h-6">
+                            <AvatarFallback className="text-xs">
+                              {task.assignee.split(' ').map(n => n[0]).join('')}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-muted-foreground">Assigned to: {task.assignee}</span>
+                        </div>
+
+                        {showArchived && task.completedBy && (
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <CheckCircle2 className="w-4 h-4 text-green-600" />
+                            <span>Completed by: <strong>{task.completedBy}</strong></span>
+                            {task.completedAt && (
+                              <span>on {format(new Date(task.completedAt), 'MMM d, yyyy h:mm a')}</span>
+                            )}
+                          </div>
+                        )}
+
+                        {!showArchived && task.dueDate && (
+                          <div className={`flex items-center gap-2 ${isOverdue(task.dueDate) ? 'text-destructive font-medium' : isDueToday(task.dueDate) ? 'text-warning font-medium' : 'text-muted-foreground'}`}>
+                            <Clock className="w-4 h-4" />
+                            <span>
+                              Due {format(new Date(task.dueDate), 'MMM d, h:mm a')}
+                              {isOverdue(task.dueDate) && ' (Overdue)'}
+                              {isDueToday(task.dueDate) && !isOverdue(task.dueDate) && ' (Today)'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))
             )}
           </div>
         )}

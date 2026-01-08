@@ -146,6 +146,8 @@ export const tasks = pgTable("tasks", {
   dueDate: timestamp("due_date"),
   priority: text("priority").notNull().default("normal"),
   status: text("status").notNull().default("pending"),
+  completedBy: text("completed_by"), // Who marked the task as completed
+  completedAt: timestamp("completed_at"), // When the task was completed
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
