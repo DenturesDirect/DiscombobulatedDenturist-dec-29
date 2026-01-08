@@ -56,7 +56,7 @@ const clinicalDetailsSchema = z.object({
   examPaid: z.enum(["yes", "no", "not applicable"]).nullable().optional(),
   repairPaid: z.enum(["yes", "no", "not applicable"]).nullable().optional(),
   newDenturePaid: z.enum(["yes", "no", "not applicable"]).nullable().optional(),
-  predeterminationStatus: z.enum(["not applicable", "pending", "approved", "not approved", "predeterminate", "predescent"]).nullable().optional(),
+  predeterminationStatus: z.enum(["not applicable", "pending", "predesent", "approved", "not approved", "predeterminate"]).nullable().optional(),
 });
 
 type ClinicalDetailsFormData = z.infer<typeof clinicalDetailsSchema>;
@@ -80,7 +80,7 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
       examPaid: (patient.examPaid as "yes" | "no" | "not applicable" | null) || null,
       repairPaid: (patient.repairPaid as "yes" | "no" | "not applicable" | null) || null,
       newDenturePaid: (patient.newDenturePaid as "yes" | "no" | "not applicable" | null) || null,
-      predeterminationStatus: (patient.predeterminationStatus as "not applicable" | "pending" | "approved" | "not approved" | "predeterminate" | "predescent" | null) || null,
+      predeterminationStatus: (patient.predeterminationStatus as "not applicable" | "pending" | "predesent" | "approved" | "not approved" | "predeterminate" | null) || null,
     },
   });
 
@@ -100,7 +100,7 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
         examPaid: (patient.examPaid as "yes" | "no" | "not applicable" | null) || null,
         repairPaid: (patient.repairPaid as "yes" | "no" | "not applicable" | null) || null,
         newDenturePaid: (patient.newDenturePaid as "yes" | "no" | "not applicable" | null) || null,
-        predeterminationStatus: (patient.predeterminationStatus as "not applicable" | "pending" | "approved" | "not approved" | "predeterminate" | "predescent" | null) || null,
+        predeterminationStatus: (patient.predeterminationStatus as "not applicable" | "pending" | "predesent" | "approved" | "not approved" | "predeterminate" | null) || null,
       });
     }
   }, [patient, form, isEditing]);
@@ -180,14 +180,14 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
                     ? "Not Applicable"
                     : patient.predeterminationStatus === "pending"
                     ? "Pre-D Pending"
+                    : patient.predeterminationStatus === "predesent"
+                    ? "Pre-D Sent"
                     : patient.predeterminationStatus === "approved"
                     ? "Pre-D Approved"
                     : patient.predeterminationStatus === "not approved"
                     ? "Pre-D Not Approved"
                     : patient.predeterminationStatus === "predeterminate"
                     ? "Predeterminate"
-                    : patient.predeterminationStatus === "predescent"
-                    ? "Predescent"
                     : patient.predeterminationStatus
                   : "Not set"}
               </p>
@@ -316,6 +316,15 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
                         </Button>
                         <Button
                           type="button"
+                          variant={field.value === "predesent" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => field.onChange("predesent")}
+                          data-testid="button-predetermination-predesent"
+                        >
+                          Pre-D Sent
+                        </Button>
+                        <Button
+                          type="button"
                           variant={field.value === "approved" ? "default" : "outline"}
                           size="sm"
                           onClick={() => field.onChange("approved")}
@@ -340,15 +349,6 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
                           data-testid="button-predetermination-predeterminate"
                         >
                           Predeterminate
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={field.value === "predescent" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => field.onChange("predescent")}
-                          data-testid="button-predetermination-predescent"
-                        >
-                          Predescent
                         </Button>
                       </div>
                     </FormControl>

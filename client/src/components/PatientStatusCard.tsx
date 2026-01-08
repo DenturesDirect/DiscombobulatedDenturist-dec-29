@@ -13,14 +13,14 @@ export default function PatientStatusCard({ patient }: PatientStatusCardProps) {
         return "Not Applicable";
       case "pending":
         return "Pre-D Pending";
+      case "predesent":
+        return "Pre-D Sent";
       case "approved":
         return "Pre-D Approved";
       case "not approved":
         return "Pre-D Not Approved";
       case "predeterminate":
         return "Predeterminate";
-      case "predescent":
-        return "Predescent";
       default:
         return status;
     }
