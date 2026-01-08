@@ -12,6 +12,9 @@ export async function runMigrations() {
     
     // Add new payment status columns if they don't exist
     const migrations = [
+      // Add completed_by and completed_at columns to tasks table
+      `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_by TEXT`,
+      `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`,
       `ALTER TABLE patients ADD COLUMN IF NOT EXISTS exam_paid TEXT`,
       `ALTER TABLE patients ADD COLUMN IF NOT EXISTS repair_paid TEXT`,
       `ALTER TABLE patients ADD COLUMN IF NOT EXISTS new_denture_paid TEXT`,
