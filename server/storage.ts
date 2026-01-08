@@ -652,8 +652,11 @@ export class DbStorage implements IStorage {
       }
     }
     
+    // Remove completedBy and completedAt from insert - these columns may not exist in the database yet
+    const { completedBy, completedAt, ...taskData } = insertTask as any;
+    
     const result = await ensureDb().insert(tasks)
-      .values(insertTask)
+      .values(taskData)
       .returning();
     return result[0];
   }

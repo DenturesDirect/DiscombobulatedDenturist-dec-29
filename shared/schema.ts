@@ -154,6 +154,8 @@ export const tasks = pgTable("tasks", {
 export const insertTaskSchema = createInsertSchema(tasks).omit({
   id: true,
   createdAt: true,
+  completedBy: true,  // Exclude from inserts - only set when task is completed
+  completedAt: true,  // Exclude from inserts - only set when task is completed
 });
 
 export type InsertTask = z.infer<typeof insertTaskSchema>;
