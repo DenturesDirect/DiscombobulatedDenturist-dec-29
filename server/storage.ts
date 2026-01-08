@@ -665,13 +665,8 @@ export class DbStorage implements IStorage {
     // This is complex with drizzle, so we'll filter after fetching if needed
     let allTasks: Task[];
     
-    // Exclude completed tasks - use or() to handle null status as well
-    const baseConditions = [
-      or(
-        ne(tasks.status, "completed"),
-        isNull(tasks.status)
-      )!
-    ];
+    // Exclude completed tasks - only show pending/active tasks
+    const baseConditions = [ne(tasks.status, "completed")];
     
     if (assignee) {
       baseConditions.push(eq(tasks.assignee, assignee));
@@ -687,37 +682,69 @@ export class DbStorage implements IStorage {
       allTasks = await ensureDb().select().from(tasks).where(whereClause!).orderBy(desc(tasks.createdAt));
     }
     
-    // Apply office filtering
+    console.log(`🔍 listTasks: Found ${allTasks.length} tasks before office filtering`);
+    
+    // Apply office filtering - but be more lenient
     if (canViewAllOffices && selectedOfficeId) {
       // Filter by selected office - need to check patient's office
       const filteredTasks = [];
       for (const task of allTasks) {
-        if (task.patientId) {
-          const patient = await this.getPatient(task.patientId);
-          if (patient?.officeId === selectedOfficeId) {
+        let taskOfficeId: string | null = null;
+        
+        // Try to get officeId from task first
+        if (task.officeId) {
+          taskOfficeId = task.officeId;
+        } else if (task.patientId) {
+          // Try to get from patient, but don't fail if patient doesn't exist
+          try {
+            const patient = await this.getPatient(task.patientId, null, true);
+            taskOfficeId = patient?.officeId || null;
+          } catch (error) {
+            console.warn(`⚠️  Could not get patient ${task.patientId} for task ${task.id}:`, error);
+            // If we can't get the patient, include the task anyway to avoid losing data
             filteredTasks.push(task);
+            continue;
           }
-        } else if (task.officeId === selectedOfficeId) {
+        }
+        
+        // Include task if office matches, or if we couldn't determine office (to avoid data loss)
+        if (!taskOfficeId || taskOfficeId === selectedOfficeId) {
           filteredTasks.push(task);
         }
       }
+      console.log(`🔍 listTasks: After office filtering (selectedOfficeId=${selectedOfficeId}): ${filteredTasks.length} tasks`);
       return filteredTasks;
     } else if (!canViewAllOffices && userOfficeId) {
       // Filter by user's office
       const filteredTasks = [];
       for (const task of allTasks) {
-        if (task.patientId) {
-          const patient = await this.getPatient(task.patientId);
-          if (patient?.officeId === userOfficeId) {
-            filteredTasks.push(task);
+        let taskOfficeId: string | null = null;
+        
+        // Try to get officeId from task first
+        if (task.officeId) {
+          taskOfficeId = task.officeId;
+        } else if (task.patientId) {
+          // Try to get from patient, but don't fail if patient doesn't exist
+          try {
+            const patient = await this.getPatient(task.patientId, userOfficeId, false);
+            taskOfficeId = patient?.officeId || null;
+          } catch (error) {
+            console.warn(`⚠️  Could not get patient ${task.patientId} for task ${task.id}:`, error);
+            // If we can't get the patient, don't include the task (user can't see it)
+            continue;
           }
-        } else if (task.officeId === userOfficeId) {
+        }
+        
+        // Include task if office matches
+        if (taskOfficeId === userOfficeId) {
           filteredTasks.push(task);
         }
       }
+      console.log(`🔍 listTasks: After office filtering (userOfficeId=${userOfficeId}): ${filteredTasks.length} tasks`);
       return filteredTasks;
     }
     
+    console.log(`🔍 listTasks: No office filtering applied, returning all ${allTasks.length} tasks`);
     return allTasks;
   }
 

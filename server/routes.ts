@@ -613,6 +613,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // TEMPORARY DEBUG: Get ALL tasks (including completed) to check if they exist
+  app.get("/api/tasks/debug-all", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { ensureDb } = await import("./db");
+      const { tasks: tasksTable } = await import("@shared/schema");
+      const db = ensureDb();
+      if (!db) {
+        return res.status(500).json({ error: "Database not available" });
+      }
+      const allTasks = await db.select().from(tasksTable).orderBy(desc(tasksTable.createdAt));
+      res.json({ 
+        total: allTasks.length,
+        tasks: allTasks,
+        statusBreakdown: allTasks.reduce((acc: Record<string, number>, t: any) => {
+          const status = t.status || 'null';
+          acc[status] = (acc[status] || 0) + 1;
+          return acc;
+        }, {})
+      });
+    } catch (error: any) {
+      console.error("❌ Error in debug endpoint:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.patch("/api/tasks/:id", isAuthenticated, async (req: any, res) => {
     try {
       const { status } = req.body;
