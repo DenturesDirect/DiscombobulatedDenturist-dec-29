@@ -1635,6 +1635,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(checks);
   });
 
+  // Diagnostic endpoint to check clinical notes (admin only)
+  app.get("/api/admin/clinical-notes/diagnostic", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user as any;
+      const isAdmin = user?.role === 'admin' || user?.canViewAllOffices;
+      
+      if (!isAdmin) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { patientName } = req.query;
+      
+      if (!patientName) {
+        return res.status(400).json({ error: "patientName query parameter required" });
+      }
+
+      const { ensureDb } = await import("./db");
+      const { patients, clinicalNotes } = await import("@shared/schema");
+      const { eq, ilike, desc } = await import("drizzle-orm");
+      const db = ensureDb();
+      
+      if (!db) {
+        return res.status(500).json({ error: "Database not available" });
+      }
+
+      // Find patients matching the name (case-insensitive)
+      const matchingPatients = await db.select()
+        .from(patients)
+        .where(ilike(patients.name, `%${patientName}%`));
+
+      if (matchingPatients.length === 0) {
+        return res.json({ 
+          message: `No patients found matching "${patientName}"`,
+          patients: [],
+          notes: []
+        });
+      }
+
+      // Get all clinical notes for these patients
+      const patientIds = matchingPatients.map(p => p.id);
+      const allNotes = await db.select()
+        .from(clinicalNotes)
+        .where(eq(clinicalNotes.patientId, patientIds[0])) // For now, check first match
+        .orderBy(desc(clinicalNotes.createdAt));
+
+      // If multiple patients, get notes for all
+      let allPatientNotes: any[] = [];
+      for (const patient of matchingPatients) {
+        const notes = await db.select()
+          .from(clinicalNotes)
+          .where(eq(clinicalNotes.patientId, patient.id))
+          .orderBy(desc(clinicalNotes.createdAt));
+        allPatientNotes.push(...notes);
+      }
+
+      res.json({
+        message: `Found ${matchingPatients.length} patient(s) and ${allPatientNotes.length} clinical note(s)`,
+        patients: matchingPatients.map(p => ({
+          id: p.id,
+          name: p.name,
+          officeId: p.officeId,
+          createdAt: p.createdAt
+        })),
+        notes: allPatientNotes.map(n => ({
+          id: n.id,
+          patientId: n.patientId,
+          content: n.content.substring(0, 100) + (n.content.length > 100 ? '...' : ''),
+          noteDate: n.noteDate,
+          createdBy: n.createdBy,
+          createdAt: n.createdAt,
+          officeId: n.officeId
+        }))
+      });
+    } catch (error: any) {
+      console.error("Diagnostic error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
