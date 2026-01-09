@@ -5,7 +5,8 @@ import { useAuth } from "@/hooks/useAuth";
 import TopNav from "@/components/TopNav";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Loader2, Plus } from "lucide-react";
+import { Search, Loader2, Plus, ArrowUpDown, Calendar, User, Clock } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import PatientTimelineCard from "@/components/PatientTimelineCard";
 import NewPatientDialog from "@/components/NewPatientDialog";
 import OfficeSelector from "@/components/OfficeSelector";
@@ -17,6 +18,7 @@ const STORAGE_KEY = 'activePatients_selectedOfficeId';
 export default function ActivePatients() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<'alphabetical' | 'lastAppointment' | 'treatmentInitiation'>('alphabetical');
   const [isDark, setIsDark] = useState(false);
   const [isNewPatientDialogOpen, setIsNewPatientDialogOpen] = useState(false);
   const { user } = useAuth();
@@ -63,6 +65,23 @@ export default function ActivePatients() {
     },
   });
 
+  // Fetch appointments to get last appointment dates
+  const { data: appointments = [] } = useQuery<Array<{ patientId: string; appointmentDate: Date }>>({
+    queryKey: ['/api/appointments', selectedOfficeId],
+    queryFn: async () => {
+      try {
+        const url = selectedOfficeId 
+          ? `/api/appointments?officeId=${selectedOfficeId}`
+          : '/api/appointments';
+        const response = await apiRequest('GET', url);
+        return response.json();
+      } catch {
+        // If appointments endpoint doesn't exist yet, return empty array
+        return [];
+      }
+    },
+  });
+
   // Create a map of patientId -> unique assignees from pending tasks
   const patientAssigneesMap = useMemo(() => {
     const map = new Map<string, string[]>();
@@ -100,9 +119,56 @@ export default function ActivePatients() {
     return map;
   }, [tasks]);
 
-  const filteredPatients = patients.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Create a map of patientId -> last appointment date
+  const lastAppointmentMap = useMemo(() => {
+    const map = new Map<string, Date>();
+    appointments.forEach(apt => {
+      const existing = map.get(apt.patientId);
+      const aptDate = new Date(apt.appointmentDate);
+      if (!existing || aptDate > existing) {
+        map.set(apt.patientId, aptDate);
+      }
+    });
+    return map;
+  }, [appointments]);
+
+  // Filter and sort patients
+  const filteredAndSortedPatients = useMemo(() => {
+    let filtered = patients.filter(p =>
+      p.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'alphabetical':
+          return a.name.localeCompare(b.name);
+        
+        case 'lastAppointment': {
+          const aDate = lastAppointmentMap.get(a.id);
+          const bDate = lastAppointmentMap.get(b.id);
+          if (!aDate && !bDate) return 0;
+          if (!aDate) return 1; // Patients without appointments go to end
+          if (!bDate) return -1;
+          return bDate.getTime() - aDate.getTime(); // Most recent first
+        }
+        
+        case 'treatmentInitiation': {
+          const aDate = a.treatmentInitiationDate ? new Date(a.treatmentInitiationDate) : null;
+          const bDate = b.treatmentInitiationDate ? new Date(b.treatmentInitiationDate) : null;
+          if (!aDate && !bDate) return 0;
+          if (!aDate) return 1; // Patients without initiation date go to end
+          if (!bDate) return -1;
+          return bDate.getTime() - aDate.getTime(); // Most recent first
+        }
+        
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [patients, searchQuery, sortBy, lastAppointmentMap]);
 
   const handlePatientClick = (id: string) => {
     setLocation(`/patient/${id}`);
@@ -160,15 +226,43 @@ export default function ActivePatients() {
                 canViewAllOffices={canViewAllOffices}
               />
             )}
-            <div className="relative w-80">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search patients..."
-                className="pl-9"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                data-testid="input-search-patients"
-              />
+            <div className="flex items-center gap-3">
+              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                <SelectTrigger className="w-[220px]" data-testid="select-sort">
+                  <ArrowUpDown className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Sort by..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="alphabetical">
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      <span>Alphabetical</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="lastAppointment">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      <span>Last Appointment</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="treatmentInitiation">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      <span>Treatment Initiation</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="relative w-80">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search patients..."
+                  className="pl-9"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  data-testid="input-search-patients"
+                />
+              </div>
             </div>
             <Button
               onClick={() => setIsNewPatientDialogOpen(true)}
@@ -188,12 +282,12 @@ export default function ActivePatients() {
           </div>
         ) : (
           <div className="space-y-3 max-w-7xl">
-            {filteredPatients.length === 0 ? (
+            {filteredAndSortedPatients.length === 0 ? (
               <div className="text-center text-muted-foreground py-12">
                 {searchQuery ? "No patients match your search" : "No active patients"}
               </div>
             ) : (
-              filteredPatients.map(patient => {
+              filteredAndSortedPatients.map(patient => {
                 const currentStep = patient.lastStepCompleted || 
                   (patient.isCDCP && !patient.copayDiscussed ? 'CDCP Copay Discussion' : 'New Patient');
                 const assignees = patientAssigneesMap.get(patient.id) || [];

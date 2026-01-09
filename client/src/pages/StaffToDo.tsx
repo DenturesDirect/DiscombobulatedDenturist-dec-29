@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { CheckCircle2, Clock, Loader2, User, RefreshCw } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, User, RefreshCw, Package } from "lucide-react";
 import { format } from "date-fns";
 import { Checkbox } from "@/components/ui/checkbox";
 import TopNav from "@/components/TopNav";
@@ -152,17 +152,32 @@ export default function StaffToDo() {
         return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
       });
 
-  // Filter tasks by selected staff member (case-insensitive matching)
+  // Filter tasks by selected staff member or casting filter
   // For archived tasks, don't filter by staff
-  const filteredTasks = showArchived
-    ? sortedTasks
-    : selectedStaff === 'All' 
-      ? sortedTasks 
-      : sortedTasks.filter(t => t.assignee?.toLowerCase() === selectedStaff.toLowerCase());
+  const filteredTasks = useMemo(() => {
+    if (showArchived) return sortedTasks;
+    
+    if (selectedStaff === 'Casting Tasks') {
+      // Show only casting-related tasks that are not completed
+      return sortedTasks.filter(t => t.status !== 'completed' && isCastingTask(t));
+    }
+    
+    if (selectedStaff === 'All') {
+      return sortedTasks;
+    }
+    
+    // Filter by staff member (case-insensitive matching)
+    return sortedTasks.filter(t => t.assignee?.toLowerCase() === selectedStaff.toLowerCase());
+  }, [sortedTasks, selectedStaff, showArchived]);
 
   const toggleTask = (id: string, currentStatus: string) => {
     const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
     updateTaskMutation.mutate({ id, status: newStatus });
+  };
+
+  const handlePatientClick = (patientId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering the card click if there is one
+    setLocation(`/patient/${patientId}`);
   };
 
   const getPriorityColor = (priority: string) => {
@@ -180,6 +195,34 @@ export default function StaffToDo() {
     const today = new Date();
     return new Date(dueDate).toDateString() === today.toDateString();
   };
+
+  // Check if a task is related to castings
+  const isCastingTask = (task: Task): boolean => {
+    const title = (task.title || '').toLowerCase();
+    const description = (task.description || '').toLowerCase();
+    const searchText = `${title} ${description}`;
+    
+    // Keywords that indicate casting-related tasks
+    const castingKeywords = [
+      'casting',
+      'cast',
+      'send out',
+      'send casting',
+      'mail casting',
+      'ship casting',
+      'dispatch casting',
+      'casting ready',
+      'ready to send'
+    ];
+    
+    return castingKeywords.some(keyword => searchText.includes(keyword));
+  };
+
+  // Get casting tasks count
+  const castingTasksCount = useMemo(() => {
+    if (showArchived) return 0;
+    return tasks.filter(t => t.status !== 'completed' && isCastingTask(t)).length;
+  }, [tasks, showArchived]);
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -236,6 +279,26 @@ export default function StaffToDo() {
         
         {!showArchived && (
           <div className="flex gap-2 flex-wrap">
+            {/* Casting Tasks Filter Button */}
+            <button
+              onClick={() => setSelectedStaff('Casting Tasks')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all hover-elevate active-elevate-2 ${
+                selectedStaff === 'Casting Tasks' 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-card border border-primary/20'
+              }`}
+              data-testid="filter-casting-tasks"
+            >
+              <Package className="w-5 h-5" />
+              <span className="font-medium">Casting Tasks</span>
+              {castingTasksCount > 0 && (
+                <Badge className={`ml-1 ${selectedStaff === 'Casting Tasks' ? 'bg-background/20 text-inherit' : 'bg-primary text-primary-foreground'}`}>
+                  {castingTasksCount}
+                </Badge>
+              )}
+            </button>
+            
+            {/* Staff Member Filter Buttons */}
             {staffMembers.map(staff => {
               const taskCount = staff === 'All' 
                 ? tasks.filter(t => t.status !== 'completed').length
@@ -279,13 +342,24 @@ export default function StaffToDo() {
             {filteredTasks.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <CheckCircle2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>{showArchived ? 'No archived tasks yet' : `No tasks assigned to ${selectedStaff}`}</p>
+                <p>
+                  {showArchived 
+                    ? 'No archived tasks yet' 
+                    : selectedStaff === 'Casting Tasks'
+                      ? 'No casting tasks to send out'
+                      : `No tasks assigned to ${selectedStaff}`
+                  }
+                </p>
               </div>
             ) : (
-              filteredTasks.map(task => (
+              filteredTasks.map(task => {
+                const isCasting = isCastingTask(task);
+                return (
                 <Card 
                   key={task.id} 
-                  className={`p-4 ${showArchived ? 'bg-muted/30' : task.status === 'completed' ? 'opacity-60' : ''}`}
+                  className={`p-4 ${showArchived ? 'bg-muted/30' : task.status === 'completed' ? 'opacity-60' : ''} ${
+                    isCasting && !showArchived && task.status !== 'completed' ? 'border-l-4 border-l-primary bg-primary/5' : ''
+                  }`}
                   data-testid={`task-${task.id}`}
                 >
                   <div className="flex items-start gap-4">
@@ -302,7 +376,12 @@ export default function StaffToDo() {
                       <div className="flex items-start justify-between gap-4 mb-2">
                         <div className="flex-1">
                           {task.patientId && patientMap[task.patientId] && (
-                            <div className="flex items-center gap-1 text-sm text-primary font-medium mb-1" data-testid={`text-patient-${task.id}`}>
+                            <div 
+                              className="flex items-center gap-1 text-sm text-primary font-medium mb-1 cursor-pointer hover:underline transition-all" 
+                              onClick={(e) => handlePatientClick(task.patientId!, e)}
+                              data-testid={`text-patient-${task.id}`}
+                              title="Click to open patient chart"
+                            >
                               <User className="w-3 h-3" />
                               {patientMap[task.patientId]}
                             </div>
@@ -318,6 +397,12 @@ export default function StaffToDo() {
                         </div>
 
                         <div className="flex items-center gap-2">
+                          {isCasting && !showArchived && task.status !== 'completed' && (
+                            <Badge variant="outline" className="border-primary text-primary bg-primary/10" data-testid={`badge-casting-${task.id}`}>
+                              <Package className="w-3 h-3 mr-1" />
+                              Casting
+                            </Badge>
+                          )}
                           <Badge className={getPriorityColor(task.priority)} data-testid={`badge-priority-${task.id}`}>
                             {task.priority}
                           </Badge>
@@ -358,7 +443,8 @@ export default function StaffToDo() {
                     </div>
                   </div>
                 </Card>
-              ))
+                );
+              })
             )}
           </div>
         )}

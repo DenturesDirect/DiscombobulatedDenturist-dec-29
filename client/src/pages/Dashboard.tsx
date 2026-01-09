@@ -30,9 +30,12 @@ import ClinicalPhotoGrid from "@/components/ClinicalPhotoGrid";
 import ShadeReminderModal from "@/components/ShadeReminderModal";
 import TaskForm from "@/components/TaskForm";
 import ChartUploader from "@/components/ChartUploader";
-import { FileText, Camera, Clock, Loader2, Mail, MailX, FlaskConical, ClipboardList, Pill, Save, X, Edit3, CheckSquare, Trash2, Upload } from "lucide-react";
+import DocumentUploadZone from "@/components/DocumentUploadZone";
+import DocumentList from "@/components/DocumentList";
+import { FileText, Camera, Clock, Loader2, Mail, MailX, FlaskConical, ClipboardList, Pill, Save, X, Edit3, CheckSquare, Trash2, Upload, Pencil, Check } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Patient, ClinicalNote, PatientFile, Task, LabNote, AdminNote, LabPrescription } from "@shared/schema";
@@ -66,8 +69,11 @@ export default function Dashboard() {
   const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showChartUpload, setShowChartUpload] = useState(false);
+  const [isEditingPatientName, setIsEditingPatientName] = useState(false);
+  const [editedPatientName, setEditedPatientName] = useState("");
 
   const canViewAllOffices = user?.canViewAllOffices ?? false;
+  const isAdmin = user?.role === 'admin' || canViewAllOffices;
 
   // Fetch offices for name lookup
   const { data: offices = [] } = useQuery<Array<{ id: string; name: string }>>({
@@ -145,6 +151,47 @@ export default function Dashboard() {
       setLocation('/');
     } else if (page === 'todos') {
       setLocation('/todos');
+    }
+  };
+
+  const handleSavePatientName = async () => {
+    if (!editedPatientName.trim()) {
+      toast({
+        title: "Error",
+        description: "Patient name cannot be empty",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (editedPatientName.trim() === patient.name) {
+      setIsEditingPatientName(false);
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      await apiRequest('PATCH', `/api/patients/${patientId}`, {
+        name: editedPatientName.trim()
+      });
+      
+      await queryClient.invalidateQueries({ queryKey: ['/api/patients', patientId] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/patients'] });
+      
+      toast({
+        title: "Patient Name Updated",
+        description: "The patient's name has been updated successfully."
+      });
+      
+      setIsEditingPatientName(false);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update patient name",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -603,7 +650,65 @@ export default function Dashboard() {
             <div className="space-y-6">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <h1 className="text-3xl font-semibold">{patient.name}</h1>
+                  {isEditingPatientName ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <Input
+                        value={editedPatientName}
+                        onChange={(e) => setEditedPatientName(e.target.value)}
+                        className="text-3xl font-semibold h-auto py-1"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleSavePatientName();
+                          } else if (e.key === 'Escape') {
+                            setIsEditingPatientName(false);
+                            setEditedPatientName(patient.name);
+                          }
+                        }}
+                        autoFocus
+                        data-testid="input-edit-patient-name"
+                      />
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={handleSavePatientName}
+                        disabled={isProcessing}
+                        data-testid="button-save-patient-name"
+                      >
+                        <Check className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => {
+                          setIsEditingPatientName(false);
+                          setEditedPatientName(patient.name);
+                        }}
+                        disabled={isProcessing}
+                        data-testid="button-cancel-edit-name"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <h1 className="text-3xl font-semibold">{patient.name}</h1>
+                      {isAdmin && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={() => {
+                            setEditedPatientName(patient.name);
+                            setIsEditingPatientName(true);
+                          }}
+                          data-testid="button-edit-patient-name"
+                          title="Edit patient name (Admin only)"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </>
+                  )}
                   {patient.officeId && canViewAllOffices && (
                     <Badge variant="secondary" className="text-xs">
                       {getOfficeName(patient.officeId) || 'Office'}
@@ -940,6 +1045,10 @@ export default function Dashboard() {
                     <TabsTrigger value="photos" className="gap-1 text-xs flex-shrink-0" data-testid="tab-photos">
                       <Camera className="w-3 h-3" />
                       Photos
+                    </TabsTrigger>
+                    <TabsTrigger value="documents" className="gap-1 text-xs flex-shrink-0" data-testid="tab-documents">
+                      <FileText className="w-3 h-3" />
+                      Documents
                     </TabsTrigger>
                   </TabsList>
                 </div>
@@ -1305,23 +1414,139 @@ export default function Dashboard() {
                     <Loader2 className="w-6 h-6 animate-spin text-primary" />
                   </div>
                 ) : (
-                  <ClinicalPhotoGrid
-                    photos={patientFiles.map(file => ({
-                      id: file.id,
-                      url: file.fileUrl,
-                      date: new Date(file.uploadedAt),
-                      description: file.description || undefined
-                    }))}
-                    onDelete={async (fileId) => {
-                      try {
-                        await apiRequest('DELETE', `/api/patients/${patientId}/files/${fileId}`);
-                        queryClient.invalidateQueries({ queryKey: ['/api/patients', patientId, 'files'] });
-                        toast({ title: "Photo deleted successfully" });
-                      } catch (error) {
-                        toast({ title: "Failed to delete photo", variant: "destructive" });
-                      }
-                    }}
-                  />
+                  <>
+                    <Card className="p-4 mb-4">
+                      <PhotoUploadZone
+                        onPhotosChange={async (photos) => {
+                          if (photos.length === 0) return;
+                          
+                          for (const photo of photos) {
+                            try {
+                              // Get upload URL
+                              const urlResponse = await apiRequest('POST', '/api/objects/upload', {});
+                              const { uploadURL } = await urlResponse.json();
+                              
+                              // Upload the file
+                              await fetch(uploadURL, {
+                                method: 'PUT',
+                                body: photo,
+                                headers: { 'Content-Type': photo.type }
+                              });
+                              
+                              // Extract the object path from Supabase signed URL
+                              // Supabase URL format: https://[project].supabase.co/storage/v1/object/sign/[bucket]/uploads/[uuid]?...
+                              const uploadUrlObj = new URL(uploadURL);
+                              const pathParts = uploadUrlObj.pathname.split('/').filter(p => p); // Remove empty strings
+                              
+                              // Find "uploads" in the path (Supabase structure: /storage/v1/object/sign/bucket/uploads/uuid)
+                              const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
+                              let objectId = '';
+                              
+                              if (uploadsIndex >= 0) {
+                                // Take everything from "uploads" onwards
+                                objectId = pathParts.slice(uploadsIndex).join('/');
+                              } else {
+                                // Fallback: try to find the bucket and take what's after it
+                                // Or use last segment if it's a UUID
+                                objectId = pathParts[pathParts.length - 1] || 'unknown';
+                              }
+                              
+                              const fileUrl = `/api/objects/${objectId}`;
+                              
+                              // Save file record to database
+                              await apiRequest('POST', `/api/patients/${patientId}/files`, {
+                                filename: photo.name,
+                                fileUrl,
+                                fileType: photo.type,
+                                description: ''
+                              });
+                              
+                              // Refresh file list
+                              queryClient.invalidateQueries({ queryKey: ['/api/patients', patientId, 'files'] });
+                              
+                              toast({
+                                title: "Photo Uploaded",
+                                description: `${photo.name} has been saved to the patient record.`
+                              });
+                            } catch (error: any) {
+                              toast({
+                                title: "Upload Failed",
+                                description: error.message || "Failed to upload photo",
+                                variant: "destructive"
+                              });
+                            }
+                          }
+                        }} 
+                      />
+                    </Card>
+                    <ClinicalPhotoGrid
+                      photos={patientFiles
+                        .filter(file => {
+                          // Filter for image files only
+                          const fileType = file.fileType?.toLowerCase() || '';
+                          return fileType.startsWith('image/');
+                        })
+                        .map(file => ({
+                          id: file.id,
+                          url: file.fileUrl,
+                          date: new Date(file.uploadedAt),
+                          description: file.description || undefined
+                        }))}
+                      onDelete={async (fileId) => {
+                        try {
+                          await apiRequest('DELETE', `/api/patients/${patientId}/files/${fileId}`);
+                          queryClient.invalidateQueries({ queryKey: ['/api/patients', patientId, 'files'] });
+                          toast({ title: "Photo deleted successfully" });
+                        } catch (error) {
+                          toast({ title: "Failed to delete photo", variant: "destructive" });
+                        }
+                      }}
+                    />
+                  </>
+                )}
+              </TabsContent>
+
+              <TabsContent value="documents" className="flex-1 overflow-y-auto">
+                {isLoadingFiles ? (
+                  <div className="flex items-center justify-center h-64">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <>
+                    <Card className="p-4 mb-4">
+                      <DocumentUploadZone
+                        patientId={patientId}
+                        onUploadComplete={() => {
+                          queryClient.invalidateQueries({ queryKey: ['/api/patients', patientId, 'files'] });
+                        }}
+                      />
+                    </Card>
+                    <DocumentList
+                      documents={patientFiles
+                        .filter(file => {
+                          // Filter for non-image files (documents)
+                          const fileType = file.fileType?.toLowerCase() || '';
+                          return !fileType.startsWith('image/');
+                        })
+                        .map(file => ({
+                          id: file.id,
+                          filename: file.filename,
+                          fileUrl: file.fileUrl,
+                          fileType: file.fileType,
+                          description: file.description,
+                          uploadedAt: new Date(file.uploadedAt)
+                        }))}
+                      onDelete={async (fileId) => {
+                        try {
+                          await apiRequest('DELETE', `/api/patients/${patientId}/files/${fileId}`);
+                          queryClient.invalidateQueries({ queryKey: ['/api/patients', patientId, 'files'] });
+                          toast({ title: "Document deleted successfully" });
+                        } catch (error) {
+                          toast({ title: "Failed to delete document", variant: "destructive" });
+                        }
+                      }}
+                    />
+                  </>
                 )}
               </TabsContent>
 

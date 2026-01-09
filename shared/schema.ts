@@ -74,6 +74,7 @@ export const patients = pgTable("patients", {
   repairPaid: text("repair_paid"), // "yes", "no", "not applicable"
   newDenturePaid: text("new_denture_paid"), // "yes", "no", "not applicable"
   predeterminationStatus: text("predetermination_status"), // "not applicable", "pending", "approved", "not approved"
+  treatmentInitiationDate: timestamp("treatment_initiation_date"), // Date treatment actually started (excludes old chart uploads)
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -83,6 +84,11 @@ export const insertPatientSchema = createInsertSchema(patients).omit({
 }).extend({
   officeId: z.string().optional(), // Optional in request, will be auto-assigned from user's office if not provided
   lastStepDate: z.union([z.date(), z.string()]).transform((val) => {
+    if (val instanceof Date) return val;
+    if (typeof val === 'string' && val.trim().length > 0) return new Date(val);
+    return null;
+  }).nullable().optional(),
+  treatmentInitiationDate: z.union([z.date(), z.string()]).transform((val) => {
     if (val instanceof Date) return val;
     if (typeof val === 'string' && val.trim().length > 0) return new Date(val);
     return null;

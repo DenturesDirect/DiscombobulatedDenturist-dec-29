@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import Uppy from "@uppy/core";
 import DashboardModal from "@uppy/react/dashboard-modal";
@@ -29,6 +29,15 @@ export function ObjectUploader({
   children,
 }: ObjectUploaderProps) {
   const [showModal, setShowModal] = useState(false);
+  const onCompleteRef = useRef(onComplete);
+  const setShowModalRef = useRef(setShowModal);
+  
+  // Keep refs updated
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+    setShowModalRef.current = setShowModal;
+  }, [onComplete]);
+
   const [uppy] = useState(() =>
     new Uppy({
       restrictions: {
@@ -42,7 +51,11 @@ export function ObjectUploader({
         getUploadParameters: onGetUploadParameters,
       })
       .on("complete", (result) => {
-        onComplete?.(result);
+        onCompleteRef.current?.(result);
+        // Close modal after successful upload
+        if (result.successful && result.successful.length > 0) {
+          setTimeout(() => setShowModalRef.current(false), 500);
+        }
       })
   );
 

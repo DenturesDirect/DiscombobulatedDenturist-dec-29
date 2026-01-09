@@ -426,6 +426,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Don't fail the request if file saving fails
       }
 
+      // Set treatment initiation date to upload date (not the old chart date)
+      // This ensures old charts don't set an incorrect initiation date
+      if (!patient.treatmentInitiationDate) {
+        await storage.updatePatient(patient.id, {
+          treatmentInitiationDate: new Date()
+        });
+        console.log(`✅ Set treatment initiation date to upload date`);
+      }
+
       // Return summary for review (does NOT auto-save the clinical note)
       res.json({
         summary: summary.formattedNote,
@@ -925,6 +934,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get appointments (for sorting by last appointment)
+  app.get("/api/appointments", isAuthenticated, async (req: any, res) => {
+    try {
+      const officeContext = await getUserOfficeContext(req);
+      const { officeId } = req.query;
+      
+      const { appointments } = await import("@shared/schema");
+      const { ensureDb } = await import("./db");
+      const { eq, desc, and } = await import("drizzle-orm");
+      const db = ensureDb();
+      
+      if (!db) {
+        return res.json([]);
+      }
+
+      let query = db.select().from(appointments);
+      
+      // Filter by office if specified and user doesn't have access to all offices
+      if (officeId && !officeContext.canViewAllOffices) {
+        query = query.where(eq(appointments.officeId, officeId));
+      } else if (!officeContext.canViewAllOffices && officeContext.officeId) {
+        query = query.where(eq(appointments.officeId, officeContext.officeId));
+      }
+      
+      const appointmentsList = await query;
+      
+      // Return simplified structure for sorting
+      res.json(appointmentsList.map(apt => ({
+        patientId: apt.patientId,
+        appointmentDate: apt.appointmentDate
+      })));
+    } catch (error: any) {
+      console.error("Error fetching appointments:", error);
+      res.json([]); // Return empty array on error
     }
   });
 

@@ -57,6 +57,7 @@ const clinicalDetailsSchema = z.object({
   repairPaid: z.enum(["yes", "no", "not applicable"]).nullable().optional(),
   newDenturePaid: z.enum(["yes", "no", "not applicable"]).nullable().optional(),
   predeterminationStatus: z.enum(["not applicable", "pending", "predesent", "approved", "not approved", "predeterminate"]).nullable().optional(),
+  treatmentInitiationDate: z.string().optional(),
 });
 
 type ClinicalDetailsFormData = z.infer<typeof clinicalDetailsSchema>;
@@ -81,6 +82,9 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
       repairPaid: (patient.repairPaid as "yes" | "no" | "not applicable" | null) || null,
       newDenturePaid: (patient.newDenturePaid as "yes" | "no" | "not applicable" | null) || null,
       predeterminationStatus: (patient.predeterminationStatus as "not applicable" | "pending" | "predesent" | "approved" | "not approved" | "predeterminate" | null) || null,
+      treatmentInitiationDate: patient.treatmentInitiationDate 
+        ? new Date(patient.treatmentInitiationDate).toISOString().split('T')[0]
+        : "",
     },
   });
 
@@ -101,6 +105,9 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
         repairPaid: (patient.repairPaid as "yes" | "no" | "not applicable" | null) || null,
         newDenturePaid: (patient.newDenturePaid as "yes" | "no" | "not applicable" | null) || null,
         predeterminationStatus: (patient.predeterminationStatus as "not applicable" | "pending" | "predesent" | "approved" | "not approved" | "predeterminate" | null) || null,
+        treatmentInitiationDate: patient.treatmentInitiationDate 
+          ? new Date(patient.treatmentInitiationDate).toISOString().split('T')[0]
+          : "",
       });
     }
   }, [patient, form, isEditing]);
@@ -126,6 +133,9 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
         repairPaid: (updatedPatient.repairPaid as "yes" | "no" | "not applicable" | null) || null,
         newDenturePaid: (updatedPatient.newDenturePaid as "yes" | "no" | "not applicable" | null) || null,
         predeterminationStatus: (updatedPatient.predeterminationStatus as "not applicable" | "pending" | "approved" | "not approved" | null) || null,
+        treatmentInitiationDate: updatedPatient.treatmentInitiationDate 
+          ? new Date(updatedPatient.treatmentInitiationDate).toISOString().split('T')[0]
+          : "",
       });
       
       queryClient.invalidateQueries({ queryKey: ['/api/patients', patient.id] });
@@ -199,6 +209,17 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
                   {patient.dateOfBirth || "Not set"}
                 </p>
               </div>
+              <div>
+                <p className="text-muted-foreground">Treatment Initiation</p>
+                <p className="font-medium" data-testid="text-treatment-initiation">
+                  {patient.treatmentInitiationDate 
+                    ? new Date(patient.treatmentInitiationDate).toLocaleDateString()
+                    : "Not set"}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-muted-foreground">Insurance</p>
                 <div className="flex gap-2">
@@ -357,24 +378,49 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="dateOfBirth"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Date of Birth</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="date"
-                        {...field}
-                        value={field.value || ""}
-                        data-testid="input-edit-dob"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="dateOfBirth"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date of Birth</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          {...field}
+                          value={field.value || ""}
+                          data-testid="input-edit-dob"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="treatmentInitiationDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Treatment Initiation Date</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          {...field}
+                          value={field.value || ""}
+                          data-testid="input-edit-treatment-initiation"
+                          placeholder="Date treatment started"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                      <p className="text-xs text-muted-foreground">
+                        For imported charts, this should be the upload date or actual treatment start date
+                      </p>
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <div className="space-y-2">
                 <FormLabel>Insurance</FormLabel>
