@@ -106,7 +106,11 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
         newDenturePaid: (patient.newDenturePaid as "yes" | "no" | "not applicable" | null) || null,
         predeterminationStatus: (patient.predeterminationStatus as "not applicable" | "pending" | "predesent" | "approved" | "not approved" | "predeterminate" | null) || null,
         treatmentInitiationDate: patient.treatmentInitiationDate 
-          ? new Date(patient.treatmentInitiationDate).toISOString().split('T')[0]
+          ? (patient.treatmentInitiationDate instanceof Date 
+              ? patient.treatmentInitiationDate.toISOString().split('T')[0]
+              : typeof patient.treatmentInitiationDate === 'string'
+              ? patient.treatmentInitiationDate.split('T')[0]
+              : new Date(patient.treatmentInitiationDate).toISOString().split('T')[0])
           : "",
       });
     }
@@ -134,7 +138,11 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
         newDenturePaid: (updatedPatient.newDenturePaid as "yes" | "no" | "not applicable" | null) || null,
         predeterminationStatus: (updatedPatient.predeterminationStatus as "not applicable" | "pending" | "approved" | "not approved" | null) || null,
         treatmentInitiationDate: updatedPatient.treatmentInitiationDate 
-          ? new Date(updatedPatient.treatmentInitiationDate).toISOString().split('T')[0]
+          ? (updatedPatient.treatmentInitiationDate instanceof Date 
+              ? updatedPatient.treatmentInitiationDate.toISOString().split('T')[0]
+              : typeof updatedPatient.treatmentInitiationDate === 'string'
+              ? updatedPatient.treatmentInitiationDate.split('T')[0]
+              : new Date(updatedPatient.treatmentInitiationDate).toISOString().split('T')[0])
           : "",
       });
       
@@ -156,7 +164,18 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
   });
 
   const onSubmit = (data: ClinicalDetailsFormData) => {
-    updateClinicalDetailsMutation.mutate(data);
+    // Clean up the data before sending - convert empty strings to null/undefined for optional fields
+    const cleanedData = {
+      ...data,
+      // Convert empty string dates to null
+      treatmentInitiationDate: data.treatmentInitiationDate && data.treatmentInitiationDate.trim() 
+        ? data.treatmentInitiationDate.trim() 
+        : undefined,
+      dateOfBirth: data.dateOfBirth && data.dateOfBirth.trim() 
+        ? data.dateOfBirth.trim() 
+        : undefined,
+    };
+    updateClinicalDetailsMutation.mutate(cleanedData);
   };
 
   const handleCancel = () => {
