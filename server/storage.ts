@@ -605,17 +605,38 @@ export class DbStorage implements IStorage {
 
   async createClinicalNote(insertNote: InsertClinicalNote): Promise<ClinicalNote> {
     // If officeId not provided, get it from patient
+    // Note: We bypass office restrictions here since we're creating a note for an existing patient
     if (!insertNote.officeId) {
-      const patient = await this.getPatient(insertNote.patientId);
-      if (patient) {
-        insertNote.officeId = patient.officeId;
+      try {
+        // Use a direct query to get patient without office restrictions for note creation
+        const patientResult = await ensureDb().select().from(patients).where(eq(patients.id, insertNote.patientId)).limit(1);
+        if (patientResult.length > 0 && patientResult[0].officeId) {
+          insertNote.officeId = patientResult[0].officeId;
+        }
+      } catch (error) {
+        console.error("Error getting patient officeId for clinical note:", error);
+        // Continue without officeId - it can be null
       }
     }
     
-    const result = await ensureDb().insert(clinicalNotes)
-      .values(insertNote)
-      .returning();
-    return result[0];
+    try {
+      const result = await ensureDb().insert(clinicalNotes)
+        .values(insertNote)
+        .returning();
+      
+      if (!result || result.length === 0) {
+        throw new Error("Failed to create clinical note - no result returned");
+      }
+      
+      console.log(`✅ Clinical note created: ID=${result[0].id}, PatientID=${insertNote.patientId}, OfficeID=${insertNote.officeId || 'null'}`);
+      return result[0];
+    } catch (error: any) {
+      console.error("❌ Error creating clinical note:", error);
+      console.error("   Patient ID:", insertNote.patientId);
+      console.error("   Office ID:", insertNote.officeId);
+      console.error("   Content length:", insertNote.content?.length || 0);
+      throw error;
+    }
   }
 
   async listClinicalNotes(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<ClinicalNote[]> {

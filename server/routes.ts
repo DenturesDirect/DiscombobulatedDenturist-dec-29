@@ -479,6 +479,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
       const parsedNoteDate = noteDate ? new Date(noteDate) : new Date();
 
+      console.log(`📝 Saving clinical note for patient ${patient.name} (ID: ${patientId})`);
+      console.log(`   Created by: ${userName}`);
+      console.log(`   Note date: ${parsedNoteDate.toISOString()}`);
+      console.log(`   Content length: ${content.length} characters`);
+      
       const savedNote = await storage.createClinicalNote({
         patientId,
         appointmentId: null,
@@ -486,6 +491,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         noteDate: parsedNoteDate,
         createdBy: userName
       });
+      
+      console.log(`✅ Clinical note saved successfully: ID=${savedNote.id}`);
       
       // Create tasks from AI-extracted suggestedTasks (when clinician explicitly mentioned tasks)
       // ONLY create predetermination tasks when explicitly mentioned, and assign based on office
