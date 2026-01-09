@@ -392,8 +392,20 @@ export default function StaffToDo() {
                               {patientMap[task.patientId]}
                             </div>
                           )}
-                          <div className={`font-medium mb-1 ${showArchived || task.status === 'completed' ? 'line-through' : ''}`}>
-                            {task.title}
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <div className={`font-medium ${showArchived || task.status === 'completed' ? 'line-through' : ''}`}>
+                              {task.title}
+                            </div>
+                            {isAdmin && (
+                              <Badge variant="outline" className="text-xs font-medium" data-testid={`badge-assignee-${task.id}`}>
+                                <Avatar className="w-3 h-3 mr-1">
+                                  <AvatarFallback className="text-[8px] p-0">
+                                    {task.assignee.split(' ').map(n => n[0]).join('')}
+                                  </AvatarFallback>
+                                </Avatar>
+                                Assigned: {task.assignee}
+                              </Badge>
+                            )}
                           </div>
                           {task.description && (
                             <div className="text-sm text-muted-foreground">
@@ -416,14 +428,16 @@ export default function StaffToDo() {
                       </div>
 
                       <div className="flex items-center gap-4 text-sm flex-wrap">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="w-6 h-6">
-                            <AvatarFallback className="text-xs">
-                              {task.assignee.split(' ').map(n => n[0]).join('')}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-muted-foreground">Assigned to: {task.assignee}</span>
-                        </div>
+                        {isAdmin && (
+                          <div className="flex items-center gap-2">
+                            <Avatar className="w-6 h-6">
+                              <AvatarFallback className="text-xs">
+                                {task.assignee.split(' ').map(n => n[0]).join('')}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-muted-foreground font-medium">Assigned to: <strong>{task.assignee}</strong></span>
+                          </div>
+                        )}
 
                         {showArchived && task.completedBy && (
                           <div className="flex items-center gap-2 text-muted-foreground">
