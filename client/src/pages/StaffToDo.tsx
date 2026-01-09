@@ -136,23 +136,26 @@ export default function StaffToDo() {
     }
   };
 
-  // Check if a task is related to castings
+  // Check if a task is related to castings (specific workflow tasks only)
   const isCastingTask = useCallback((task: Task): boolean => {
     const title = (task.title || '').toLowerCase();
     const description = (task.description || '').toLowerCase();
     const searchText = `${title} ${description}`;
     
-    // Keywords that indicate casting-related tasks
+    // Specific keywords for casting workflow tasks
     const castingKeywords = [
-      'casting',
-      'cast',
-      'send out',
+      'send out casting',
       'send casting',
-      'mail casting',
-      'ship casting',
-      'dispatch casting',
-      'casting ready',
-      'ready to send'
+      'send out cast',
+      'casting back from lab',
+      'cast back from lab',
+      'casting eta',
+      'cast eta',
+      'casting et a',
+      'cast et a',
+      'metal framework tryin',
+      'metal framework try-in',
+      'metal framework try in'
     ];
     
     return castingKeywords.some(keyword => searchText.includes(keyword));
