@@ -142,11 +142,12 @@ export default function StaffToDo() {
     const description = (task.description || '').toLowerCase();
     const searchText = `${title} ${description}`;
     
-    // Specific keywords for casting workflow tasks
-    const castingKeywords = [
-      'send out casting',
-      'send casting',
-      'send out cast',
+    // Check for "send" + "casting/cast" (flexible matching - words can be separated)
+    const hasSendAndCasting = (searchText.includes('send') || searchText.includes('mail') || searchText.includes('ship') || searchText.includes('dispatch')) &&
+                              (searchText.includes('casting') || searchText.includes('cast'));
+    
+    // Check for specific phrases
+    const specificPhrases = [
       'casting back from lab',
       'cast back from lab',
       'casting eta',
@@ -158,7 +159,9 @@ export default function StaffToDo() {
       'metal framework try in'
     ];
     
-    return castingKeywords.some(keyword => searchText.includes(keyword));
+    const hasSpecificPhrase = specificPhrases.some(phrase => searchText.includes(phrase));
+    
+    return hasSendAndCasting || hasSpecificPhrase;
   }, []);
 
   // Sort tasks by due date (earliest first), then filter by staff
