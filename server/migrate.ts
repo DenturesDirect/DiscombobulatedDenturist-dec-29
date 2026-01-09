@@ -19,6 +19,7 @@ export async function runMigrations() {
       `ALTER TABLE patients ADD COLUMN IF NOT EXISTS repair_paid TEXT`,
       `ALTER TABLE patients ADD COLUMN IF NOT EXISTS new_denture_paid TEXT`,
       `ALTER TABLE patients ADD COLUMN IF NOT EXISTS predetermination_status TEXT`,
+      `ALTER TABLE patients ADD COLUMN IF NOT EXISTS treatment_initiation_date TIMESTAMP`,
     ];
 
     for (const migration of migrations) {
@@ -37,7 +38,7 @@ export async function runMigrations() {
       SELECT column_name 
       FROM information_schema.columns 
       WHERE table_name = 'patients' 
-      AND column_name IN ('exam_paid', 'repair_paid', 'new_denture_paid', 'predetermination_status')
+      AND column_name IN ('exam_paid', 'repair_paid', 'new_denture_paid', 'predetermination_status', 'treatment_initiation_date')
     `);
 
     const addedColumns = result.rows.map((row: any) => row.column_name);
