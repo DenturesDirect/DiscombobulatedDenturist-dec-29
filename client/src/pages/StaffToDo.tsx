@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
@@ -136,6 +136,28 @@ export default function StaffToDo() {
     }
   };
 
+  // Check if a task is related to castings
+  const isCastingTask = useCallback((task: Task): boolean => {
+    const title = (task.title || '').toLowerCase();
+    const description = (task.description || '').toLowerCase();
+    const searchText = `${title} ${description}`;
+    
+    // Keywords that indicate casting-related tasks
+    const castingKeywords = [
+      'casting',
+      'cast',
+      'send out',
+      'send casting',
+      'mail casting',
+      'ship casting',
+      'dispatch casting',
+      'casting ready',
+      'ready to send'
+    ];
+    
+    return castingKeywords.some(keyword => searchText.includes(keyword));
+  }, []);
+
   // Sort tasks by due date (earliest first), then filter by staff
   const sortedTasks = showArchived 
     ? [...archivedTasks].sort((a, b) => {
@@ -168,7 +190,7 @@ export default function StaffToDo() {
     
     // Filter by staff member (case-insensitive matching)
     return sortedTasks.filter(t => t.assignee?.toLowerCase() === selectedStaff.toLowerCase());
-  }, [sortedTasks, selectedStaff, showArchived]);
+  }, [sortedTasks, selectedStaff, showArchived, isCastingTask]);
 
   const toggleTask = (id: string, currentStatus: string) => {
     const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
@@ -196,33 +218,11 @@ export default function StaffToDo() {
     return new Date(dueDate).toDateString() === today.toDateString();
   };
 
-  // Check if a task is related to castings
-  const isCastingTask = (task: Task): boolean => {
-    const title = (task.title || '').toLowerCase();
-    const description = (task.description || '').toLowerCase();
-    const searchText = `${title} ${description}`;
-    
-    // Keywords that indicate casting-related tasks
-    const castingKeywords = [
-      'casting',
-      'cast',
-      'send out',
-      'send casting',
-      'mail casting',
-      'ship casting',
-      'dispatch casting',
-      'casting ready',
-      'ready to send'
-    ];
-    
-    return castingKeywords.some(keyword => searchText.includes(keyword));
-  };
-
   // Get casting tasks count
   const castingTasksCount = useMemo(() => {
     if (showArchived) return 0;
     return tasks.filter(t => t.status !== 'completed' && isCastingTask(t)).length;
-  }, [tasks, showArchived]);
+  }, [tasks, showArchived, isCastingTask]);
 
   return (
     <div className="h-screen flex flex-col bg-background">
