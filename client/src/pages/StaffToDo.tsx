@@ -137,6 +137,7 @@ export default function StaffToDo() {
   };
 
   // Check if a task is related to castings (specific workflow tasks only)
+  // ONLY match: "send out metal", "send out framework", or "send out framework or metal"
   const isCastingTask = useCallback((task: Task): boolean => {
     const title = (task.title || '').toLowerCase();
     const description = (task.description || '').toLowerCase();
@@ -146,36 +147,20 @@ export default function StaffToDo() {
     fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StaffToDo.tsx:140',message:'isCastingTask evaluation',data:{taskId:task.id,title:task.title,description:task.description,searchText:searchText.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
     
-    // Check for "send" + "casting/cast" (flexible matching - words can be separated)
-    const hasSendAndCasting = (searchText.includes('send') || searchText.includes('mail') || searchText.includes('ship') || searchText.includes('dispatch')) &&
-                              (searchText.includes('casting') || searchText.includes('cast'));
-    
-    // Check for "send" + "metal" (e.g., "send metal out")
-    const hasSendAndMetal = (searchText.includes('send') || searchText.includes('mail') || searchText.includes('ship') || searchText.includes('dispatch')) &&
-                            (searchText.includes('metal'));
-    
-    // Check for specific phrases
+    // Only match these specific patterns:
+    // - "send out metal"
+    // - "send out framework"
+    // - "send out framework or metal"
     const specificPhrases = [
-      'casting back from lab',
-      'cast back from lab',
-      'casting eta',
-      'cast eta',
-      'casting et a',
-      'cast et a',
-      'metal framework tryin',
-      'metal framework try-in',
-      'metal framework try in',
-      'send metal out',
-      'send metal',
-      'metal out'
+      'send out metal',
+      'send out framework',
+      'send out framework or metal'
     ];
     
-    const hasSpecificPhrase = specificPhrases.some(phrase => searchText.includes(phrase));
-    
-    const result = hasSendAndCasting || hasSendAndMetal || hasSpecificPhrase;
+    const result = specificPhrases.some(phrase => searchText.includes(phrase));
     
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StaffToDo.tsx:168',message:'isCastingTask result',data:{taskId:task.id,hasSendAndCasting,hasSendAndMetal,hasSpecificPhrase,result},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StaffToDo.tsx:151',message:'isCastingTask result',data:{taskId:task.id,result,matchedPhrase:result?specificPhrases.find(phrase=>searchText.includes(phrase)):null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
     
     return result;
