@@ -142,9 +142,17 @@ export default function StaffToDo() {
     const description = (task.description || '').toLowerCase();
     const searchText = `${title} ${description}`;
     
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StaffToDo.tsx:140',message:'isCastingTask evaluation',data:{taskId:task.id,title:task.title,description:task.description,searchText:searchText.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
     // Check for "send" + "casting/cast" (flexible matching - words can be separated)
     const hasSendAndCasting = (searchText.includes('send') || searchText.includes('mail') || searchText.includes('ship') || searchText.includes('dispatch')) &&
                               (searchText.includes('casting') || searchText.includes('cast'));
+    
+    // Check for "send" + "metal" (e.g., "send metal out")
+    const hasSendAndMetal = (searchText.includes('send') || searchText.includes('mail') || searchText.includes('ship') || searchText.includes('dispatch')) &&
+                            (searchText.includes('metal'));
     
     // Check for specific phrases
     const specificPhrases = [
@@ -156,12 +164,21 @@ export default function StaffToDo() {
       'cast et a',
       'metal framework tryin',
       'metal framework try-in',
-      'metal framework try in'
+      'metal framework try in',
+      'send metal out',
+      'send metal',
+      'metal out'
     ];
     
     const hasSpecificPhrase = specificPhrases.some(phrase => searchText.includes(phrase));
     
-    return hasSendAndCasting || hasSpecificPhrase;
+    const result = hasSendAndCasting || hasSendAndMetal || hasSpecificPhrase;
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StaffToDo.tsx:168',message:'isCastingTask result',data:{taskId:task.id,hasSendAndCasting,hasSendAndMetal,hasSpecificPhrase,result},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
+    return result;
   }, []);
 
   // Sort tasks by due date (earliest first), then filter by staff
@@ -186,8 +203,23 @@ export default function StaffToDo() {
     if (showArchived) return sortedTasks;
     
     if (selectedStaff === 'Casting Tasks') {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StaffToDo.tsx:188',message:'Filtering casting tasks',data:{totalTasks:sortedTasks.length,nonCompletedTasks:sortedTasks.filter(t => t.status !== 'completed').length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       // Show only casting-related tasks that are not completed
-      return sortedTasks.filter(t => t.status !== 'completed' && isCastingTask(t));
+      const filtered = sortedTasks.filter(t => {
+        const isCasting = t.status !== 'completed' && isCastingTask(t);
+        // #region agent log
+        if (!isCasting && t.status !== 'completed') {
+          fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StaffToDo.tsx:193',message:'Task filtered out from casting tasks',data:{taskId:t.id,title:t.title,status:t.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        }
+        // #endregion
+        return isCasting;
+      });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'StaffToDo.tsx:199',message:'Casting tasks filter result',data:{filteredCount:filtered.length,filteredTitles:filtered.map(t => t.title)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      return filtered;
     }
     
     if (selectedStaff === 'All') {

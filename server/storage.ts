@@ -203,6 +203,9 @@ export class MemStorage implements IStorage {
   }
 
   async updatePatient(id: string, updates: Partial<InsertPatient>): Promise<Patient | undefined> {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'storage.ts:205',message:'MemStorage.updatePatient entry',data:{patientId:id,hasTreatmentInitiationDate:!!updates.treatmentInitiationDate,treatmentInitiationDate:updates.treatmentInitiationDate||null,treatmentInitiationDateType:typeof updates.treatmentInitiationDate},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     const patient = this.patients.get(id);
     if (!patient) return undefined;
     
@@ -210,9 +213,25 @@ export class MemStorage implements IStorage {
     if (updates.lastStepDate !== undefined) {
       normalizedUpdates.lastStepDate = updates.lastStepDate as Date | null;
     }
+    // Normalize treatmentInitiationDate - convert string to Date if needed
+    if (updates.treatmentInitiationDate !== undefined) {
+      if (updates.treatmentInitiationDate instanceof Date) {
+        normalizedUpdates.treatmentInitiationDate = updates.treatmentInitiationDate;
+      } else if (typeof updates.treatmentInitiationDate === 'string' && updates.treatmentInitiationDate.trim().length > 0) {
+        normalizedUpdates.treatmentInitiationDate = new Date(updates.treatmentInitiationDate);
+      } else {
+        normalizedUpdates.treatmentInitiationDate = null;
+      }
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'storage.ts:217',message:'MemStorage.updatePatient normalized treatmentInitiationDate',data:{original:updates.treatmentInitiationDate,normalized:normalizedUpdates.treatmentInitiationDate,normalizedType:normalizedUpdates.treatmentInitiationDate instanceof Date ? 'Date' : typeof normalizedUpdates.treatmentInitiationDate},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+    }
     
     const updated = { ...patient, ...normalizedUpdates };
     this.patients.set(id, updated);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'storage.ts:222',message:'MemStorage.updatePatient exit',data:{updatedTreatmentInitiationDate:updated.treatmentInitiationDate||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     return updated;
   }
 

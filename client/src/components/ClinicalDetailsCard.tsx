@@ -68,29 +68,100 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
 
   const form = useForm<ClinicalDetailsFormData>({
     resolver: zodResolver(clinicalDetailsSchema),
-    defaultValues: {
-      dateOfBirth: patient.dateOfBirth || "",
-      currentToothShade: patient.currentToothShade || "",
-      requestedToothShade: patient.requestedToothShade || "",
-      upperDentureType: patient.upperDentureType || "None",
-      lowerDentureType: patient.lowerDentureType || "None",
-      isCDCP: patient.isCDCP || false,
-      workInsurance: patient.workInsurance || false,
-      lastStepCompleted: patient.lastStepCompleted || "",
-      nextStep: patient.nextStep || "",
-      examPaid: (patient.examPaid as "yes" | "no" | "not applicable" | null) || null,
-      repairPaid: (patient.repairPaid as "yes" | "no" | "not applicable" | null) || null,
-      newDenturePaid: (patient.newDenturePaid as "yes" | "no" | "not applicable" | null) || null,
-      predeterminationStatus: (patient.predeterminationStatus as "not applicable" | "pending" | "predesent" | "approved" | "not approved" | "predeterminate" | null) || null,
-      treatmentInitiationDate: patient.treatmentInitiationDate 
-        ? new Date(patient.treatmentInitiationDate).toISOString().split('T')[0]
-        : "",
-    },
+    defaultValues: (() => {
+      // #region agent log
+      const initDateValue = patient.treatmentInitiationDate;
+      const initDateType = typeof initDateValue;
+      const initDateIsDate = initDateValue instanceof Date;
+      const initDateStr = String(initDateValue);
+      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:69',message:'Form defaultValues - treatmentInitiationDate analysis',data:{hasValue:!!initDateValue,type:initDateType,isDate:initDateIsDate,value:initDateStr,valueLength:initDateStr?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      let formattedDate = "";
+      if (initDateValue) {
+        try {
+          if (initDateValue instanceof Date) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:77',message:'Form defaultValues - Date path',data:{dateValue:initDateValue.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+            formattedDate = initDateValue.toISOString().split('T')[0];
+          } else if (typeof initDateValue === 'string') {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:81',message:'Form defaultValues - string path',data:{stringValue:initDateValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+            formattedDate = initDateValue.split('T')[0];
+          } else {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:85',message:'Form defaultValues - other type, attempting Date conversion',data:{type:typeof initDateValue,value:String(initDateValue)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+            const dateObj = new Date(initDateValue as any);
+            if (!isNaN(dateObj.getTime())) {
+              formattedDate = dateObj.toISOString().split('T')[0];
+            }
+          }
+        } catch (error: any) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:92',message:'Form defaultValues - ERROR formatting date',data:{errorMessage:error?.message,errorStack:error?.stack,originalValue:initDateValue,originalType:typeof initDateValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+          // #endregion
+          formattedDate = "";
+        }
+      }
+      return {
+        dateOfBirth: patient.dateOfBirth || "",
+        currentToothShade: patient.currentToothShade || "",
+        requestedToothShade: patient.requestedToothShade || "",
+        upperDentureType: patient.upperDentureType || "None",
+        lowerDentureType: patient.lowerDentureType || "None",
+        isCDCP: patient.isCDCP || false,
+        workInsurance: patient.workInsurance || false,
+        lastStepCompleted: patient.lastStepCompleted || "",
+        nextStep: patient.nextStep || "",
+        examPaid: (patient.examPaid as "yes" | "no" | "not applicable" | null) || null,
+        repairPaid: (patient.repairPaid as "yes" | "no" | "not applicable" | null) || null,
+        newDenturePaid: (patient.newDenturePaid as "yes" | "no" | "not applicable" | null) || null,
+        predeterminationStatus: (patient.predeterminationStatus as "not applicable" | "pending" | "predesent" | "approved" | "not approved" | "predeterminate" | null) || null,
+        treatmentInitiationDate: formattedDate,
+      };
+    })(),
   });
 
   // Reset form when patient data changes (e.g., after save) - but only when NOT editing
   useEffect(() => {
     if (!isEditing) {
+      // #region agent log
+      const resetDateValue = patient.treatmentInitiationDate;
+      const resetDateType = typeof resetDateValue;
+      const resetDateIsDate = resetDateValue instanceof Date;
+      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:120',message:'useEffect form.reset - treatmentInitiationDate analysis',data:{hasValue:!!resetDateValue,type:resetDateType,isDate:resetDateIsDate,value:String(resetDateValue)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      let formattedDate = "";
+      if (resetDateValue) {
+        try {
+          if (resetDateValue instanceof Date) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:127',message:'useEffect form.reset - Date path',data:{dateValue:resetDateValue.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
+            formattedDate = resetDateValue.toISOString().split('T')[0];
+          } else if (typeof resetDateValue === 'string') {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:131',message:'useEffect form.reset - string path',data:{stringValue:resetDateValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
+            formattedDate = resetDateValue.split('T')[0];
+          } else {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:135',message:'useEffect form.reset - other type, attempting Date conversion',data:{type:typeof resetDateValue,value:String(resetDateValue)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
+            const dateObj = new Date(resetDateValue as any);
+            if (!isNaN(dateObj.getTime())) {
+              formattedDate = dateObj.toISOString().split('T')[0];
+            }
+          }
+        } catch (error: any) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:142',message:'useEffect form.reset - ERROR formatting date',data:{errorMessage:error?.message,errorStack:error?.stack,originalValue:resetDateValue,originalType:typeof resetDateValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
+          formattedDate = "";
+        }
+      }
       form.reset({
         dateOfBirth: patient.dateOfBirth || "",
         currentToothShade: patient.currentToothShade || "",
@@ -105,13 +176,7 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
         repairPaid: (patient.repairPaid as "yes" | "no" | "not applicable" | null) || null,
         newDenturePaid: (patient.newDenturePaid as "yes" | "no" | "not applicable" | null) || null,
         predeterminationStatus: (patient.predeterminationStatus as "not applicable" | "pending" | "predesent" | "approved" | "not approved" | "predeterminate" | null) || null,
-        treatmentInitiationDate: patient.treatmentInitiationDate 
-          ? (patient.treatmentInitiationDate instanceof Date 
-              ? patient.treatmentInitiationDate.toISOString().split('T')[0]
-              : typeof patient.treatmentInitiationDate === 'string'
-              ? patient.treatmentInitiationDate.split('T')[0]
-              : new Date(patient.treatmentInitiationDate).toISOString().split('T')[0])
-          : "",
+        treatmentInitiationDate: formattedDate,
       });
     }
   }, [patient, form, isEditing]);
@@ -122,7 +187,42 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
       return response.json();
     },
     onSuccess: (updatedPatient) => {
+      // #region agent log
+      const successDateValue = updatedPatient.treatmentInitiationDate;
+      const successDateType = typeof successDateValue;
+      const successDateIsDate = successDateValue instanceof Date;
+      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:164',message:'onSuccess form.reset - treatmentInitiationDate analysis',data:{hasValue:!!successDateValue,type:successDateType,isDate:successDateIsDate,value:String(successDateValue)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       // Reset form with the fresh data from the mutation response
+      let formattedDate = "";
+      if (successDateValue) {
+        try {
+          if (successDateValue instanceof Date) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:171',message:'onSuccess form.reset - Date path',data:{dateValue:successDateValue.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+            // #endregion
+            formattedDate = successDateValue.toISOString().split('T')[0];
+          } else if (typeof successDateValue === 'string') {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:175',message:'onSuccess form.reset - string path',data:{stringValue:successDateValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+            // #endregion
+            formattedDate = successDateValue.split('T')[0];
+          } else {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:179',message:'onSuccess form.reset - other type, attempting Date conversion',data:{type:typeof successDateValue,value:String(successDateValue)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+            // #endregion
+            const dateObj = new Date(successDateValue as any);
+            if (!isNaN(dateObj.getTime())) {
+              formattedDate = dateObj.toISOString().split('T')[0];
+            }
+          }
+        } catch (error: any) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:186',message:'onSuccess form.reset - ERROR formatting date',data:{errorMessage:error?.message,errorStack:error?.stack,originalValue:successDateValue,originalType:typeof successDateValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
+          formattedDate = "";
+        }
+      }
       form.reset({
         dateOfBirth: updatedPatient.dateOfBirth || "",
         currentToothShade: updatedPatient.currentToothShade || "",
@@ -137,13 +237,7 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
         repairPaid: (updatedPatient.repairPaid as "yes" | "no" | "not applicable" | null) || null,
         newDenturePaid: (updatedPatient.newDenturePaid as "yes" | "no" | "not applicable" | null) || null,
         predeterminationStatus: (updatedPatient.predeterminationStatus as "not applicable" | "pending" | "approved" | "not approved" | null) || null,
-        treatmentInitiationDate: updatedPatient.treatmentInitiationDate 
-          ? (updatedPatient.treatmentInitiationDate instanceof Date 
-              ? updatedPatient.treatmentInitiationDate.toISOString().split('T')[0]
-              : typeof updatedPatient.treatmentInitiationDate === 'string'
-              ? updatedPatient.treatmentInitiationDate.split('T')[0]
-              : new Date(updatedPatient.treatmentInitiationDate).toISOString().split('T')[0])
-          : "",
+        treatmentInitiationDate: formattedDate,
       });
       
       queryClient.invalidateQueries({ queryKey: ['/api/patients', patient.id] });
@@ -164,6 +258,9 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
   });
 
   const onSubmit = (data: ClinicalDetailsFormData) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:166',message:'onSubmit entry',data:{hasTreatmentInitiationDate:!!data.treatmentInitiationDate,treatmentInitiationDate:data.treatmentInitiationDate||null,treatmentInitiationDateType:typeof data.treatmentInitiationDate},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     // Clean up the data before sending - convert empty strings to null/undefined for optional fields
     const cleanedData = {
       ...data,
@@ -175,6 +272,9 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
         ? data.dateOfBirth.trim() 
         : undefined,
     };
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:178',message:'onSubmit before mutate',data:{cleanedTreatmentInitiationDate:cleanedData.treatmentInitiationDate||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     updateClinicalDetailsMutation.mutate(cleanedData);
   };
 

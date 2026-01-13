@@ -216,9 +216,9 @@ export default function ActivePatients() {
         currentPage="patients"
       />
       <div className="p-6 border-b bg-background">
-        <div className="flex items-center justify-between gap-4 mb-4">
+        <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
           <h1 className="text-3xl font-semibold">Active Patients</h1>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {canViewAllOffices && (
               <OfficeSelector
                 selectedOfficeId={selectedOfficeId}
@@ -226,43 +226,41 @@ export default function ActivePatients() {
                 canViewAllOffices={canViewAllOffices}
               />
             )}
-            <div className="flex items-center gap-3">
-              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-                <SelectTrigger className="w-[220px]" data-testid="select-sort">
-                  <ArrowUpDown className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Sort by..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="alphabetical">
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      <span>Alphabetical</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="lastAppointment">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      <span>Last Appointment</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="treatmentInitiation">
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
-                      <span>Treatment Initiation</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="relative w-80">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search patients..."
-                  className="pl-9"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  data-testid="input-search-patients"
-                />
-              </div>
+            <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+              <SelectTrigger className="w-[220px]" data-testid="select-sort">
+                <ArrowUpDown className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Sort by..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="alphabetical">
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    <span>Alphabetical</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="lastAppointment">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    <span>Last Appointment</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="treatmentInitiation">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    <span>Treatment Initiation</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="relative w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search patients..."
+                className="pl-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                data-testid="input-search-patients"
+              />
             </div>
             <Button
               onClick={() => setIsNewPatientDialogOpen(true)}

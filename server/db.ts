@@ -26,7 +26,15 @@ function throwDbDisabledError(): never {
 export { pool, db };
 
 export const ensureDb = () => {
-  if (!db) throwDbDisabledError();
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:28',message:'ensureDb called',data:{hasDb:!!db,hasPool:!!pool,useMemStorage:!!(typeof USE_MEM_STORAGE!=='undefined'?USE_MEM_STORAGE:false)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+  if (!db) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:30',message:'ensureDb error - db is null',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    throwDbDisabledError();
+  }
   return db;
 };
 

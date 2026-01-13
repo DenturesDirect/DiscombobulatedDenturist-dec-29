@@ -14,13 +14,28 @@ import { extractTextFromPDF } from "./pdfExtractor";
 
 // Helper function to get user office context from request
 async function getUserOfficeContext(req: any): Promise<{ officeId: string | null; canViewAllOffices: boolean }> {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:16',message:'getUserOfficeContext entry',data:{hasUser:!!req.user,hasUserId:!!req.user?.id,userId:req.user?.id||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+  // #endregion
   const user = req.user as any;
   if (!user?.id) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:19',message:'getUserOfficeContext no user id',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+    // #endregion
     return { officeId: null, canViewAllOffices: false };
   }
   
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:22',message:'getUserOfficeContext before storage.getUser',data:{userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+  // #endregion
   const dbUser = await storage.getUser(user.id);
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:23',message:'getUserOfficeContext after storage.getUser',data:{hasDbUser:!!dbUser,dbUserOfficeId:dbUser?.officeId||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+  // #endregion
   if (!dbUser) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:24',message:'getUserOfficeContext no dbUser',data:{userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+    // #endregion
     return { officeId: null, canViewAllOffices: false };
   }
   
@@ -31,6 +46,9 @@ async function getUserOfficeContext(req: any): Promise<{ officeId: string | null
   // Dentures Direct staff can see all offices, Toronto Smile Centre staff can only see their own
   const canViewAll = (dbUser.canViewAllOffices ?? false) || isDenturesDirectUser;
   
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:36',message:'getUserOfficeContext exit',data:{officeId:dbUser.officeId||null,canViewAllOffices:canViewAll},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+  // #endregion
   return {
     officeId: dbUser.officeId ?? null,
     canViewAllOffices: canViewAll
@@ -43,18 +61,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Get offices list
   app.get("/api/offices", isAuthenticated, async (req, res) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:63',message:'GET /api/offices entry',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     try {
+      const { USE_MEM_STORAGE } = await import("./config");
+      
+      // When using in-memory storage, return hardcoded offices
+      if (USE_MEM_STORAGE) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:69',message:'GET /api/offices using hardcoded offices',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        const hardcodedOffices = [
+          { id: 'dentures-direct-id', name: 'Dentures Direct' },
+          { id: 'toronto-smile-centre-id', name: 'Toronto Smile Centre' }
+        ];
+        return res.json(hardcodedOffices);
+      }
+      
       const { offices } = await import("@shared/schema");
       const { ensureDb } = await import("./db");
       const db = ensureDb();
       if (!db) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:77',message:'GET /api/offices db is null',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
         return res.json([]); // Return empty if no database
       }
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:81',message:'GET /api/offices before db query',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       const officesList = await db.select().from(offices);
       // Sort by name manually since drizzle orderBy with text fields can be tricky
       officesList.sort((a, b) => a.name.localeCompare(b.name));
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:85',message:'GET /api/offices success',data:{officesCount:officesList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       res.json(officesList);
     } catch (error: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:87',message:'GET /api/offices error',data:{errorType:error?.constructor?.name,errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       console.error("Error fetching offices:", error);
       res.json([]); // Return empty array on error
     }
@@ -88,16 +135,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/patients", isAuthenticated, async (req, res) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:90',message:'GET /api/patients entry',data:{hasQuery:!!req.query,selectedOfficeId:req.query.officeId||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     try {
       const officeContext = await getUserOfficeContext(req);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:94',message:'GET /api/patients before listPatients',data:{officeId:officeContext.officeId,canViewAllOffices:officeContext.canViewAllOffices},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       const selectedOfficeId = req.query.officeId as string | undefined;
       const patients = await storage.listPatients(
         officeContext.officeId,
         officeContext.canViewAllOffices,
         selectedOfficeId || null
       );
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:99',message:'GET /api/patients success',data:{patientsCount:patients?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       res.json(patients);
     } catch (error: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:101',message:'GET /api/patients error',data:{errorType:error?.constructor?.name,errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       res.status(500).json({ error: error.message });
     }
   });
@@ -134,6 +193,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   app.patch("/api/patients/:id", isAuthenticated, async (req, res) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:195',message:'PATCH /api/patients/:id entry',data:{patientId:req.params.id,hasTreatmentInitiationDate:!!req.body.treatmentInitiationDate,treatmentInitiationDate:req.body.treatmentInitiationDate||null,treatmentInitiationDateType:typeof req.body.treatmentInitiationDate,bodyKeys:Object.keys(req.body||{})},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     try {
       const officeContext = await getUserOfficeContext(req);
       
@@ -145,6 +207,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       if (!currentPatient) return res.status(404).json({ error: "Patient not found" });
       
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:207',message:'PATCH /api/patients/:id before update',data:{currentTreatmentInitiationDate:currentPatient.treatmentInitiationDate||null,newTreatmentInitiationDate:req.body.treatmentInitiationDate||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      
       // If user cannot view all offices, prevent changing officeId
       if (!officeContext.canViewAllOffices && req.body.officeId) {
         delete req.body.officeId; // Remove officeId from update if user can't change it
@@ -155,7 +221,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.body.lastStepDate = new Date();
       }
       
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:217',message:'PATCH /api/patients/:id before storage.updatePatient',data:{treatmentInitiationDate:req.body.treatmentInitiationDate||null,treatmentInitiationDateType:typeof req.body.treatmentInitiationDate},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       const patient = await storage.updatePatient(req.params.id, req.body);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:218',message:'PATCH /api/patients/:id after storage.updatePatient',data:{hasPatient:!!patient,updatedTreatmentInitiationDate:patient?.treatmentInitiationDate||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       if (!patient) return res.status(404).json({ error: "Patient not found" });
       
       // AUTO-CREATE PREDETERMINATION TASK: When status is set to "pending", create task for appropriate staff
