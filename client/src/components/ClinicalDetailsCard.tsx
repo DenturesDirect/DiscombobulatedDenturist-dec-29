@@ -331,9 +331,16 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
               <div>
                 <p className="text-muted-foreground">Treatment Initiation</p>
                 <p className="font-medium" data-testid="text-treatment-initiation">
-                  {patient.treatmentInitiationDate 
-                    ? new Date(patient.treatmentInitiationDate).toLocaleDateString()
-                    : "Not set"}
+                  {(() => {
+                    if (!patient.treatmentInitiationDate) return "Not set";
+                    try {
+                      const date = new Date(patient.treatmentInitiationDate);
+                      if (isNaN(date.getTime())) return "Invalid date";
+                      return date.toLocaleDateString();
+                    } catch (error) {
+                      return "Invalid date";
+                    }
+                  })()}
                 </p>
               </div>
             </div>
