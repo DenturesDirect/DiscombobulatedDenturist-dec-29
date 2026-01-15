@@ -216,6 +216,42 @@ export async function setupLocalAuth(app: Express) {
     });
   });
 
+  // Emergency password reset for allowed staff emails (no auth required)
+  app.post('/api/auth/emergency-reset', async (req, res) => {
+    try {
+      const { email, newPassword } = req.body;
+      
+      if (!email || !newPassword) {
+        return res.status(400).json({ message: 'Email and new password required' });
+      }
+
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: 'Password must be at least 8 characters' });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+      
+      // Only allow reset for emails in the ALLOWED_STAFF list
+      if (!isAllowedEmail(normalizedEmail)) {
+        return res.status(403).json({ message: 'Email not authorized for emergency reset' });
+      }
+
+      const user = await storage.getUserByEmail(normalizedEmail);
+      if (!user) {
+        return res.status(404).json({ message: 'Account not found. The account may need to be created.' });
+      }
+
+      const hashedPassword = await hashPassword(newPassword);
+      await storage.updateUserPassword(user.id, hashedPassword);
+      
+      console.log(`⚠️  Emergency password reset for ${normalizedEmail}`);
+      
+      res.json({ success: true, message: 'Password reset successfully. You can now log in with your new password.' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get('/api/auth/user', async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: 'Unauthorized' });
