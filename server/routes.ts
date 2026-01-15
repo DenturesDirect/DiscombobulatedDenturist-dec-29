@@ -57,7 +57,10 @@ async function getUserOfficeContext(req: any): Promise<{ officeId: string | null
 
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupLocalAuth(app);
-  await seedStaffAccounts();
+  // Seed staff accounts in background (non-blocking)
+  seedStaffAccounts().catch((error: any) => {
+    console.error('⚠️  Staff account seeding failed (non-critical):', error.message);
+  });
 
   // Get offices list
   app.get("/api/offices", isAuthenticated, async (req, res) => {
