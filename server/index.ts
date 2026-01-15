@@ -60,23 +60,23 @@ console.log("  All SUPABASE_* vars:", Object.keys(process.env).filter(k => k.toU
   fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.ts:58',message:'Server startup begin',data:{hasPORT:!!process.env.PORT,nodeEnv:process.env.NODE_ENV||'development'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
   // #endregion
   try {
-    // Run database migrations first
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.ts:60',message:'Before runMigrations',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    await runMigrations();
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.ts:61',message:'After runMigrations',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
+    // Run database migrations first (non-blocking - don't crash if it fails)
+    try {
+      await runMigrations();
+      console.log('✅ Database migrations completed');
+    } catch (error: any) {
+      console.error('⚠️  Database migrations failed (non-critical):', error.message);
+      console.error('   Server will continue, but some features may not work');
+    }
     
-    // Seed initial data
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.ts:63',message:'Before seedData',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    await seedData();
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.ts:64',message:'After seedData',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
+    // Seed initial data (non-blocking - don't crash if it fails)
+    // Run in background so it doesn't block server startup
+    seedData().then(() => {
+      console.log('✅ Initial data seeding completed');
+    }).catch((error: any) => {
+      console.error('⚠️  Data seeding failed (non-critical):', error.message);
+      console.error('   Server will continue running');
+    });
     
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.ts:65',message:'Before registerRoutes',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
