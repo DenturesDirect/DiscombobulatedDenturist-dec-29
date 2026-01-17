@@ -615,8 +615,31 @@ export class DbStorage implements IStorage {
   }
 
   async updatePatient(id: string, updates: Partial<InsertPatient>): Promise<Patient | undefined> {
+    // Normalize date fields - convert strings to Date objects for timestamp columns
+    const normalizedUpdates: any = { ...updates };
+    
+    if (updates.treatmentInitiationDate !== undefined) {
+      if (updates.treatmentInitiationDate instanceof Date) {
+        normalizedUpdates.treatmentInitiationDate = updates.treatmentInitiationDate;
+      } else if (typeof updates.treatmentInitiationDate === 'string' && updates.treatmentInitiationDate.trim().length > 0) {
+        normalizedUpdates.treatmentInitiationDate = new Date(updates.treatmentInitiationDate);
+      } else {
+        normalizedUpdates.treatmentInitiationDate = null;
+      }
+    }
+    
+    if (updates.lastStepDate !== undefined) {
+      if (updates.lastStepDate instanceof Date) {
+        normalizedUpdates.lastStepDate = updates.lastStepDate;
+      } else if (typeof updates.lastStepDate === 'string' && updates.lastStepDate.trim().length > 0) {
+        normalizedUpdates.lastStepDate = new Date(updates.lastStepDate);
+      } else {
+        normalizedUpdates.lastStepDate = null;
+      }
+    }
+    
     const result = await ensureDb().update(patients)
-      .set(updates)
+      .set(normalizedUpdates)
       .where(eq(patients.id, id))
       .returning();
     return result[0];
