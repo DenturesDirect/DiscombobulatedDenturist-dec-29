@@ -256,7 +256,7 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="case-type-upper">Case Type - Upper (Max/Maxillary)</Label>
-              <Select value={caseTypeUpper || undefined} onValueChange={(val) => setCaseTypeUpper(val === "none" ? "" : val || "")}>
+              <Select value={caseTypeUpper || "none"} onValueChange={(val) => setCaseTypeUpper(val === "none" ? "" : val)}>
                 <SelectTrigger id="case-type-upper" data-testid="select-case-type-upper">
                   <SelectValue placeholder="Select upper case type..." />
                 </SelectTrigger>
@@ -288,7 +288,7 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="case-type-lower">Case Type - Lower (Mand)</Label>
-              <Select value={caseTypeLower || undefined} onValueChange={(val) => setCaseTypeLower(val === "none" ? "" : val || "")}>
+              <Select value={caseTypeLower || "none"} onValueChange={(val) => setCaseTypeLower(val === "none" ? "" : val)}>
                 <SelectTrigger id="case-type-lower" data-testid="select-case-type-lower">
                   <SelectValue placeholder="Select lower case type..." />
                 </SelectTrigger>
@@ -319,6 +319,12 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
         </div>
         {!caseTypeUpper && !caseTypeLower && (
           <p className="text-sm text-destructive">At least one case type (Upper or Lower) is required</p>
+        )}
+        {caseTypeUpper && !fabricationStageUpper && (
+          <p className="text-sm text-destructive">Fabrication Stage - Upper is required when Upper case type is selected</p>
+        )}
+        {caseTypeLower && !fabricationStageLower && (
+          <p className="text-sm text-destructive">Fabrication Stage - Lower is required when Lower case type is selected</p>
         )}
 
         <div className="space-y-2">
