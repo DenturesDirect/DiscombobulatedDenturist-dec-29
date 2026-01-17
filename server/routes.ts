@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { processClinicalNote, generateReferralLetter } from "./openai";
 import { storage } from "./storage";
-import { insertPatientSchema, insertLabNoteSchema, insertAdminNoteSchema, insertLabPrescriptionSchema } from "@shared/schema";
+import { insertPatientSchema, insertLabNoteSchema, insertAdminNoteSchema, insertLabPrescriptionSchema, insertTaskSchema } from "@shared/schema";
 import { setupLocalAuth, isAuthenticated, seedStaffAccounts } from "./localAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { sendCustomNotification, sendAppointmentReminder } from "./gmail";
@@ -242,9 +242,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create task endpoint (for manual task creation by clinician)
-  app.post("/api/tasks", isAuthenticated, async (req, res) => {
+  app.post("/api/tasks", isAuthenticated, async (req: any, res) => {
     try {
-      const task = await storage.createTask(req.body);
+      // Validate and transform the request body
+      const validatedData = insertTaskSchema.parse(req.body);
+      
+      // Convert dueDate string to Date if provided
+      if (validatedData.dueDate !== undefined && validatedData.dueDate !== null) {
+        if (typeof validatedData.dueDate === 'string') {
+          validatedData.dueDate = new Date(validatedData.dueDate);
+        } else if (!(validatedData.dueDate instanceof Date)) {
+          validatedData.dueDate = null;
+        }
+      }
+      
+      // Ensure priority is valid
+      if (validatedData.priority && !['high', 'normal', 'low'].includes(validatedData.priority)) {
+        validatedData.priority = 'normal';
+      }
+      
+      // Get user context for office assignment
+      const user = req.user as any;
+      const userOfficeId = user?.officeId || null;
+      
+      // If officeId not provided and task is patient-related, get it from patient
+      if (!validatedData.officeId && validatedData.patientId) {
+        const patient = await storage.getPatient(validatedData.patientId, userOfficeId, user?.canViewAllOffices || false);
+        if (patient) {
+          validatedData.officeId = patient.officeId;
+        } else if (userOfficeId) {
+          validatedData.officeId = userOfficeId;
+        }
+      } else if (!validatedData.officeId && userOfficeId) {
+        validatedData.officeId = userOfficeId;
+      }
+      
+      const task = await storage.createTask(validatedData);
       res.json(task);
     } catch (error: any) {
       res.status(400).json({ error: error.message });

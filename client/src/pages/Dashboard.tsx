@@ -590,7 +590,7 @@ export default function Dashboard() {
         description: taskData.description,
         assignee: taskData.assignee,
         priority: taskData.priority,
-        dueDate: taskData.dueDate,
+        dueDate: taskData.dueDate ? taskData.dueDate.toISOString() : undefined,
         status: "pending"
       });
       
