@@ -102,6 +102,11 @@ export default function Dashboard() {
 
   const { data: patientFiles = [], isLoading: isLoadingFiles } = useQuery<PatientFile[]>({
     queryKey: ['/api/patients', patientId, 'files'],
+    queryFn: async () => {
+      if (!patientId) return [];
+      const response = await apiRequest('GET', `/api/patients/${patientId}/files`);
+      return response.json();
+    },
     enabled: !!patientId
   });
 

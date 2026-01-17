@@ -262,9 +262,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Patient files
-  app.get("/api/patients/:id/files", isAuthenticated, async (req, res) => {
+  app.get("/api/patients/:id/files", isAuthenticated, async (req: any, res) => {
     try {
-      const files = await storage.listPatientFiles(req.params.id);
+      const user = req.user as any;
+      const userOfficeId = user?.officeId || null;
+      const canViewAllOffices = user?.canViewAllOffices || false;
+      const files = await storage.listPatientFiles(req.params.id, userOfficeId, canViewAllOffices);
       res.json(files);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
