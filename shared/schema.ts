@@ -266,6 +266,46 @@ export const insertLabPrescriptionSchema = createInsertSchema(labPrescriptions).
     }
     return null;
   }).nullable().optional(),
+  digitalFiles: z.union([z.array(z.string()), z.undefined()]).optional().transform((val) => {
+    if (!val || (Array.isArray(val) && val.length === 0)) return undefined;
+    return val;
+  }),
+  caseTypeUpper: z.union([z.string(), z.undefined()]).optional().transform((val) => {
+    if (!val || (typeof val === 'string' && val.trim().length === 0)) return undefined;
+    return val;
+  }),
+  caseTypeLower: z.union([z.string(), z.undefined()]).optional().transform((val) => {
+    if (!val || (typeof val === 'string' && val.trim().length === 0)) return undefined;
+    return val;
+  }),
+  fabricationStageUpper: z.union([z.string(), z.undefined()]).optional().transform((val) => {
+    if (!val || (typeof val === 'string' && val.trim().length === 0)) return undefined;
+    return val;
+  }),
+  fabricationStageLower: z.union([z.string(), z.undefined()]).optional().transform((val) => {
+    if (!val || (typeof val === 'string' && val.trim().length === 0)) return undefined;
+    return val;
+  }),
+  designInstructions: z.union([z.string(), z.undefined()]).optional().transform((val) => {
+    if (!val || (typeof val === 'string' && val.trim().length === 0)) return undefined;
+    return val;
+  }),
+  existingDentureReference: z.union([z.string(), z.undefined()]).optional().transform((val) => {
+    if (!val || (typeof val === 'string' && val.trim().length === 0)) return undefined;
+    return val;
+  }),
+  biteNotes: z.union([z.string(), z.undefined()]).optional().transform((val) => {
+    if (!val || (typeof val === 'string' && val.trim().length === 0)) return undefined;
+    return val;
+  }),
+  shippingInstructions: z.union([z.string(), z.undefined()]).optional().transform((val) => {
+    if (!val || (typeof val === 'string' && val.trim().length === 0)) return undefined;
+    return val;
+  }),
+  specialNotes: z.union([z.string(), z.undefined()]).optional().transform((val) => {
+    if (!val || (typeof val === 'string' && val.trim().length === 0)) return undefined;
+    return val;
+  }),
 });
 
 export type InsertLabPrescription = z.infer<typeof insertLabPrescriptionSchema>;

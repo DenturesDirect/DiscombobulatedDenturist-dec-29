@@ -190,17 +190,17 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
   const handleSubmit = () => {
     const prescription: LabPrescriptionData = {
       labName,
-      caseTypeUpper: caseTypeUpper || undefined,
-      caseTypeLower: caseTypeLower || undefined,
-      fabricationStageUpper: caseTypeUpper ? (fabricationStageUpper || undefined) : undefined,
-      fabricationStageLower: caseTypeLower ? (fabricationStageLower || undefined) : undefined,
-      deadline: deadline ? new Date(deadline) : undefined,
+      caseTypeUpper: caseTypeUpper && caseTypeUpper.trim() ? caseTypeUpper.trim() : undefined,
+      caseTypeLower: caseTypeLower && caseTypeLower.trim() ? caseTypeLower.trim() : undefined,
+      fabricationStageUpper: caseTypeUpper && fabricationStageUpper && fabricationStageUpper.trim() ? fabricationStageUpper.trim() : undefined,
+      fabricationStageLower: caseTypeLower && fabricationStageLower && fabricationStageLower.trim() ? fabricationStageLower.trim() : undefined,
+      deadline: deadline && deadline.trim() ? new Date(deadline) : undefined,
       digitalFiles: selectedFiles.length > 0 ? selectedFiles : undefined,
-      designInstructions: designInstructions || undefined,
-      existingDentureReference: existingDentureReference || undefined,
-      biteNotes: biteNotes || undefined,
-      shippingInstructions: shippingInstructions || undefined,
-      specialNotes: specialNotes || undefined
+      designInstructions: designInstructions && designInstructions.trim() ? designInstructions.trim() : undefined,
+      existingDentureReference: existingDentureReference && existingDentureReference.trim() ? existingDentureReference.trim() : undefined,
+      biteNotes: biteNotes && biteNotes.trim() ? biteNotes.trim() : undefined,
+      shippingInstructions: shippingInstructions && shippingInstructions.trim() ? shippingInstructions.trim() : undefined,
+      specialNotes: specialNotes && specialNotes.trim() ? specialNotes.trim() : undefined
     };
     onSubmit(prescription);
     
