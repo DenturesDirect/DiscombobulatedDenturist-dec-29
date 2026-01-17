@@ -361,8 +361,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // This route streams the file directly to the client for privacy
   app.get("/api/objects/*", isAuthenticated, async (req, res) => {
     try {
-      const objectPath = `/objects/${req.params[0]}`;
-      const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+      // Extract the path after /api/objects/
+      // req.path gives us the full path like "/api/objects/uploads/uuid/filename.jpg"
+      // We need to extract "uploads/uuid/filename.jpg" and prepend "/objects/"
+      const fullPath = req.path; // e.g., "/api/objects/uploads/uuid/filename.jpg"
+      const pathAfterApi = fullPath.replace(/^\/api\/objects\/?/, ''); // Remove "/api/objects/" prefix
+      
+      // The storage service expects paths starting with "/objects/"
+      const storagePath = `/objects/${pathAfterApi}`;
+      
+      const objectFile = await objectStorageService.getObjectEntityFile(storagePath);
       await objectStorageService.downloadObject(objectFile, res);
     } catch (error: any) {
       if (error.name === "ObjectNotFoundError") {
