@@ -22,27 +22,18 @@ export default function OfficeSelector({ selectedOfficeId, onOfficeChange, canVi
   const { data: officesData } = useQuery<Office[]>({
     queryKey: ["/api/offices"],
     queryFn: async () => {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OfficeSelector.tsx:24',message:'OfficeSelector queryFn entry',data:{canViewAllOffices},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       const response = await apiRequest('GET', '/api/offices');
       const data = await response.json();
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OfficeSelector.tsx:27',message:'OfficeSelector queryFn response',data:{dataLength:data?.length||0,data:JSON.stringify(data||[])},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       return data;
     },
     enabled: canViewAllOffices,
   });
 
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'OfficeSelector.tsx:31',message:'OfficeSelector useEffect',data:{hasOfficesData:!!officesData,officesDataLength:officesData?.length||0,officesData:JSON.stringify(officesData||[]),canViewAllOffices},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     if (officesData) {
       setOffices(officesData);
     }
-  }, [officesData, canViewAllOffices]);
+  }, [officesData]);
 
   if (!canViewAllOffices) {
     return null; // Don't show selector if user can't view all offices
@@ -61,7 +52,7 @@ export default function OfficeSelector({ selectedOfficeId, onOfficeChange, canVi
           <SelectValue placeholder="Select office..." />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Offices</SelectItem>
+          <SelectItem value="all">Office Overall</SelectItem>
           {offices.map((office) => (
             <SelectItem key={office.id} value={office.id}>
               {office.name}

@@ -523,6 +523,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all offices
+  app.get("/api/offices", isAuthenticated, async (req, res) => {
+    try {
+      const offices = await storage.listOffices();
+      res.json(offices);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

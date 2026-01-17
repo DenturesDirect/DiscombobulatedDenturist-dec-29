@@ -7,8 +7,9 @@ import {
   type LabNote, type InsertLabNote,
   type AdminNote, type InsertAdminNote,
   type LabPrescription, type InsertLabPrescription,
+  type Office,
   users, patients, clinicalNotes, tasks, patientFiles, loginAttempts,
-  labNotes, adminNotes, labPrescriptions
+  labNotes, adminNotes, labPrescriptions, offices
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { ensureDb } from "./db";
@@ -63,6 +64,9 @@ export interface IStorage {
   listLabPrescriptions(patientId: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<LabPrescription[]>;
   getLabPrescription(id: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<LabPrescription | undefined>;
   updateLabPrescription(id: string, updates: Partial<InsertLabPrescription>): Promise<LabPrescription | undefined>;
+  
+  // Offices
+  listOffices(): Promise<Office[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -531,6 +535,12 @@ export class MemStorage implements IStorage {
     const updated = { ...prescription, ...updates };
     this.labPrescriptionsStore.set(id, updated);
     return updated;
+  }
+
+  async listOffices(): Promise<Office[]> {
+    // For MemStorage, return empty array or seed with default offices
+    // In production, this should come from the database
+    return [];
   }
 }
 
@@ -1057,6 +1067,10 @@ export class DbStorage implements IStorage {
       .where(eq(labPrescriptions.id, id))
       .returning();
     return result[0];
+  }
+
+  async listOffices(): Promise<Office[]> {
+    return await ensureDb().select().from(offices).orderBy(offices.name);
   }
 }
 
