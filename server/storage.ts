@@ -145,7 +145,7 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const patient: Patient = { 
       id,
-      officeId: insertPatient.officeId ?? null,
+      officeId: insertPatient.officeId || '',
       name: insertPatient.name,
       dateOfBirth: insertPatient.dateOfBirth ?? null,
       phone: insertPatient.phone ?? null,
@@ -165,6 +165,11 @@ export class MemStorage implements IStorage {
       lastStepDate: insertPatient.lastStepDate ?? null,
       emailNotifications: insertPatient.emailNotifications ?? false,
       textNotifications: insertPatient.textNotifications ?? false,
+      examPaid: insertPatient.examPaid ?? null,
+      repairPaid: insertPatient.repairPaid ?? null,
+      newDenturePaid: insertPatient.newDenturePaid ?? null,
+      predeterminationStatus: insertPatient.predeterminationStatus ?? null,
+      treatmentInitiationDate: insertPatient.treatmentInitiationDate ?? null,
       createdAt: new Date()
     };
     this.patients.set(id, patient);
@@ -212,10 +217,16 @@ export class MemStorage implements IStorage {
     }
     // Normalize treatmentInitiationDate - convert string to Date if needed
     if (updates.treatmentInitiationDate !== undefined) {
-      if (updates.treatmentInitiationDate instanceof Date) {
-        normalizedUpdates.treatmentInitiationDate = updates.treatmentInitiationDate;
-      } else if (typeof updates.treatmentInitiationDate === 'string' && updates.treatmentInitiationDate.trim().length > 0) {
-        normalizedUpdates.treatmentInitiationDate = new Date(updates.treatmentInitiationDate);
+      const dateValue = updates.treatmentInitiationDate;
+      if (dateValue instanceof Date) {
+        normalizedUpdates.treatmentInitiationDate = dateValue;
+      } else if (dateValue && typeof dateValue === 'string') {
+        const trimmed = (dateValue as string).trim();
+        if (trimmed.length > 0) {
+          normalizedUpdates.treatmentInitiationDate = new Date(trimmed);
+        } else {
+          normalizedUpdates.treatmentInitiationDate = null;
+        }
       } else {
         normalizedUpdates.treatmentInitiationDate = null;
       }
@@ -237,7 +248,7 @@ export class MemStorage implements IStorage {
       officeId: insertNote.officeId ?? patient?.officeId ?? null,
       content: insertNote.content,
       noteDate: insertNote.noteDate ?? null,
-      createdBy: insertNote.createdBy,
+      createdBy: insertNote.createdBy || '',
       createdAt: new Date()
     };
     this.clinicalNotes.set(id, note);
@@ -410,7 +421,7 @@ export class MemStorage implements IStorage {
       patientId: insertNote.patientId,
       officeId: insertNote.officeId ?? patient?.officeId ?? null,
       content: insertNote.content,
-      createdBy: insertNote.createdBy,
+      createdBy: insertNote.createdBy || '',
       createdAt: new Date()
     };
     this.labNotesStore.set(id, note);
@@ -444,7 +455,7 @@ export class MemStorage implements IStorage {
       patientId: insertNote.patientId,
       officeId: insertNote.officeId ?? patient?.officeId ?? null,
       content: insertNote.content,
-      createdBy: insertNote.createdBy,
+      createdBy: insertNote.createdBy || '',
       createdAt: new Date()
     };
     this.adminNotesStore.set(id, note);
@@ -576,18 +587,28 @@ export class DbStorage implements IStorage {
       throw new Error("officeId is required. Patient must be assigned to an office.");
     }
     
+    // Ensure officeId is set (required by schema)
+    if (!insertPatient.officeId) {
+      throw new Error("officeId is required. Patient must be assigned to an office.");
+    }
+    
     const result = await ensureDb().insert(patients)
-      .values(insertPatient)
+      .values({
+        ...insertPatient,
+        officeId: insertPatient.officeId,
+      })
       .returning();
     return result[0];
   }
 
   async getPatient(id: string, userOfficeId?: string | null, canViewAllOffices?: boolean): Promise<Patient | undefined> {
-    let query = ensureDb().select().from(patients).where(eq(patients.id, id));
+    let query = ensureDb().select().from(patients);
     
     // Apply office filter if user cannot view all offices
     if (!canViewAllOffices && userOfficeId) {
       query = query.where(and(eq(patients.id, id), eq(patients.officeId, userOfficeId))) as any;
+    } else {
+      query = query.where(eq(patients.id, id)) as any;
     }
     
     const result = await query;
@@ -615,20 +636,32 @@ export class DbStorage implements IStorage {
     const normalizedUpdates: any = { ...updates };
     
     if (updates.treatmentInitiationDate !== undefined) {
-      if (updates.treatmentInitiationDate instanceof Date) {
-        normalizedUpdates.treatmentInitiationDate = updates.treatmentInitiationDate;
-      } else if (typeof updates.treatmentInitiationDate === 'string' && updates.treatmentInitiationDate.trim().length > 0) {
-        normalizedUpdates.treatmentInitiationDate = new Date(updates.treatmentInitiationDate);
+      const dateValue = updates.treatmentInitiationDate;
+      if (dateValue instanceof Date) {
+        normalizedUpdates.treatmentInitiationDate = dateValue;
+      } else if (dateValue && typeof dateValue === 'string') {
+        const trimmed = (dateValue as string).trim();
+        if (trimmed.length > 0) {
+          normalizedUpdates.treatmentInitiationDate = new Date(trimmed);
+        } else {
+          normalizedUpdates.treatmentInitiationDate = null;
+        }
       } else {
         normalizedUpdates.treatmentInitiationDate = null;
       }
     }
     
     if (updates.lastStepDate !== undefined) {
-      if (updates.lastStepDate instanceof Date) {
-        normalizedUpdates.lastStepDate = updates.lastStepDate;
-      } else if (typeof updates.lastStepDate === 'string' && updates.lastStepDate.trim().length > 0) {
-        normalizedUpdates.lastStepDate = new Date(updates.lastStepDate);
+      const dateValue = updates.lastStepDate;
+      if (dateValue instanceof Date) {
+        normalizedUpdates.lastStepDate = dateValue;
+      } else if (dateValue && typeof dateValue === 'string') {
+        const trimmed = (dateValue as string).trim();
+        if (trimmed.length > 0) {
+          normalizedUpdates.lastStepDate = new Date(trimmed);
+        } else {
+          normalizedUpdates.lastStepDate = null;
+        }
       } else {
         normalizedUpdates.lastStepDate = null;
       }
@@ -913,8 +946,16 @@ export class DbStorage implements IStorage {
       }
     }
     
+    // Ensure createdBy is set (required by schema)
+    if (!insertNote.createdBy) {
+      throw new Error("createdBy is required for lab notes");
+    }
+    
     const result = await ensureDb().insert(labNotes)
-      .values(insertNote)
+      .values({
+        ...insertNote,
+        createdBy: insertNote.createdBy || '',
+      })
       .returning();
     return result[0];
   }
@@ -947,8 +988,16 @@ export class DbStorage implements IStorage {
       }
     }
     
+    // Ensure createdBy is set (required by schema)
+    if (!insertNote.createdBy) {
+      throw new Error("createdBy is required for admin notes");
+    }
+    
     const result = await ensureDb().insert(adminNotes)
-      .values(insertNote)
+      .values({
+        ...insertNote,
+        createdBy: insertNote.createdBy || '',
+      })
       .returning();
     return result[0];
   }

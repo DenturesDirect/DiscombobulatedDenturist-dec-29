@@ -41,13 +41,7 @@ export function getStaffInfo(email: string) {
 }
 
 export function getSession() {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'localAuth.ts:43',message:'getSession entry',data:{hasSessionSecret:!!process.env.SESSION_SECRET,nodeEnv:process.env.NODE_ENV||'development'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
   if (!process.env.SESSION_SECRET) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'localAuth.ts:45',message:'SESSION_SECRET missing',data:{nodeEnv:process.env.NODE_ENV||'development'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     if (process.env.NODE_ENV === 'production') {
       throw new Error('SESSION_SECRET environment variable is required in production. Add it to Railway Variables.');
     }
@@ -104,64 +98,31 @@ export async function setupLocalAuth(app: Express) {
   passport.use(new LocalStrategy(
     { usernameField: 'email' },
     async (email, password, done) => {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'localAuth.ts:93',message:'LocalStrategy authenticate entry',data:{emailLength:email?.length||0,hasPassword:!!password},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
       try {
         const normalizedEmail = email.toLowerCase().trim();
         
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'localAuth.ts:97',message:'LocalStrategy before isAllowedEmail',data:{normalizedEmail},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
         if (!isAllowedEmail(normalizedEmail)) {
           await storage.logLoginAttempt(normalizedEmail, false);
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'localAuth.ts:99',message:'LocalStrategy email not allowed',data:{normalizedEmail},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-          // #endregion
           return done(null, false, { message: 'Access not authorized' });
         }
 
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'localAuth.ts:103',message:'LocalStrategy before getUserByEmail',data:{normalizedEmail},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
         const user = await storage.getUserByEmail(normalizedEmail);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'localAuth.ts:104',message:'LocalStrategy after getUserByEmail',data:{hasUser:!!user,hasPassword:!!user?.password},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
         
         if (!user || !user.password) {
           await storage.logLoginAttempt(normalizedEmail, false);
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'localAuth.ts:107',message:'LocalStrategy invalid user or password',data:{hasUser:!!user,hasPassword:!!user?.password},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-          // #endregion
           return done(null, false, { message: 'Invalid credentials' });
         }
 
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'localAuth.ts:110',message:'LocalStrategy before verifyPassword',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
         const isValid = await verifyPassword(password, user.password);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'localAuth.ts:111',message:'LocalStrategy after verifyPassword',data:{isValid},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
         
         if (!isValid) {
           await storage.logLoginAttempt(normalizedEmail, false);
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'localAuth.ts:114',message:'LocalStrategy password invalid',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-          // #endregion
           return done(null, false, { message: 'Invalid credentials' });
         }
 
         await storage.logLoginAttempt(normalizedEmail, true);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'localAuth.ts:117',message:'LocalStrategy success',data:{userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
         return done(null, user);
       } catch (error) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'localAuth.ts:119',message:'LocalStrategy error',data:{errorType:error?.constructor?.name,errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
         return done(error);
       }
     }

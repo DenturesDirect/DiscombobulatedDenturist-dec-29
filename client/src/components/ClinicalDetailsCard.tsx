@@ -69,39 +69,21 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
   const form = useForm<ClinicalDetailsFormData>({
     resolver: zodResolver(clinicalDetailsSchema),
     defaultValues: (() => {
-      // #region agent log
-      const initDateValue = patient.treatmentInitiationDate;
-      const initDateType = typeof initDateValue;
-      const initDateIsDate = initDateValue instanceof Date;
-      const initDateStr = String(initDateValue);
-      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:69',message:'Form defaultValues - treatmentInitiationDate analysis',data:{hasValue:!!initDateValue,type:initDateType,isDate:initDateIsDate,value:initDateStr,valueLength:initDateStr?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
+      const initDateValue: Date | string | null | undefined = patient.treatmentInitiationDate;
       let formattedDate = "";
       if (initDateValue) {
         try {
           if (initDateValue instanceof Date) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:77',message:'Form defaultValues - Date path',data:{dateValue:initDateValue.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
             formattedDate = initDateValue.toISOString().split('T')[0];
-          } else if (typeof initDateValue === 'string') {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:81',message:'Form defaultValues - string path',data:{stringValue:initDateValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
-            formattedDate = initDateValue.split('T')[0];
+          } else if (typeof initDateValue === 'string' && initDateValue) {
+            formattedDate = (initDateValue as string).split('T')[0];
           } else {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:85',message:'Form defaultValues - other type, attempting Date conversion',data:{type:typeof initDateValue,value:String(initDateValue)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
             const dateObj = new Date(initDateValue as any);
             if (!isNaN(dateObj.getTime())) {
               formattedDate = dateObj.toISOString().split('T')[0];
             }
           }
         } catch (error: any) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:92',message:'Form defaultValues - ERROR formatting date',data:{errorMessage:error?.message,errorStack:error?.stack,originalValue:initDateValue,originalType:typeof initDateValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-          // #endregion
           formattedDate = "";
         }
       }
@@ -127,38 +109,21 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
   // Reset form when patient data changes (e.g., after save) - but only when NOT editing
   useEffect(() => {
     if (!isEditing) {
-      // #region agent log
-      const resetDateValue = patient.treatmentInitiationDate;
-      const resetDateType = typeof resetDateValue;
-      const resetDateIsDate = resetDateValue instanceof Date;
-      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:120',message:'useEffect form.reset - treatmentInitiationDate analysis',data:{hasValue:!!resetDateValue,type:resetDateType,isDate:resetDateIsDate,value:String(resetDateValue)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
+      const resetDateValue: Date | string | null | undefined = patient.treatmentInitiationDate;
       let formattedDate = "";
       if (resetDateValue) {
         try {
           if (resetDateValue instanceof Date) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:127',message:'useEffect form.reset - Date path',data:{dateValue:resetDateValue.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-            // #endregion
             formattedDate = resetDateValue.toISOString().split('T')[0];
-          } else if (typeof resetDateValue === 'string') {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:131',message:'useEffect form.reset - string path',data:{stringValue:resetDateValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-            // #endregion
-            formattedDate = resetDateValue.split('T')[0];
+          } else if (typeof resetDateValue === 'string' && resetDateValue) {
+            formattedDate = (resetDateValue as string).split('T')[0];
           } else {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:135',message:'useEffect form.reset - other type, attempting Date conversion',data:{type:typeof resetDateValue,value:String(resetDateValue)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-            // #endregion
             const dateObj = new Date(resetDateValue as any);
             if (!isNaN(dateObj.getTime())) {
               formattedDate = dateObj.toISOString().split('T')[0];
             }
           }
         } catch (error: any) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:142',message:'useEffect form.reset - ERROR formatting date',data:{errorMessage:error?.message,errorStack:error?.stack,originalValue:resetDateValue,originalType:typeof resetDateValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-          // #endregion
           formattedDate = "";
         }
       }
@@ -187,39 +152,22 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
       return response.json();
     },
     onSuccess: (updatedPatient) => {
-      // #region agent log
-      const successDateValue = updatedPatient.treatmentInitiationDate;
-      const successDateType = typeof successDateValue;
-      const successDateIsDate = successDateValue instanceof Date;
-      fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:164',message:'onSuccess form.reset - treatmentInitiationDate analysis',data:{hasValue:!!successDateValue,type:successDateType,isDate:successDateIsDate,value:String(successDateValue)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       // Reset form with the fresh data from the mutation response
+      const successDateValue = updatedPatient.treatmentInitiationDate;
       let formattedDate = "";
       if (successDateValue) {
         try {
           if (successDateValue instanceof Date) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:171',message:'onSuccess form.reset - Date path',data:{dateValue:successDateValue.toISOString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-            // #endregion
             formattedDate = successDateValue.toISOString().split('T')[0];
           } else if (typeof successDateValue === 'string') {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:175',message:'onSuccess form.reset - string path',data:{stringValue:successDateValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-            // #endregion
             formattedDate = successDateValue.split('T')[0];
           } else {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:179',message:'onSuccess form.reset - other type, attempting Date conversion',data:{type:typeof successDateValue,value:String(successDateValue)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-            // #endregion
             const dateObj = new Date(successDateValue as any);
             if (!isNaN(dateObj.getTime())) {
               formattedDate = dateObj.toISOString().split('T')[0];
             }
           }
         } catch (error: any) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:186',message:'onSuccess form.reset - ERROR formatting date',data:{errorMessage:error?.message,errorStack:error?.stack,originalValue:successDateValue,originalType:typeof successDateValue},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-          // #endregion
           formattedDate = "";
         }
       }
@@ -272,9 +220,6 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
         ? data.dateOfBirth.trim() 
         : undefined,
     };
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/dd0051a6-00ac-4fc6-bff4-39c2ca4bdff0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ClinicalDetailsCard.tsx:178',message:'onSubmit before mutate',data:{cleanedTreatmentInitiationDate:cleanedData.treatmentInitiationDate||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     updateClinicalDetailsMutation.mutate(cleanedData);
   };
 
