@@ -1433,12 +1433,12 @@ export default function Dashboard() {
                                 headers: { 'Content-Type': photo.type }
                               });
                               
-                              // Extract the object path from Supabase signed URL
-                              // Supabase URL format: https://[project].supabase.co/storage/v1/object/sign/[bucket]/uploads/[uuid]?...
+                              // Extract the object path from GCS signed URL
+                              // GCS URL format: https://storage.googleapis.com/[bucket]/uploads/[uuid]?...
                               const uploadUrlObj = new URL(uploadURL);
                               const pathParts = uploadUrlObj.pathname.split('/').filter(p => p); // Remove empty strings
                               
-                              // Find "uploads" in the path (Supabase structure: /storage/v1/object/sign/bucket/uploads/uuid)
+                              // Find "uploads" in the path (GCS structure: /bucket/uploads/uuid)
                               const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
                               let objectId = '';
                               

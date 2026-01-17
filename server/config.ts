@@ -1,5 +1,5 @@
 // Use database whenever DATABASE_URL is available (both dev and production)
-// Use Supabase PostgreSQL connection string (format: postgresql://user:password@host:port/database)
+// Use PostgreSQL connection string (format: postgresql://user:password@host:port/database)
 // Only use in-memory if explicitly requested via USE_MEM_STORAGE=1 OR if no database URL
 const forceMemStorage = process.env.USE_MEM_STORAGE === '1';
 export const DATABASE_URL = process.env.DATABASE_URL;

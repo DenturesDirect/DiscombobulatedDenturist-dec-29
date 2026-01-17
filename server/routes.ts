@@ -28,18 +28,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/patients", isAuthenticated, async (req, res) => {
+  app.get("/api/patients", isAuthenticated, async (req: any, res) => {
     try {
-      const patients = await storage.listPatients();
+      const user = req.user as any;
+      const userOfficeId = user?.officeId || null;
+      const canViewAllOffices = user?.canViewAllOffices || false;
+      const selectedOfficeId = req.query.officeId || null;
+      
+      const patients = await storage.listPatients(userOfficeId, canViewAllOffices, selectedOfficeId);
       res.json(patients);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.get("/api/patients/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/patients/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const patient = await storage.getPatient(req.params.id);
+      const user = req.user as any;
+      const userOfficeId = user?.officeId || null;
+      const canViewAllOffices = user?.canViewAllOffices || false;
+      
+      const patient = await storage.getPatient(req.params.id, userOfficeId, canViewAllOffices);
       if (!patient) return res.status(404).json({ error: "Patient not found" });
       res.json(patient);
     } catch (error: any) {

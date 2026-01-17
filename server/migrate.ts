@@ -48,8 +48,31 @@ export async function runMigrations() {
       console.log("✅ Migration check complete: All columns already exist");
     }
   } catch (error: any) {
-    // Don't crash the server if migrations fail - just log it
-    console.error("⚠️  Migration warning:", error.message);
-    console.error("   This is usually okay - the columns may already exist or will be added later");
+    const errorMessage = error.message?.toLowerCase() || '';
+    
+    // Check for password authentication errors
+    if (errorMessage.includes('password authentication failed') || 
+        errorMessage.includes('invalid password')) {
+      console.error('\n❌ MIGRATION FAILED: Password Authentication Error');
+      console.error('   Error:', error.message);
+      console.error('\n💡 Your DATABASE_URL password needs URL encoding!');
+      console.error('   Special characters (@, #, $, %, &, +, =, /, ?) break connection strings.');
+      console.error('\n🔧 Quick Fix:');
+      console.error('   1. Run: npm run setup-supabase');
+      console.error('   2. This generates a properly encoded connection string');
+      console.error('   3. Update DATABASE_URL in Railway Variables');
+      console.error('   4. See FIX_PASSWORD_ENCODING.md for detailed help\n');
+    } else if (errorMessage.includes('enotunreach') || errorMessage.includes('etimedout')) {
+      console.error('\n❌ MIGRATION FAILED: Connection Error');
+      console.error('   Error:', error.message);
+      console.error('\n💡 Check your DATABASE_URL connection string:');
+      console.error('   1. Must use Supabase "Session" tab connection string');
+      console.error('   2. Must contain "pooler.supabase.com"');
+      console.error('   3. See RECONNECT_SUPABASE_RAILWAY.md for instructions\n');
+    } else {
+      // Other migration errors (usually just column already exists)
+      console.error("⚠️  Migration warning:", error.message);
+      console.error("   This is usually okay - the columns may already exist or will be added later");
+    }
   }
 }
