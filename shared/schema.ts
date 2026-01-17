@@ -162,6 +162,15 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({
   createdAt: true,
   completedBy: true,  // Exclude from inserts - only set when task is completed
   completedAt: true,  // Exclude from inserts - only set when task is completed
+}).extend({
+  dueDate: z.union([z.date(), z.string(), z.null()]).transform((val) => {
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    if (typeof val === 'string' && val.trim().length > 0) {
+      return new Date(val);
+    }
+    return null;
+  }).optional(),
 });
 
 export type InsertTask = z.infer<typeof insertTaskSchema>;

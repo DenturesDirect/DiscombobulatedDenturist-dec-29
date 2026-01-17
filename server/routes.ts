@@ -244,17 +244,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create task endpoint (for manual task creation by clinician)
   app.post("/api/tasks", isAuthenticated, async (req: any, res) => {
     try {
-      // Validate and transform the request body
+      // Validate and transform the request body (dueDate is now transformed in schema)
       const validatedData = insertTaskSchema.parse(req.body);
-      
-      // Convert dueDate string to Date if provided
-      if (validatedData.dueDate !== undefined && validatedData.dueDate !== null) {
-        if (typeof validatedData.dueDate === 'string') {
-          validatedData.dueDate = new Date(validatedData.dueDate);
-        } else if (!(validatedData.dueDate instanceof Date)) {
-          validatedData.dueDate = null;
-        }
-      }
       
       // Ensure priority is valid
       if (validatedData.priority && !['high', 'normal', 'low'].includes(validatedData.priority)) {
