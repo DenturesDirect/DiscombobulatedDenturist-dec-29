@@ -516,6 +516,7 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
                           type="date"
                           {...field}
                           value={field.value || ""}
+                          disabled={false}
                           data-testid="input-edit-dob"
                         />
                       </FormControl>
@@ -535,6 +536,7 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
                           type="date"
                           {...field}
                           value={field.value || ""}
+                          disabled={false}
                           data-testid="input-edit-treatment-initiation"
                           placeholder="Date treatment started"
                         />
@@ -598,6 +600,7 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
                           placeholder=""
                           {...field}
                           value={field.value || ""}
+                          disabled={false}
                           data-testid="input-edit-current-shade"
                         />
                       </FormControl>
@@ -617,6 +620,7 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
                           placeholder=""
                           {...field}
                           value={field.value || ""}
+                          disabled={false}
                           data-testid="input-edit-requested-shade"
                         />
                       </FormControl>
@@ -696,6 +700,7 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
                           placeholder="e.g., Impressions Complete"
                           {...field}
                           value={field.value || ""}
+                          disabled={false}
                           data-testid="input-edit-current-step"
                         />
                       </FormControl>
@@ -715,6 +720,7 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
                           placeholder="e.g., Bite Blocks"
                           {...field}
                           value={field.value || ""}
+                          disabled={false}
                           data-testid="input-edit-next-step"
                         />
                       </FormControl>
