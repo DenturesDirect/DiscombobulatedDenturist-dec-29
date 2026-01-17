@@ -334,11 +334,31 @@ export default function ClinicalDetailsCard({ patient }: ClinicalDetailsCardProp
                   {(() => {
                     if (!patient.treatmentInitiationDate) return "Not set";
                     try {
-                      const date = new Date(patient.treatmentInitiationDate);
-                      if (isNaN(date.getTime())) return "Invalid date";
-                      return date.toLocaleDateString();
+                      // Handle different date formats from database
+                      let date: Date;
+                      if (patient.treatmentInitiationDate instanceof Date) {
+                        date = patient.treatmentInitiationDate;
+                      } else if (typeof patient.treatmentInitiationDate === 'string') {
+                        date = new Date(patient.treatmentInitiationDate);
+                      } else {
+                        date = new Date(String(patient.treatmentInitiationDate));
+                      }
+                      
+                      // Check if date is valid
+                      if (!date || isNaN(date.getTime())) {
+                        return "Invalid date";
+                      }
+                      
+                      // Ensure toLocaleDateString exists (should always exist on Date objects)
+                      if (typeof date.toLocaleDateString === 'function') {
+                        return date.toLocaleDateString();
+                      } else {
+                        // Fallback formatting
+                        return date.toISOString().split('T')[0];
+                      }
                     } catch (error) {
-                      return "Invalid date";
+                      // If anything fails, try to display the raw value
+                      return String(patient.treatmentInitiationDate || "Invalid date");
                     }
                   })()}
                 </p>
