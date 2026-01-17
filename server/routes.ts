@@ -11,9 +11,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await setupLocalAuth(app);
   await seedStaffAccounts();
 
-  app.post("/api/patients", isAuthenticated, async (req, res) => {
+  app.post("/api/patients", isAuthenticated, async (req: any, res) => {
     try {
       const validatedData = insertPatientSchema.parse(req.body);
+      const user = req.user as any;
+      
+      // Auto-assign officeId from user if not provided
+      if (!validatedData.officeId && user?.officeId) {
+        validatedData.officeId = user.officeId;
+      }
+      
       const patient = await storage.createPatient(validatedData);
       res.json(patient);
     } catch (error: any) {
@@ -467,8 +474,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         patientId: validatedData.patientId,
         labName: validatedData.labName,
         caseType: validatedData.caseType,
+        caseTypeUpper: validatedData.caseTypeUpper,
+        caseTypeLower: validatedData.caseTypeLower,
         arch: validatedData.arch,
         fabricationStage: validatedData.fabricationStage,
+        fabricationStageUpper: validatedData.fabricationStageUpper,
+        fabricationStageLower: validatedData.fabricationStageLower,
         deadline: validatedData.deadline,
         digitalFiles: validatedData.digitalFiles,
         designInstructions: validatedData.designInstructions,

@@ -580,6 +580,11 @@ export class DbStorage implements IStorage {
   }
 
   async createPatient(insertPatient: InsertPatient): Promise<Patient> {
+    // Ensure officeId is set - it's required by the schema
+    if (!insertPatient.officeId) {
+      throw new Error("officeId is required. Patient must be assigned to an office.");
+    }
+    
     const result = await ensureDb().insert(patients)
       .values(insertPatient)
       .returning();
