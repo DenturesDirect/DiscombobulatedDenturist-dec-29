@@ -216,7 +216,7 @@ export default function ActivePatients() {
         currentPage="patients"
       />
       <div className="p-6 border-b bg-background">
-        <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+        <div className="flex items-center justify-between gap-4 mb-4 flex-wrap max-w-full">
           <h1 className="text-3xl font-semibold">Active Patients</h1>
           <div className="flex items-center gap-3 flex-wrap">
             {canViewAllOffices && (
@@ -279,7 +279,7 @@ export default function ActivePatients() {
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : (
-          <div className="space-y-3 max-w-7xl">
+          <div className="space-y-3 w-full max-w-full">
             {filteredAndSortedPatients.length === 0 ? (
               <div className="text-center text-muted-foreground py-12">
                 {searchQuery ? "No patients match your search" : "No active patients"}
@@ -296,18 +296,14 @@ export default function ActivePatients() {
                   ? `${patient.lastStepCompleted} (${lastActionDate.toLocaleDateString()})`
                   : `Created ${lastActionDate.toLocaleDateString()}`;
                 
-                const dentureType = [
-                  patient.upperDentureType && patient.upperDentureType !== 'None' ? `Upper: ${patient.upperDentureType}` : null,
-                  patient.lowerDentureType && patient.lowerDentureType !== 'None' ? `Lower: ${patient.lowerDentureType}` : null
-                ].filter(Boolean).join(' / ') || undefined;
-                
                 return (
                   <PatientTimelineCard
                     key={patient.id}
                     id={patient.id}
                     name={patient.name}
                     photoUrl={patient.photoUrl}
-                    dentureType={dentureType}
+                    upperDentureType={patient.upperDentureType && patient.upperDentureType !== 'None' ? patient.upperDentureType : undefined}
+                    lowerDentureType={patient.lowerDentureType && patient.lowerDentureType !== 'None' ? patient.lowerDentureType : undefined}
                     date={lastActionDate}
                     currentStep={currentStep}
                     lastAction={lastAction}
