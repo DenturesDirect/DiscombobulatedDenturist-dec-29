@@ -32,6 +32,7 @@ import TaskForm from "@/components/TaskForm";
 import ChartUploader from "@/components/ChartUploader";
 import DocumentUploadZone from "@/components/DocumentUploadZone";
 import DocumentList from "@/components/DocumentList";
+import RadiographAnalysis from "@/components/RadiographAnalysis";
 import { FileText, Camera, Clock, Loader2, Mail, MailX, FlaskConical, ClipboardList, Pill, Save, X, Edit3, CheckSquare, Trash2, Upload, Pencil, Check } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -952,6 +953,35 @@ export default function Dashboard() {
                   </TabsContent>
                 </Tabs>
               </Card>
+
+              <RadiographAnalysis 
+                patientId={patientId}
+                onSaveAsClinicalNote={async (content, label) => {
+                  try {
+                    const response = await apiRequest('POST', '/api/clinical-notes/save', {
+                      patientId,
+                      content,
+                      noteDate: new Date().toISOString(),
+                    });
+                    const data = await response.json();
+                    if (data.error) {
+                      throw new Error(data.error || data.message || 'Server error saving clinical note');
+                    }
+                    queryClient.invalidateQueries({ queryKey: ['/api/clinical-notes', patientId] });
+                    toast({
+                      title: "Clinical Note Saved",
+                      description: `The ${label} has been saved successfully.`,
+                    });
+                  } catch (error: any) {
+                    toast({
+                      title: "Error",
+                      description: error.message || "Failed to save clinical note.",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                disabled={isProcessing}
+              />
 
               <Card className="p-6">
                 <h2 className="text-xl font-semibold mb-4">Upload Clinical Photos</h2>
