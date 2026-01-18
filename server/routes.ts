@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { processClinicalNote, generateReferralLetter } from "./openai";
+import multer from "multer";
+import { processClinicalNote, generateReferralLetter, summarizePatientChart } from "./openai";
+import { extractTextFromPDF } from "./pdfExtractor";
 import { storage } from "./storage";
 import { insertPatientSchema, insertLabNoteSchema, insertAdminNoteSchema, insertLabPrescriptionSchema, insertTaskSchema } from "@shared/schema";
 import { setupLocalAuth, isAuthenticated, seedStaffAccounts } from "./localAuth";
@@ -321,6 +323,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Chart upload endpoint for PDF processing
+  const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype === 'application/pdf') {
+        cb(null, true);
+      } else {
+        cb(new Error('Only PDF files are allowed'));
+      }
+    }
+  });
+
+  app.post("/api/patients/:id/chart-upload", isAuthenticated, upload.single('chart'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      // Verify file is PDF
+      if (req.file.mimetype !== 'application/pdf') {
+        return res.status(400).json({ error: "Only PDF files are allowed" });
+      }
+
+      // Get patient information
+      const user = req.user as any;
+      const userOfficeId = user?.officeId || null;
+      const canViewAllOffices = user?.canViewAllOffices || false;
+      const patient = await storage.getPatient(req.params.id, userOfficeId, canViewAllOffices);
+      
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+
+      // Get patient name for summary
+      const patientName = patient.firstName && patient.lastName 
+        ? `${patient.firstName} ${patient.lastName}`
+        : patient.firstName || patient.lastName || "Patient";
+
+      // Extract text from PDF
+      const chartText = await extractTextFromPDF(req.file.buffer);
+      
+      if (!chartText || chartText.trim().length === 0) {
+        return res.status(400).json({ error: "Could not extract text from PDF. The file may be corrupted or contain only images." });
+      }
+
+      // Summarize the chart using OpenAI
+      const summaryResult = await summarizePatientChart(chartText, patientName);
+
+      // Return the formatted note
+      res.json({ 
+        summary: summaryResult.formattedNote,
+        followUpPrompt: summaryResult.followUpPrompt || null,
+        suggestedTasks: summaryResult.suggestedTasks || null
+      });
+    } catch (error: any) {
+      console.error("Chart upload error:", error);
+      res.status(500).json({ 
+        error: error.message || "Failed to process chart. Please try again." 
+      });
     }
   });
 
