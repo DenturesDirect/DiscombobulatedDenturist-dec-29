@@ -672,7 +672,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shippingInstructions: validatedData.shippingInstructions,
         specialNotes: validatedData.specialNotes,
         status: validatedData.status,
-        createdBy: userName,
         createdBy: userName
       });
       res.json(prescription);
