@@ -652,7 +652,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertLabPrescriptionSchema.parse(req.body);
       const user = req.user as any;
-      const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+      const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown User';
       
       const prescription = await storage.createLabPrescription({
         patientId: validatedData.patientId,
