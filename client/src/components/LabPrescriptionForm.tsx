@@ -7,8 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Send, FileText, AlertTriangle, Mic, MicOff } from "lucide-react";
+import { Send, FileText, AlertTriangle, Mic, MicOff, Upload, X, Loader2, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ObjectUploader } from "@/components/ObjectUploader";
+import { apiRequest } from "@/lib/queryClient";
 
 interface LabPrescriptionFormProps {
   patientName: string;
@@ -97,6 +99,7 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
   const [biteNotes, setBiteNotes] = useState("");
   const [shippingInstructions, setShippingInstructions] = useState("");
   const [specialNotes, setSpecialNotes] = useState("");
+  const [radiographImages, setRadiographImages] = useState<Array<{ url: string; type: "radiograph" | "cbct"; interpretation?: string; analyzing?: boolean }>>([]);
   const recognitionRef = useRef<any>(null);
   const designTextareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
@@ -446,6 +449,178 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
             data-testid="input-special-notes"
           />
         </div>
+      </div>
+
+      <div className="space-y-4 border-t pt-4">
+        <div className="space-y-2">
+          <Label>Radiograph / CBCT Scan Analysis</Label>
+          <p className="text-sm text-muted-foreground">
+            Upload radiographs or CBCT scans for AI-assisted interpretation. The analysis will include a disclaimer that it is for interpretation only and not for diagnostic purposes.
+          </p>
+          
+          <ObjectUploader
+            maxNumberOfFiles={5}
+            maxFileSize={10 * 1024 * 1024} // 10MB
+            onGetUploadParameters={async () => {
+              const response = await apiRequest('POST', '/api/objects/upload', {});
+              const data = await response.json();
+              return {
+                method: "PUT" as const,
+                url: data.uploadURL,
+              };
+            }}
+            onComplete={(result) => {
+              if (result.successful && result.successful.length > 0) {
+                const uploadedFiles = result.successful.map((file: any) => {
+                  // Extract URL from upload result (similar to NewPatientDialog)
+                  const rawUrl = file.uploadURL as string;
+                  let url = rawUrl;
+                  
+                  // Convert GCS URL to our API endpoint format
+                  if (rawUrl && rawUrl.includes('uploads')) {
+                    try {
+                      const gcsUrl = new URL(rawUrl);
+                      const pathParts = gcsUrl.pathname.split('/');
+                      const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
+                      const objectId = uploadsIndex >= 0 ? pathParts.slice(uploadsIndex).join('/') : pathParts.slice(-2).join('/');
+                      url = `/api/objects/${objectId}`;
+                    } catch (e) {
+                      // If URL parsing fails, use the raw URL
+                      console.error("Error parsing upload URL:", e);
+                    }
+                  }
+                  
+                  return {
+                    url,
+                    type: "radiograph" as const,
+                  };
+                });
+                setRadiographImages(prev => [...prev, ...uploadedFiles]);
+                toast({
+                  title: "Images Uploaded",
+                  description: `${uploadedFiles.length} image(s) uploaded successfully.`,
+                });
+              }
+            }}
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Upload Radiograph/CBCT
+          </ObjectUploader>
+        </div>
+
+        {radiographImages.length > 0 && (
+          <div className="space-y-3">
+            {radiographImages.map((image, index) => (
+              <Card key={index} className="p-4">
+                <div className="flex items-start gap-4">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={image.type}
+                        onValueChange={(value: "radiograph" | "cbct") => {
+                          setRadiographImages(prev => 
+                            prev.map((img, i) => i === index ? { ...img, type: value } : img)
+                          );
+                        }}
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="radiograph">Radiograph</SelectItem>
+                          <SelectItem value="cbct">CBCT Scan</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const imageUrl = image.url.startsWith('http') 
+                            ? image.url 
+                            : image.url.startsWith('/api/objects/')
+                            ? `${window.location.origin}${image.url}`
+                            : `${window.location.origin}${image.url}`;
+                          window.open(imageUrl, '_blank');
+                        }}
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        View
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          setRadiographImages(prev => 
+                            prev.map((img, i) => i === index ? { ...img, analyzing: true } : img)
+                          );
+                          
+                          try {
+                            // Send the URL as-is (backend will handle conversion)
+                            const response = await apiRequest('POST', '/api/analyze-radiograph', {
+                              imageUrl: image.url,
+                              imageType: image.type,
+                            });
+                            const data = await response.json();
+                            
+                            setRadiographImages(prev => 
+                              prev.map((img, i) => 
+                                i === index 
+                                  ? { ...img, interpretation: data.interpretation, analyzing: false }
+                                  : img
+                              )
+                            );
+                            
+                            toast({
+                              title: "Analysis Complete",
+                              description: "AI interpretation has been generated.",
+                            });
+                          } catch (error: any) {
+                            setRadiographImages(prev => 
+                              prev.map((img, i) => i === index ? { ...img, analyzing: false } : img)
+                            );
+                            toast({
+                              title: "Analysis Failed",
+                              description: error.message || "Failed to analyze image. Please try again.",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        disabled={image.analyzing}
+                      >
+                        {image.analyzing ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                            Analyzing...
+                          </>
+                        ) : (
+                          "Analyze with AI"
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setRadiographImages(prev => prev.filter((_, i) => i !== index));
+                        }}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    
+                    {image.interpretation && (
+                      <div className="mt-3 p-3 bg-muted rounded-lg">
+                        <Label className="text-sm font-semibold mb-2 block">AI Interpretation:</Label>
+                        <div className="text-sm whitespace-pre-wrap text-muted-foreground">
+                          {image.interpretation}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground">

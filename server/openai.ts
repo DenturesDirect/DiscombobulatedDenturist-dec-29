@@ -449,6 +449,92 @@ export async function summarizePatientChart(chartText: string, patientName: stri
   }
 }
 
+/**
+ * Analyzes radiographs or CBCT scans using OpenAI Vision API
+ * @param imageUrl - URL of the image to analyze (must be publicly accessible or base64)
+ * @param imageType - Type of image: "radiograph" or "cbct"
+ * @returns Interpretation text with caveat
+ */
+export async function analyzeRadiograph(imageUrl: string, imageType: "radiograph" | "cbct" = "radiograph"): Promise<string> {
+  if (!config.apiKey) {
+    throw new Error("OpenAI API key not configured. Please add AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY to your secrets.");
+  }
+
+  try {
+    const imageTypeLabel = imageType === "cbct" ? "CBCT scan" : "radiograph";
+    console.log(`🔍 Analyzing ${imageTypeLabel}...`);
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // gpt-4o supports vision
+      messages: [
+        {
+          role: "system",
+          content: `You are a dental imaging analysis assistant. Your role is to provide a detailed, professional interpretation of dental ${imageType === "cbct" ? "CBCT scans" : "radiographs"} for a denturist.
+
+IMPORTANT GUIDELINES:
+- Provide a clear, structured interpretation of what you observe in the image
+- Focus on anatomical structures, bone levels, tooth positions, and any visible pathology
+- Use professional dental terminology
+- Be specific about locations (e.g., "maxillary anterior region", "mandibular posterior")
+- Note any areas of concern or interest
+- Keep the interpretation clinical and objective
+- Do NOT provide diagnostic conclusions - only observations and interpretations
+- The interpretation will automatically include a disclaimer that this is for interpretation only and not for diagnostic purposes`
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `Please provide a detailed interpretation of this ${imageTypeLabel}. Describe:
+1. Anatomical structures visible
+2. Bone levels and quality
+3. Tooth positions and relationships
+4. Any visible pathology or abnormalities
+5. Any other relevant observations
+
+Format your response as a clear, professional clinical interpretation suitable for a denturist's records.`
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: imageUrl
+              }
+            }
+          ]
+        }
+      ],
+      max_tokens: 2000,
+    });
+
+    const interpretation = response.choices[0]?.message?.content;
+    
+    if (!interpretation) {
+      throw new Error("OpenAI returned an empty response. Please try again.");
+    }
+
+    // Add the required caveat at the end
+    const interpretationWithCaveat = `${interpretation}\n\n---\n\n**DISCLAIMER: This is an AI-generated interpretation only and is not intended for diagnostic purposes. Clinical decisions should be made by qualified dental professionals based on comprehensive clinical examination and professional judgment.**`;
+
+    console.log(`✅ ${imageTypeLabel} analyzed successfully`);
+    return interpretationWithCaveat;
+  } catch (error: any) {
+    console.error(`❌ Error analyzing ${imageType}:`, error);
+    
+    if (error.status === 401) {
+      throw new Error("OpenAI authentication failed. Please check your API key configuration.");
+    }
+    if (error.status === 429) {
+      throw new Error("Rate limit exceeded. Please wait a moment and try again.");
+    }
+    if (error.status === 400 && error.message?.includes("image")) {
+      throw new Error("Invalid image format. Please ensure the image is accessible and in a supported format (JPEG, PNG, etc.).");
+    }
+    
+    throw new Error(error.message || `Failed to analyze ${imageType}. Please try again.`);
+  }
+}
+
 export async function generateReferralLetter(
   patientName: string,
   clinicalNote: string,

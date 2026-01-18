@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
-import { processClinicalNote, generateReferralLetter, summarizePatientChart } from "./openai";
+import { processClinicalNote, generateReferralLetter, summarizePatientChart, analyzeRadiograph } from "./openai";
 import { extractTextFromPDF } from "./pdfExtractor";
 import { storage } from "./storage";
 import { insertPatientSchema, insertLabNoteSchema, insertAdminNoteSchema, insertLabPrescriptionSchema, insertTaskSchema } from "@shared/schema";
@@ -410,6 +410,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ uploadURL: signedUrl });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Analyze radiograph/CBCT scan endpoint
+  app.post("/api/analyze-radiograph", isAuthenticated, async (req: any, res) => {
+    try {
+      const { imageUrl, imageType } = req.body;
+
+      if (!imageUrl) {
+        return res.status(400).json({ error: "Image URL is required" });
+      }
+
+      // Validate imageType
+      const validImageType = imageType === "cbct" ? "cbct" : "radiograph";
+      
+      // If the URL is a relative path (our API endpoint), fetch the image and convert to base64
+      let finalImageUrl = imageUrl;
+      
+      if (imageUrl.startsWith('/api/objects/')) {
+        // Extract the path and fetch the image from object storage
+        const pathAfterApi = imageUrl.replace(/^\/api\/objects\/?/, '');
+        const storagePath = `/objects/${pathAfterApi}`;
+        
+        try {
+          const objectFile = await objectStorageService.getObjectEntityFile(storagePath);
+          const [buffer] = await objectFile.download();
+          const base64 = buffer.toString('base64');
+          const contentType = (await objectFile.getMetadata())[0].contentType || 'image/jpeg';
+          finalImageUrl = `data:${contentType};base64,${base64}`;
+        } catch (error: any) {
+          console.error("Error fetching image from storage:", error);
+          return res.status(404).json({ error: "Image not found in storage" });
+        }
+      } else if (!imageUrl.startsWith('http') && !imageUrl.startsWith('data:')) {
+        // If it's a relative path, try to construct full URL
+        const protocol = req.protocol;
+        const host = req.get('host');
+        finalImageUrl = `${protocol}://${host}${imageUrl}`;
+      }
+      
+      // Analyze the image
+      const interpretation = await analyzeRadiograph(finalImageUrl, validImageType);
+
+      res.json({ 
+        interpretation,
+        imageType: validImageType
+      });
+    } catch (error: any) {
+      console.error("Radiograph analysis error:", error);
+      res.status(500).json({ 
+        error: error.message || "Failed to analyze image. Please try again." 
+      });
     }
   });
 
