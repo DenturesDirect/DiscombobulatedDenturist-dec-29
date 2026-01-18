@@ -7,8 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Send, FileText, AlertTriangle, Mic, MicOff } from "lucide-react";
+import { Send, FileText, AlertTriangle, Mic, MicOff, Sparkles, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 interface LabPrescriptionFormProps {
   patientName: string;
@@ -93,6 +94,7 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
   const [interimDesignText, setInterimDesignText] = useState("");
   const [isListeningDesign, setIsListeningDesign] = useState(false);
   const [isVoiceSupported, setIsVoiceSupported] = useState(false);
+  const [isFormattingInstructions, setIsFormattingInstructions] = useState(false);
   const [existingDentureReference, setExistingDentureReference] = useState("");
   const [biteNotes, setBiteNotes] = useState("");
   const [shippingInstructions, setShippingInstructions] = useState("");
@@ -370,7 +372,63 @@ export default function LabPrescriptionForm({ patientName, onSubmit, disabled }:
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="design-instructions">Design Instructions</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="design-instructions">Design Instructions</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                if (!designInstructions.trim()) {
+                  toast({
+                    title: "No Instructions",
+                    description: "Please enter design instructions before formatting.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+
+                setIsFormattingInstructions(true);
+                try {
+                  const response = await apiRequest('POST', '/api/lab-prescriptions/format-instructions', {
+                    designInstructions: designInstructions.trim(),
+                  });
+                  const data = await response.json();
+                  
+                  if (data.error) {
+                    throw new Error(data.error);
+                  }
+
+                  setDesignInstructions(data.formattedInstructions);
+                  toast({
+                    title: "Instructions Formatted",
+                    description: "Design instructions have been formatted and organized.",
+                  });
+                } catch (error: any) {
+                  toast({
+                    title: "Formatting Failed",
+                    description: error.message || "Failed to format instructions. Please try again.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setIsFormattingInstructions(false);
+                }
+              }}
+              disabled={disabled || isFormattingInstructions || !designInstructions.trim()}
+            >
+              {isFormattingInstructions ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Formatting...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Format with AI
+                </>
+              )}
+            </Button>
+          </div>
           <div className="relative">
             <Textarea
               ref={designTextareaRef}

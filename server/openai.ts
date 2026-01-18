@@ -535,6 +535,78 @@ Format your response as a clear, professional clinical interpretation suitable f
   }
 }
 
+/**
+ * Formats lab prescription design instructions according to Dentures Direct style
+ * @param designInstructions - Raw design instructions text
+ * @returns Formatted, organized design instructions
+ */
+export async function formatDesignInstructions(designInstructions: string): Promise<string> {
+  if (!config.apiKey) {
+    throw new Error("OpenAI API key not configured. Please add AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY to your secrets.");
+  }
+
+  try {
+    console.log("📝 Formatting design instructions...");
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: `You are an AI assistant helping format lab prescription design instructions for Dentures Direct.
+
+Your task is to take raw design instructions (which may be dictated, typed informally, or in plain English) and rewrite them in a formal, organized, professional format suitable for laboratory prescriptions.
+
+FORMATTING GUIDELINES:
+- Organize instructions logically by component (major connector, rests, clasps, finish lines, coverage, occlusal scheme, relief areas, etc.)
+- Use clear, technical dental terminology
+- Be precise and explicit - labs fabricate only what is explicitly stated
+- Maintain all original specifications and requirements
+- Use professional, formal language
+- Structure with clear sections or bullet points for readability
+- Do NOT add information that wasn't in the original instructions
+- Do NOT assume or infer design elements
+- Preserve all specific measurements, materials, and design choices mentioned
+- Format for clarity and easy reading by lab technicians
+
+STYLE:
+- Professional and technical
+- Clear and unambiguous
+- Well-organized and structured
+- Suitable for laboratory fabrication instructions
+
+Return ONLY the formatted design instructions in plain text. Do not include any explanations, comments, or meta-text.`
+        },
+        {
+          role: "user",
+          content: `Please format and organize these design instructions according to Dentures Direct style:\n\n${designInstructions}`
+        }
+      ],
+      max_tokens: 2000,
+    });
+
+    const formatted = response.choices[0]?.message?.content;
+    
+    if (!formatted) {
+      throw new Error("OpenAI returned an empty response. Please try again.");
+    }
+
+    console.log("✅ Design instructions formatted successfully");
+    return formatted.trim();
+  } catch (error: any) {
+    console.error("❌ Error formatting design instructions:", error);
+    
+    if (error.status === 401) {
+      throw new Error("OpenAI authentication failed. Please check your API key configuration.");
+    }
+    if (error.status === 429) {
+      throw new Error("Rate limit exceeded. Please wait a moment and try again.");
+    }
+    
+    throw new Error(error.message || "Failed to format design instructions. Please try again.");
+  }
+}
+
 export async function generateReferralLetter(
   patientName: string,
   clinicalNote: string,

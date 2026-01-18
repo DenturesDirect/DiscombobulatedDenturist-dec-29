@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
-import { processClinicalNote, generateReferralLetter, summarizePatientChart, analyzeRadiograph } from "./openai";
+import { processClinicalNote, generateReferralLetter, summarizePatientChart, analyzeRadiograph, formatDesignInstructions } from "./openai";
 import { extractTextFromPDF } from "./pdfExtractor";
 import { storage } from "./storage";
 import { insertPatientSchema, insertLabNoteSchema, insertAdminNoteSchema, insertLabPrescriptionSchema, insertTaskSchema } from "@shared/schema";
@@ -603,6 +603,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===== LAB PRESCRIPTIONS =====
+  // Format lab prescription design instructions
+  app.post("/api/lab-prescriptions/format-instructions", isAuthenticated, async (req: any, res) => {
+    try {
+      const { designInstructions } = req.body;
+
+      if (!designInstructions || typeof designInstructions !== 'string') {
+        return res.status(400).json({ error: "Design instructions text is required" });
+      }
+
+      if (!designInstructions.trim()) {
+        return res.status(400).json({ error: "Design instructions cannot be empty" });
+      }
+
+      const formatted = await formatDesignInstructions(designInstructions);
+      res.json({ formattedInstructions: formatted });
+    } catch (error: any) {
+      console.error("Error formatting design instructions:", error);
+      res.status(500).json({ 
+        error: error.message || "Failed to format design instructions. Please try again." 
+      });
+    }
+  });
+
   // Get lab prescriptions for a patient
   app.get("/api/lab-prescriptions/:patientId", isAuthenticated, async (req, res) => {
     try {
