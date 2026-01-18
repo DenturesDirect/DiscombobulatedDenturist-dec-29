@@ -266,6 +266,7 @@ export const insertLabPrescriptionSchema = createInsertSchema(labPrescriptions).
   createdAt: true,
   sentAt: true,
 }).extend({
+  createdBy: z.string().optional(), // Optional in request, added server-side if missing
   deadline: z.union([z.date(), z.string()]).transform((val) => {
     if (!val) return null;
     if (val instanceof Date) return val;
