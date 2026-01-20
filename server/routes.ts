@@ -11,7 +11,6 @@ import { SupabaseStorageService, getSupabaseClient } from "./supabaseStorage";
 import { RailwayStorageService, getS3Client } from "./railwayStorage";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { sendCustomNotification, sendAppointmentReminder } from "./gmail";
-import { migrateStorage } from "./migrateStorage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupLocalAuth(app);
@@ -810,6 +809,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log("🔄 Migration triggered via API endpoint");
+      
+      // Lazy-load migration function to avoid startup issues
+      const { migrateStorage } = await import("./migrateStorage");
       
       // Run migration in background
       migrateStorage().then(() => {
