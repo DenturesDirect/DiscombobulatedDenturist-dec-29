@@ -439,7 +439,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
     
-    // No storage configured
+    // No storage configured - provide helpful error
+    console.error("❌ ERROR: No storage service configured!");
+    console.error("   Set either Railway Storage (RAILWAY_STORAGE_*) or Supabase Storage (SUPABASE_*) environment variables.");
     throw new Error(
       "Storage not configured. Please either:\n" +
       "1. Set up Railway Storage Buckets (RAILWAY_STORAGE_ACCESS_KEY_ID, RAILWAY_STORAGE_SECRET_ACCESS_KEY, RAILWAY_STORAGE_ENDPOINT), OR\n" +
@@ -560,18 +562,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // The storage service expects paths starting with "/objects/"
       const storagePath = `/objects/${pathAfterApi}`;
       
-      const storageService = getStorageService();
+      // Try both storage services - files might be in either Supabase or Railway
+      // First try Supabase (for old files)
+      const supabaseUrl = process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL;
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY;
       
-      // Handle different storage services
-      if (storageService instanceof SupabaseStorageService) {
-        const fileInfo = await storageService.getObjectEntityFile(storagePath);
-        await storageService.downloadObject(fileInfo, res);
-      } else if (storageService instanceof RailwayStorageService) {
-        const fileInfo = await storageService.getObjectEntityFile(storagePath);
-        await storageService.downloadObject(fileInfo, res);
-      } else {
-        throw new Error("Unsupported storage service");
+      if (supabaseUrl && supabaseKey) {
+        try {
+          const supabaseService = new SupabaseStorageService();
+          const fileInfo = await supabaseService.getObjectEntityFile(storagePath);
+          await supabaseService.downloadObject(fileInfo, res);
+          return; // Successfully served from Supabase
+        } catch (supabaseError: any) {
+          // File not in Supabase, try Railway next
+          console.log("📁 File not in Supabase, trying Railway Storage...");
+        }
       }
+      
+      // Try Railway Storage (for new files)
+      const railwayAccessKey = process.env.RAILWAY_STORAGE_ACCESS_KEY_ID;
+      const railwaySecretKey = process.env.RAILWAY_STORAGE_SECRET_ACCESS_KEY;
+      const railwayEndpoint = process.env.RAILWAY_STORAGE_ENDPOINT;
+      
+      if (railwayAccessKey && railwaySecretKey && railwayEndpoint) {
+        try {
+          const railwayService = new RailwayStorageService();
+          const fileInfo = await railwayService.getObjectEntityFile(storagePath);
+          await railwayService.downloadObject(fileInfo, res);
+          return; // Successfully served from Railway
+        } catch (railwayError: any) {
+          // File not in Railway either
+          console.error("❌ File not found in Railway Storage:", railwayError.message);
+        }
+      }
+      
+      // File not found in either storage
+      throw new ObjectNotFoundError();
     } catch (error: any) {
       if (error.name === "ObjectNotFoundError" || error.message?.includes("not found")) {
         return res.status(404).json({ error: "File not found" });
