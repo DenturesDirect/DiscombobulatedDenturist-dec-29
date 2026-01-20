@@ -560,8 +560,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // The storage service expects paths starting with "/objects/"
       const storagePath = `/objects/${pathAfterApi}`;
       
-      // Try both storage services - files might be in either Supabase or Railway
-      // First try Supabase (for old files)
+      // Try both storage services - files might be in either Supabase or Railway  
+      // First try Supabase (for old files) - updated to remove old ObjectStorageService dependency
       const supabaseUrl = process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL;
       const supabaseKey = process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY;
       
