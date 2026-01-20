@@ -10,7 +10,7 @@
 import { ensureDb } from "./db";
 import { patientFiles } from "../shared/schema";
 import { getSupabaseClient } from "./supabaseStorage";
-import { getS3Client } from "./railwayStorage";
+import { getS3Client } from "./railwayStorage.js";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { eq } from "drizzle-orm";
 

@@ -8,10 +8,10 @@ import { insertPatientSchema, insertLabNoteSchema, insertAdminNoteSchema, insert
 import { setupLocalAuth, isAuthenticated, seedStaffAccounts } from "./localAuth";
 import { ObjectNotFoundError } from "./objectStorage";
 import { SupabaseStorageService, getSupabaseClient } from "./supabaseStorage";
-import { RailwayStorageService, getS3Client } from "./railwayStorage";
+import { RailwayStorageService, getS3Client } from "./railwayStorage.js";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { sendCustomNotification, sendAppointmentReminder } from "./gmail";
-import { migrateStorage } from "./migrateStorage";
+import { migrateStorage } from "./migrateStorage.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupLocalAuth(app);
@@ -572,14 +572,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const supabaseService = new SupabaseStorageService();
           const fileInfo = await supabaseService.getObjectEntityFile(storagePath);
           await supabaseService.downloadObject(fileInfo, res);
-          return; // Successfully served from Supabase
+          if (!res.headersSent) {
+            return; // Successfully served from Supabase
+          }
         } catch (supabaseError: any) {
-          // File not in Supabase, try Railway next
-          console.log("📁 File not in Supabase, trying Railway Storage...");
+          // File not in Supabase, try Railway next (only if response not sent)
+          if (!res.headersSent) {
+            console.log("📁 File not in Supabase, trying Railway Storage...");
+          } else {
+            return; // Response already sent, exit
+          }
         }
       }
       
-      // Try Railway Storage (for new files)
+      // Try Railway Storage (for new files) - only if response not sent yet
+      if (res.headersSent) {
+        return; // Response already sent, exit
+      }
+      
       const railwayAccessKey = process.env.RAILWAY_STORAGE_ACCESS_KEY_ID;
       const railwaySecretKey = process.env.RAILWAY_STORAGE_SECRET_ACCESS_KEY;
       const railwayEndpoint = process.env.RAILWAY_STORAGE_ENDPOINT;
@@ -589,15 +599,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const railwayService = new RailwayStorageService();
           const fileInfo = await railwayService.getObjectEntityFile(storagePath);
           await railwayService.downloadObject(fileInfo, res);
-          return; // Successfully served from Railway
+          if (!res.headersSent) {
+            return; // Successfully served from Railway
+          }
         } catch (railwayError: any) {
           // File not in Railway either
-          console.error("❌ File not found in Railway Storage:", railwayError.message);
+          if (!res.headersSent) {
+            console.error("❌ File not found in Railway Storage:", railwayError.message);
+          } else {
+            return; // Response already sent, exit
+          }
         }
       }
       
-      // File not found in either storage
-      throw new ObjectNotFoundError();
+      // File not found in either storage - only send error if response not sent
+      if (!res.headersSent) {
+        throw new ObjectNotFoundError();
+      }
     } catch (error: any) {
       if (error.name === "ObjectNotFoundError" || error.message?.includes("not found")) {
         return res.status(404).json({ error: "File not found" });
