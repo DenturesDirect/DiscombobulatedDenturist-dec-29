@@ -811,7 +811,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("🔄 Migration triggered via API endpoint");
       
       // Lazy-load migration function to avoid startup issues
-      const { migrateStorage } = await import("./migrateStorage");
+      // Use .js extension for ESM compatibility after build
+      const { migrateStorage } = await import("./migrateStorage.js");
       
       // Run migration in background
       migrateStorage().then(() => {
