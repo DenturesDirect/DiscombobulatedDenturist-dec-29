@@ -8,10 +8,10 @@ import { insertPatientSchema, insertLabNoteSchema, insertAdminNoteSchema, insert
 import { setupLocalAuth, isAuthenticated, seedStaffAccounts } from "./localAuth";
 import { ObjectNotFoundError } from "./objectStorage";
 import { SupabaseStorageService, getSupabaseClient } from "./supabaseStorage";
-import { RailwayStorageService, getS3Client } from "./railwayStorage.js";
+import { RailwayStorageService, getS3Client } from "./railwayStorage";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { sendCustomNotification, sendAppointmentReminder } from "./gmail";
-import { migrateStorage } from "./migrateStorage.js";
+import { migrateStorage } from "./migrateStorage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupLocalAuth(app);

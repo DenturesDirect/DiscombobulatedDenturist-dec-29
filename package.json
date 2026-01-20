@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "tsx server/index.ts",
-    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist --resolve-extensions=.ts,.js",
     "start": "node dist/index.js",
     "check": "tsc",
     "db:push": "drizzle-kit push",
@@ -13,9 +13,17 @@
     "check-db": "tsx scripts/check-database-connection.ts",
     "diagnose-login": "tsx scripts/diagnose-login-issues.ts",
     "setup-supabase": "tsx scripts/interactive-supabase-setup.ts",
-    "build-connection": "tsx scripts/build-supabase-connection-string.ts"
+    "build-connection": "tsx scripts/build-supabase-connection-string.ts",
+    "backup-data": "tsx scripts/backup-patient-data.ts",
+    "check-files": "tsx scripts/check-file-urls.ts",
+    "check-patients": "tsx scripts/check-patients.ts",
+    "check-supabase-patients": "tsx scripts/check-supabase-patients.ts",
+    "migrate-storage": "tsx scripts/migrate-supabase-to-railway-storage.ts",
+    "list-supabase-files": "tsx scripts/list-supabase-files.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.971.0",
+    "@aws-sdk/s3-request-presigner": "^3.971.0",
     "@google-cloud/storage": "^7.17.3",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
@@ -99,9 +107,6 @@
     "zod-validation-error": "^3.4.0"
   },
   "devDependencies": {
-    "@replit/vite-plugin-cartographer": "^0.4.1",
-    "@replit/vite-plugin-dev-banner": "^0.1.1",
-    "@replit/vite-plugin-runtime-error-modal": "^0.0.3",
     "@tailwindcss/typography": "^0.5.15",
     "@tailwindcss/vite": "^4.1.3",
     "@types/connect-pg-simple": "^7.0.3",
