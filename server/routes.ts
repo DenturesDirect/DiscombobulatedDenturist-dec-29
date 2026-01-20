@@ -11,7 +11,6 @@ import { SupabaseStorageService, getSupabaseClient } from "./supabaseStorage";
 import { RailwayStorageService, getS3Client } from "./railwayStorage";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { sendCustomNotification, sendAppointmentReminder } from "./gmail";
-import { migrateStorage } from "./migrateStorage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupLocalAuth(app);
@@ -844,33 +843,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Migration endpoint - trigger migration from browser
-  app.post("/api/migrate-storage", isAuthenticated, async (req, res) => {
-    try {
-      // Only allow admin users
-      const user = req.user as any;
-      if (!user?.email?.includes('damien@denturesdirect.ca')) {
-        return res.status(403).json({ error: "Only admin can run migration" });
-      }
-
-      console.log("🔄 Migration triggered via API endpoint");
-      
-      // Run migration in background
-      migrateStorage().then(() => {
-        console.log("✅ Migration completed");
-      }).catch((error: any) => {
-        console.error("❌ Migration failed:", error);
-      });
-
-      res.json({ 
-        message: "Migration started. Check Railway logs for progress.",
-        note: "This may take several minutes for ~200 files."
-      });
-    } catch (error: any) {
-      console.error("❌ Migration endpoint error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
 
   const httpServer = createServer(app);
   return httpServer;
