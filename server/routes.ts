@@ -6,8 +6,12 @@ import { extractTextFromPDF } from "./pdfExtractor";
 import { storage } from "./storage";
 import { insertPatientSchema, insertLabNoteSchema, insertAdminNoteSchema, insertLabPrescriptionSchema, insertTaskSchema } from "@shared/schema";
 import { setupLocalAuth, isAuthenticated, seedStaffAccounts } from "./localAuth";
-import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { ObjectNotFoundError } from "./objectStorage";
+import { SupabaseStorageService, getSupabaseClient } from "./supabaseStorage";
+import { RailwayStorageService, getS3Client } from "./railwayStorage";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { sendCustomNotification, sendAppointmentReminder } from "./gmail";
+import { migrateStorage } from "./migrateStorage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupLocalAuth(app);
@@ -74,10 +78,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return result;
   }
 
-  app.patch("/api/patients/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/patients/:id", isAuthenticated, async (req: any, res) => {
     try {
-      // Get current patient state before update
-      const currentPatient = await storage.getPatient(req.params.id);
+      const user = req.user as any;
+      const userOfficeId = user?.officeId || null;
+      const canViewAllOffices = user?.canViewAllOffices || false;
+      
+      // Get current patient state before update - check office permissions
+      const currentPatient = await storage.getPatient(req.params.id, userOfficeId, canViewAllOffices);
       if (!currentPatient) return res.status(404).json({ error: "Patient not found" });
       
       // Validate and transform the request body, especially dates
@@ -402,11 +410,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Object storage upload URL generation
-  const objectStorageService = new ObjectStorageService();
+  // Priority: Railway Storage > Supabase Storage
+  function getStorageService() {
+    // Try Railway Storage first (Railway's built-in S3-compatible storage)
+    const railwayAccessKey = process.env.RAILWAY_STORAGE_ACCESS_KEY_ID;
+    const railwaySecretKey = process.env.RAILWAY_STORAGE_SECRET_ACCESS_KEY;
+    const railwayEndpoint = process.env.RAILWAY_STORAGE_ENDPOINT;
+    
+    if (railwayAccessKey && railwaySecretKey && railwayEndpoint) {
+      try {
+        console.log("💾 Using Railway Storage Buckets for file uploads");
+        return new RailwayStorageService();
+      } catch (error: any) {
+        console.warn("⚠️  Railway Storage not available:", error.message);
+      }
+    }
+    
+    // Fallback to Supabase Storage
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (supabaseUrl && supabaseKey) {
+      try {
+        console.log("💾 Using Supabase Storage for file uploads");
+        return new SupabaseStorageService();
+      } catch (error: any) {
+        console.warn("⚠️  Supabase Storage not available:", error.message);
+      }
+    }
+    
+    // No storage configured
+    throw new Error(
+      "Storage not configured. Please either:\n" +
+      "1. Set up Railway Storage Buckets (RAILWAY_STORAGE_ACCESS_KEY_ID, RAILWAY_STORAGE_SECRET_ACCESS_KEY, RAILWAY_STORAGE_ENDPOINT), OR\n" +
+      "2. Set up Supabase Storage (SUPABASE_URL and SUPABASE_SERVICE_ROLE)"
+    );
+  }
   
   app.post("/api/objects/upload", isAuthenticated, async (req, res) => {
     try {
-      const signedUrl = await objectStorageService.getObjectEntityUploadURL();
+      const storageService = getStorageService();
+      const signedUrl = await storageService.getObjectEntityUploadURL();
       res.json({ uploadURL: signedUrl });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -434,11 +478,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const storagePath = `/objects/${pathAfterApi}`;
         
         try {
-          const objectFile = await objectStorageService.getObjectEntityFile(storagePath);
-          const [buffer] = await objectFile.download();
-          const base64 = buffer.toString('base64');
-          const contentType = (await objectFile.getMetadata())[0].contentType || 'image/jpeg';
-          finalImageUrl = `data:${contentType};base64,${base64}`;
+          const storageService = getStorageService();
+          
+          // Handle Supabase Storage
+          if (storageService instanceof SupabaseStorageService) {
+            const fileInfo = await storageService.getObjectEntityFile(storagePath);
+            const supabase = getSupabaseClient();
+            const { data, error } = await supabase.storage
+              .from(fileInfo.bucket)
+              .download(fileInfo.path);
+            
+            if (error || !data) {
+              throw new Error("Failed to download file from Supabase");
+            }
+            
+            const arrayBuffer = await data.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            const base64 = buffer.toString('base64');
+            finalImageUrl = `data:image/jpeg;base64,${base64}`;
+          } else if (storageService instanceof RailwayStorageService) {
+            // Handle Railway Storage
+            const fileInfo = await storageService.getObjectEntityFile(storagePath);
+            const s3 = getS3Client();
+            
+            const command = new GetObjectCommand({
+              Bucket: fileInfo.bucket,
+              Key: fileInfo.path,
+            });
+            
+            const response = await s3.send(command);
+            if (!response.Body) {
+              throw new Error("Failed to download file from Railway Storage");
+            }
+            
+            const chunks: Uint8Array[] = [];
+            for await (const chunk of response.Body as any) {
+              chunks.push(chunk);
+            }
+            const buffer = Buffer.concat(chunks);
+            const base64 = buffer.toString('base64');
+            finalImageUrl = `data:image/jpeg;base64,${base64}`;
+          } else {
+            throw new Error("Unsupported storage service for image analysis");
+          }
         } catch (error: any) {
           console.error("Error fetching image from storage:", error);
           return res.status(404).json({ error: "Image not found in storage" });
@@ -478,14 +560,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // The storage service expects paths starting with "/objects/"
       const storagePath = `/objects/${pathAfterApi}`;
       
-      const objectFile = await objectStorageService.getObjectEntityFile(storagePath);
-      await objectStorageService.downloadObject(objectFile, res);
+      const storageService = getStorageService();
+      
+      // Handle different storage services
+      if (storageService instanceof SupabaseStorageService) {
+        const fileInfo = await storageService.getObjectEntityFile(storagePath);
+        await storageService.downloadObject(fileInfo, res);
+      } else if (storageService instanceof RailwayStorageService) {
+        const fileInfo = await storageService.getObjectEntityFile(storagePath);
+        await storageService.downloadObject(fileInfo, res);
+      } else {
+        throw new Error("Unsupported storage service");
+      }
     } catch (error: any) {
-      if (error.name === "ObjectNotFoundError") {
+      if (error.name === "ObjectNotFoundError" || error.message?.includes("not found")) {
         return res.status(404).json({ error: "File not found" });
       }
       console.error("Error serving object:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error.message || "Failed to serve file" });
     }
   });
 
@@ -704,6 +796,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const offices = await storage.listOffices();
       res.json(offices);
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Migration endpoint - trigger migration from browser
+  app.post("/api/migrate-storage", isAuthenticated, async (req, res) => {
+    try {
+      // Only allow admin users
+      const user = req.user as any;
+      if (!user?.email?.includes('damien@denturesdirect.ca')) {
+        return res.status(403).json({ error: "Only admin can run migration" });
+      }
+
+      console.log("🔄 Migration triggered via API endpoint");
+      
+      // Run migration in background
+      migrateStorage().then(() => {
+        console.log("✅ Migration completed");
+      }).catch((error: any) => {
+        console.error("❌ Migration failed:", error);
+      });
+
+      res.json({ 
+        message: "Migration started. Check Railway logs for progress.",
+        note: "This may take several minutes for ~200 files."
+      });
+    } catch (error: any) {
+      console.error("❌ Migration endpoint error:", error);
       res.status(500).json({ error: error.message });
     }
   });
