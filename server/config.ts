@@ -1,3 +1,9 @@
+// Load .env files FIRST
+import { config } from "dotenv";
+import { resolve } from "path";
+config({ path: resolve(process.cwd(), ".env", ".env") });
+config({ path: resolve(process.cwd(), ".env") });
+
 // Use database whenever DATABASE_URL is available (both dev and production)
 // Use PostgreSQL connection string (format: postgresql://user:password@host:port/database)
 // Only use in-memory if explicitly requested via USE_MEM_STORAGE=1 OR if no database URL

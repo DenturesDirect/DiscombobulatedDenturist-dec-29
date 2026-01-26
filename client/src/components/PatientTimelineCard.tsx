@@ -55,7 +55,7 @@ export default function PatientTimelineCard({
 
   return (
     <Card
-      className={`p-4 cursor-pointer hover-elevate active-elevate-2 transition-all ${isActive ? 'border-l-4 border-l-primary' : ''}`}
+      className={`p-5 cursor-pointer hover-elevate active-elevate-2 transition-all shadow-md hover:shadow-lg border-card-border bg-card/95 backdrop-blur-sm ${isActive ? 'border-l-4 border-l-primary shadow-lg' : ''}`}
       onClick={onClick}
       data-testid={`card-patient-timeline-${id}`}
     >

@@ -1,0 +1,162 @@
+[
+  {
+    "id": "e468677a-10b4-4eb1-9959-6d7e87cf9a4c",
+    "patientId": "f9c00a04-0472-4c36-bb63-440f52ff047b",
+    "appointmentId": null,
+    "officeId": "f616cb25-9fd0-45e8-a98a-0e97eaf3fd0e",
+    "content": "Date: December 11, 2025 ago\nProcedure: Final impressions for implant-retained denture.\n\nClinical Findings: Implants fully osseointegrated. Healing caps removed. Impressions taken with implant analogs. Excellent fit achieved.\n\nConsent obtained: Patient consented to final impression procedure.\n\nMedical and dental history reviewed and updated with no significant changes unless otherwise stated.\n\nNext Steps: Send to lab for framework fabrication. Schedule try-in appointment in 3 weeks.",
+    "noteDate": "2025-12-12T00:03:22.907Z",
+    "createdBy": "Damien",
+    "createdAt": "2025-12-27T00:03:23.104Z"
+  },
+  {
+    "id": "271f06f2-6c87-47d3-b2f9-fca6b14048d1",
+    "patientId": "f9c00a04-0472-4c36-bb63-440f52ff047b",
+    "appointmentId": null,
+    "officeId": "f616cb25-9fd0-45e8-a98a-0e97eaf3fd0e",
+    "content": "Date: October 27, 2025 ago\nProcedure: Implant placement consultation follow-up.\n\nClinical Findings: Patient has completed implant placement with oral surgeon. Four implants placed in positions 3, 6, 11, 14. Healing caps in place. Patient healing well.\n\nConsent obtained: Patient consented to proceed with implant-retained denture fabrication.\n\nMedical and dental history reviewed and updated with no significant changes unless otherwise stated.\n\nNext Steps: Wait for osseointegration (3-4 months). Schedule impression appointment after healing period.",
+    "noteDate": "2025-10-27T23:03:22.882Z",
+    "createdBy": "Damien",
+    "createdAt": "2025-12-27T00:03:23.078Z"
+  },
+  {
+    "id": "5ae841a5-3aa0-4947-ae3f-720969219513",
+    "patientId": "f9c00a04-0472-4c36-bb63-440f52ff047b",
+    "appointmentId": null,
+    "officeId": "f616cb25-9fd0-45e8-a98a-0e97eaf3fd0e",
+    "content": "Date: August 28, 2025 ago\nChief Complaint: Patient seeking implant-retained upper denture.\n\nHistory: Patient has been edentulous for 3 years. Current conventional denture provides poor retention. Patient interested in implant option.\n\nClinical Findings: Adequate bone in maxilla for implant placement. Patient is good candidate for implant-retained denture.\n\nTreatment Plan: Fabricate implant-retained upper denture. Discussed 2 vs 4 implant options. Patient opted for 4-implant retained denture for maximum stability.\n\nConsent obtained: Patient was informed of risks, benefits, alternatives, and costs. Patient understands implant procedure and maintenance requirements.\n\nMedical and dental history reviewed and updated with no significant changes unless otherwise stated.\n\nNext Steps: Refer to oral surgeon for implant placement. Schedule consultation.",
+    "noteDate": "2025-08-28T23:03:22.857Z",
+    "createdBy": "Damien",
+    "createdAt": "2025-12-27T00:03:23.054Z"
+  },
+  {
+    "id": "44742365-5951-4d32-990a-11b2ba0f6ddc",
+    "patientId": "6b73c4df-08e9-4820-9a69-a5442f428f4c",
+    "appointmentId": null,
+    "officeId": "f616cb25-9fd0-45e8-a98a-0e97eaf3fd0e",
+    "content": "Date: December 16, 2025 ago\nChief Complaint: Upper denture repair needed, lower denture requires reline.\n\nCDCP Coverage: Patient is CDCP eligible. Copay discussed.\n\nHistory: Upper denture has a crack through the midline. Lower denture has become loose due to tissue changes.\n\nClinical Findings: Upper denture shows fracture through midline. Lower denture shows poor retention due to tissue resorption. Adequate border extension present.\n\nTreatment Plan: Repair upper denture. Reline lower denture. CDCP copay discussed: $200 total ($100 repair + $100 reline). Patient accepted.\n\nConsent obtained: Patient was informed of risks, benefits, alternatives, and costs. Patient agreed to proceed with repair and reline procedures.\n\nMedical and dental history reviewed and updated with no significant changes unless otherwise stated.\n\nNext Steps: Send upper denture for repair. Schedule reline appointment for lower denture.",
+    "noteDate": "2025-12-17T00:03:22.757Z",
+    "createdBy": "Damien",
+    "createdAt": "2025-12-27T00:03:22.953Z"
+  },
+  {
+    "id": "62fd9637-b59b-4b8b-8d2d-f8608f3c81e3",
+    "patientId": "236a1ede-5897-4373-8a4e-f016e25dd1c1",
+    "appointmentId": null,
+    "officeId": "f616cb25-9fd0-45e8-a98a-0e97eaf3fd0e",
+    "content": "Date: November 26, 2025 ago\nChief Complaint: Patient seeking replacement of upper partial denture.\n\nWork Insurance: Patient has work insurance coverage. Estimate required.\n\nHistory: Current partial denture is 5 years old. Patient reports broken clasp and poor fit.\n\nClinical Findings: Missing teeth 14, 15, 16. Adequate abutment teeth present. Broken clasp on tooth 13. Good tissue health.\n\nTreatment Plan: Fabricate new acrylic partial denture for upper arch. Work insurance estimate required.\n\nConsent obtained: Patient was informed of risks, benefits, alternatives, and costs. Patient agreed to proceed pending insurance approval.\n\nMedical and dental history reviewed and updated with no significant changes unless otherwise stated.\n\nNext Steps: Submit work insurance estimate. Schedule preliminary impression after approval.",
+    "noteDate": "2025-11-27T00:03:22.675Z",
+    "createdBy": "Damien",
+    "createdAt": "2025-12-27T00:03:22.872Z"
+  },
+  {
+    "id": "a7525825-d26c-45e2-a6b6-57b0701c1355",
+    "patientId": "a83c6e60-f2ac-4f3a-a27b-6f41a8ce3431",
+    "appointmentId": null,
+    "officeId": "f616cb25-9fd0-45e8-a98a-0e97eaf3fd0e",
+    "content": "Date: December 6, 2025 ago\nProcedure: Try-in appointment.\n\nClinical Findings: Denture setup approved by patient. Minor adjustments to tooth positioning requested. Vertical dimension and centric relation verified.\n\nConsent obtained: Patient approved denture setup and consented to final processing.\n\nMedical and dental history reviewed and updated with no significant changes unless otherwise stated.\n\nNext Steps: Send to lab for final processing. Schedule delivery appointment in 2 weeks.",
+    "noteDate": "2025-12-07T00:03:22.574Z",
+    "createdBy": "Damien",
+    "createdAt": "2025-12-27T00:03:22.770Z"
+  },
+  {
+    "id": "166b7105-b9b2-4444-b215-e05bb5a7261d",
+    "patientId": "a83c6e60-f2ac-4f3a-a27b-6f41a8ce3431",
+    "appointmentId": null,
+    "officeId": "f616cb25-9fd0-45e8-a98a-0e97eaf3fd0e",
+    "content": "Date: November 6, 2025 ago\nProcedure: Final impressions and bite registration for both arches.\n\nClinical Findings: Excellent border seal achieved bilaterally. Bite registration completed at proper vertical dimension. Patient approved tooth shade A2 for both arches.\n\nConsent obtained: Patient consented to final impressions and bite registration procedures.\n\nMedical and dental history reviewed and updated with no significant changes unless otherwise stated.\n\nNext Steps: Send to lab for denture fabrication. Schedule try-in appointment in 3 weeks.",
+    "noteDate": "2025-11-07T00:03:22.542Z",
+    "createdBy": "Damien",
+    "createdAt": "2025-12-27T00:03:22.738Z"
+  },
+  {
+    "id": "499dfcdd-8600-4204-a0d1-818a8229e3e7",
+    "patientId": "a83c6e60-f2ac-4f3a-a27b-6f41a8ce3431",
+    "appointmentId": null,
+    "officeId": "f616cb25-9fd0-45e8-a98a-0e97eaf3fd0e",
+    "content": "Date: October 17, 2025 ago\nProcedure: Preliminary impressions for both arches.\n\nClinical Findings: Good ridge form bilaterally. Adequate border extension achieved on both arches. Patient tolerated procedure well.\n\nConsent obtained: Patient consented to preliminary impression procedures.\n\nMedical and dental history reviewed and updated with no significant changes unless otherwise stated.\n\nNext Steps: Pour models and fabricate custom trays for both arches.",
+    "noteDate": "2025-10-17T23:03:22.517Z",
+    "createdBy": "Damien",
+    "createdAt": "2025-12-27T00:03:22.714Z"
+  },
+  {
+    "id": "b794c593-23ce-423b-b455-0fad020a3461",
+    "patientId": "a83c6e60-f2ac-4f3a-a27b-6f41a8ce3431",
+    "appointmentId": null,
+    "officeId": "f616cb25-9fd0-45e8-a98a-0e97eaf3fd0e",
+    "content": "Date: September 27, 2025 ago\nChief Complaint: Patient seeking replacement of both upper and lower complete dentures.\n\nCDCP Coverage: Patient is CDCP eligible. Copay discussed and accepted.\n\nHistory: Current dentures are 12 years old. Patient reports poor fit, difficulty eating, and aesthetic concerns.\n\nClinical Findings: Significant bone resorption in both arches. Existing dentures show poor retention. Patient has adequate interarch space.\n\nTreatment Plan: Fabricate new complete upper and lower dentures. CDCP copay discussed: $900 total ($450 per arch). Patient accepted.\n\nConsent obtained: Patient was informed of risks, benefits, alternatives, and costs. Patient agreed to proceed with new complete upper and lower dentures.\n\nMedical and dental history reviewed and updated with no significant changes unless otherwise stated.\n\nNext Steps: Schedule preliminary impressions for both arches.",
+    "noteDate": "2025-09-27T23:03:22.492Z",
+    "createdBy": "Damien",
+    "createdAt": "2025-12-27T00:03:22.689Z"
+  },
+  {
+    "id": "f7c9e2d9-fba1-4a90-9d0c-040557409d0a",
+    "patientId": "cef458f1-ad97-4bb2-b883-72a84381a11a",
+    "appointmentId": null,
+    "officeId": "f616cb25-9fd0-45e8-a98a-0e97eaf3fd0e",
+    "content": "Date: November 16, 2025 ago\nProcedure: CDCP copay discussion and treatment acceptance.\n\nCDCP Coverage: Copay of $450 discussed with patient. Patient accepted treatment plan and copay amount.\n\nClinical Findings: Patient ready to proceed with lower cast partial denture.\n\nConsent obtained: Patient consented to lower cast partial denture fabrication and understands copay obligation.\n\nMedical and dental history reviewed and updated with no significant changes unless otherwise stated.\n\nNext Steps: Schedule preliminary impression appointment.",
+    "noteDate": "2025-11-17T00:03:22.392Z",
+    "createdBy": "Damien",
+    "createdAt": "2025-12-27T00:03:22.589Z"
+  },
+  {
+    "id": "8f346e84-3b61-4992-95fd-59e99feeab74",
+    "patientId": "cef458f1-ad97-4bb2-b883-72a84381a11a",
+    "appointmentId": null,
+    "officeId": "f616cb25-9fd0-45e8-a98a-0e97eaf3fd0e",
+    "content": "Date: October 27, 2025 ago\nChief Complaint: Missing multiple lower teeth, difficulty chewing.\n\nCDCP Coverage: Patient is CDCP eligible. Copay discussion required.\n\nHistory: Patient lost teeth 36, 37, 46, 47 due to periodontal disease 2 years ago. Has been managing with remaining dentition but reports difficulty with certain foods.\n\nClinical Findings: Missing teeth 36, 37, 46, 47. Adequate bone support for partial denture. Remaining teeth show good periodontal health. Adequate interarch space present.\n\nTreatment Plan: Fabricate cast partial denture for mandibular arch. Estimated CDCP copay $450. Patient needs copay discussion before proceeding.\n\nConsent obtained: Patient was informed of risks, benefits, alternatives, and costs. Patient understands CDCP coverage and copay requirements.\n\nMedical and dental history reviewed and updated with no significant changes unless otherwise stated.\n\nNext Steps: Schedule copay discussion appointment.",
+    "noteDate": "2025-10-27T23:03:22.366Z",
+    "createdBy": "Damien",
+    "createdAt": "2025-12-27T00:03:22.563Z"
+  },
+  {
+    "id": "8969c8f3-c5eb-4203-b838-f1c4acd042b5",
+    "patientId": "17d5ddbd-6b33-48fd-a451-d3efbb94fcaa",
+    "appointmentId": null,
+    "officeId": "f616cb25-9fd0-45e8-a98a-0e97eaf3fd0e",
+    "content": "Date: December 11, 2025 ago\nProcedure: Final impressions and bite registration.\n\nClinical Findings: Excellent border seal achieved. Bite registration completed at proper vertical dimension. Patient approved tooth shade B1.\n\nConsent obtained: Patient consented to final impression and bite registration procedures.\n\nMedical and dental history reviewed and updated with no significant changes unless otherwise stated.\n\nNext Steps: Send to lab for framework fabrication. Schedule try-in appointment in 2 weeks.",
+    "noteDate": "2025-12-12T00:03:22.286Z",
+    "createdBy": "Damien",
+    "createdAt": "2025-12-27T00:03:22.483Z"
+  },
+  {
+    "id": "99b4ad83-9ca3-4a1d-b58c-87b56ea628f5",
+    "patientId": "17d5ddbd-6b33-48fd-a451-d3efbb94fcaa",
+    "appointmentId": null,
+    "officeId": "f616cb25-9fd0-45e8-a98a-0e97eaf3fd0e",
+    "content": "Date: November 26, 2025 ago\nProcedure: Preliminary impressions taken.\n\nClinical Findings: Good ridge form. Adequate border extension achieved. Patient tolerated procedure well.\n\nConsent obtained: Patient consented to preliminary impression procedure.\n\nMedical and dental history reviewed and updated with no significant changes unless otherwise stated.\n\nNext Steps: Pour models and fabricate custom trays.",
+    "noteDate": "2025-11-27T00:03:22.260Z",
+    "createdBy": "Damien",
+    "createdAt": "2025-12-27T00:03:22.457Z"
+  },
+  {
+    "id": "db1681fb-601d-4508-8250-cfd63f51b43d",
+    "patientId": "17d5ddbd-6b33-48fd-a451-d3efbb94fcaa",
+    "appointmentId": null,
+    "officeId": "f616cb25-9fd0-45e8-a98a-0e97eaf3fd0e",
+    "content": "Date: November 11, 2025 ago\nChief Complaint: Patient seeking replacement of failing upper denture.\n\nHistory: Current denture is 8 years old, reports poor retention and difficulty eating. Patient states the denture feels loose and moves when speaking or eating.\n\nClinical Findings: Moderate bone resorption in maxilla. Existing denture shows significant wear on occlusal surfaces. Patient has adequate ridge height but some resorption noted.\n\nTreatment Plan: Fabricate new complete upper denture. Discussed conventional vs. immediate options. Patient opted for conventional approach to allow for proper healing.\n\nConsent obtained: Patient was informed of risks, benefits, alternatives, and costs. Patient agreed to proceed with new complete upper denture fabrication.\n\nMedical and dental history reviewed and updated with no significant changes unless otherwise stated.\n\nNext Steps: Schedule preliminary impression appointment.",
+    "noteDate": "2025-11-12T00:03:22.223Z",
+    "createdBy": "Damien",
+    "createdAt": "2025-12-27T00:03:22.419Z"
+  },
+  {
+    "id": "78c90f47-c950-44a0-981f-f2ecfc91959e",
+    "patientId": "d57df445-b0cf-4f76-b319-af2a432644c3",
+    "appointmentId": null,
+    "officeId": "f616cb25-9fd0-45e8-a98a-0e97eaf3fd0e",
+    "content": "Chief Complaint: Missing multiple lower teeth, difficulty chewing.\n\nCDCP Coverage: Patient is CDCP eligible. Copay discussion required.\n\nClinical Findings: Missing teeth 36, 37, 46, 47. Adequate bone support for partial denture.\n\nTreatment Plan: Fabricate cast partial denture for mandibular arch. Estimated copay $450.\n\nConsent obtained by patient for partial denture fabrication.\n\nUpdated medical/dental history: no changes",
+    "noteDate": null,
+    "createdBy": "Damien",
+    "createdAt": "2025-12-26T19:40:22.235Z"
+  },
+  {
+    "id": "116e2dcc-20cf-4aa4-b6cc-f5bc78030764",
+    "patientId": "0d80c97b-68d2-421b-b1fa-ca5fad231e6d",
+    "appointmentId": null,
+    "officeId": "f616cb25-9fd0-45e8-a98a-0e97eaf3fd0e",
+    "content": "Chief Complaint: Patient seeking replacement of failing upper denture.\n\nHistory: Current denture is 8 years old, reports poor retention and difficulty eating.\n\nClinical Findings: Moderate bone resorption in maxilla. Existing denture shows wear on occlusal surfaces.\n\nTreatment Plan: Fabricate new complete upper denture. Discussed conventional vs. immediate options. Patient opted for conventional approach.\n\nConsent obtained by patient for complete upper denture fabrication.\n\nUpdated medical/dental history: no changes",
+    "noteDate": null,
+    "createdBy": "Damien",
+    "createdAt": "2025-12-26T19:40:22.206Z"
+  }
+]

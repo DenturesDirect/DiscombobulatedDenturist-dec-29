@@ -1,3 +1,8 @@
+import { config } from "dotenv";
+import { resolve } from "path";
+// Load .env files BEFORE importing config
+config({ path: resolve(process.cwd(), ".env", ".env") });
+config({ path: resolve(process.cwd(), ".env") });
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";

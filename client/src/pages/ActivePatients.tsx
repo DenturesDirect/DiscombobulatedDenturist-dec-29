@@ -215,9 +215,12 @@ export default function ActivePatients() {
         onSettings={() => setLocation('/settings')}
         currentPage="patients"
       />
-      <div className="p-6 border-b bg-background">
+      <div className="p-6 border-b bg-gradient-to-r from-background via-card/50 to-background backdrop-blur-sm shadow-sm">
         <div className="flex items-center justify-between gap-4 mb-4 flex-wrap max-w-full">
-          <h1 className="text-3xl font-semibold">Active Patients</h1>
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">Active Patients</h1>
+            <p className="text-sm text-muted-foreground mt-1">Manage and track patient workflows</p>
+          </div>
           <div className="flex items-center gap-3 flex-wrap">
             {canViewAllOffices && (
               <OfficeSelector
@@ -227,7 +230,7 @@ export default function ActivePatients() {
               />
             )}
             <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-              <SelectTrigger className="w-[220px]" data-testid="select-sort">
+              <SelectTrigger className="w-[220px] shadow-sm" data-testid="select-sort">
                 <ArrowUpDown className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="Sort by..." />
               </SelectTrigger>
@@ -256,7 +259,7 @@ export default function ActivePatients() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search patients..."
-                className="pl-9"
+                className="pl-9 shadow-sm focus:ring-2 focus:ring-primary/20 transition-all"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 data-testid="input-search-patients"
@@ -264,6 +267,7 @@ export default function ActivePatients() {
             </div>
             <Button
               onClick={() => setIsNewPatientDialogOpen(true)}
+              className="shadow-md hover:shadow-lg transition-all"
               data-testid="button-new-patient"
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -273,16 +277,20 @@ export default function ActivePatients() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-6 bg-gradient-to-b from-background to-primary/5">
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : (
-          <div className="space-y-3 w-full max-w-full">
+          <div className="space-y-4 w-full max-w-full">
             {filteredAndSortedPatients.length === 0 ? (
-              <div className="text-center text-muted-foreground py-12">
-                {searchQuery ? "No patients match your search" : "No active patients"}
+              <div className="text-center text-muted-foreground py-16">
+                <div className="inline-block p-4 bg-muted/50 rounded-full mb-4">
+                  <User className="w-8 h-8 opacity-50" />
+                </div>
+                <p className="text-lg font-medium">{searchQuery ? "No patients match your search" : "No active patients"}</p>
+                <p className="text-sm mt-2">Try adjusting your search or add a new patient</p>
               </div>
             ) : (
               filteredAndSortedPatients.map(patient => {
@@ -323,6 +331,7 @@ export default function ActivePatients() {
         open={isNewPatientDialogOpen}
         onOpenChange={setIsNewPatientDialogOpen}
         onSuccess={(patientId) => setLocation(`/patient/${patientId}`)}
+        selectedOfficeId={canViewAllOffices ? selectedOfficeId : null}
       />
     </div>
   );

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -41,10 +41,16 @@ import { z } from "zod";
 import { ObjectUploader } from "./ObjectUploader";
 import type { UploadResult } from "@uppy/core";
 
+interface Office {
+  id: string;
+  name: string;
+}
+
 interface NewPatientDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: (patientId: string) => void;
+  selectedOfficeId?: string | null;
 }
 
 const DENTURE_TYPES = [
@@ -59,22 +65,56 @@ const DENTURE_TYPES = [
   "Implant Retained"
 ];
 
-export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewPatientDialogProps) {
+export default function NewPatientDialog({ open, onOpenChange, onSuccess, selectedOfficeId }: NewPatientDialogProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const canViewAllOffices = user?.canViewAllOffices ?? false;
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined);
   const [uploadedPatientId, setUploadedPatientId] = useState<string | undefined>(undefined);
+
+  // Fetch offices if user can view all offices
+  const { data: offices = [] } = useQuery<Office[]>({
+    queryKey: ["/api/offices"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/offices');
+      return response.json();
+    },
+    enabled: canViewAllOffices,
+  });
 
   const form = useForm<InsertPatient>({
     resolver: zodResolver(insertPatientSchema.extend({
       phone: z.string().optional(),
       email: z.string().optional(),
+      officeId: canViewAllOffices ? z.string().min(1, "Office selection is required") : z.string().optional(),
     })),
     defaultValues: {
       name: "",
       phone: undefined,
       email: undefined,
+      officeId: selectedOfficeId || undefined,
     },
   });
+
+  // Update form when selectedOfficeId prop changes
+  useEffect(() => {
+    if (canViewAllOffices && selectedOfficeId) {
+      form.setValue("officeId", selectedOfficeId);
+    }
+  }, [selectedOfficeId, canViewAllOffices]);
+
+  // Reset form when dialog closes
+  useEffect(() => {
+    if (!open) {
+      form.reset({
+        name: "",
+        phone: undefined,
+        email: undefined,
+        officeId: selectedOfficeId || undefined,
+      });
+      setPhotoUrl(undefined);
+    }
+  }, [open, selectedOfficeId]);
 
 
   const createPatientMutation = useMutation({
@@ -148,10 +188,21 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
   }, [uploadedPatientId, photoUrl]);
 
   const onSubmit = (data: InsertPatient) => {
+    // For multi-office users, officeId is required
+    if (canViewAllOffices && !data.officeId) {
+      toast({
+        title: "Office Required",
+        description: "Please select an office before creating a patient.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const submissionData: InsertPatient = {
       name: data.name,
       phone: data.phone && typeof data.phone === 'string' ? data.phone.trim() : undefined,
       email: data.email && typeof data.email === 'string' ? data.email.trim() : undefined,
+      officeId: data.officeId || undefined,
     };
     createPatientMutation.mutate(submissionData);
   };
@@ -225,6 +276,36 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
               )}
             />
 
+            {canViewAllOffices && (
+              <FormField
+                control={form.control}
+                name="officeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Office *</FormLabel>
+                    <Select
+                      value={field.value || ""}
+                      onValueChange={field.onChange}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an office..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {offices.map((office) => (
+                          <SelectItem key={office.id} value={office.id}>
+                            {office.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <div>
               <FormLabel>Patient Photo (Optional)</FormLabel>
               <div className="mt-2">
@@ -281,7 +362,7 @@ export default function NewPatientDialog({ open, onOpenChange, onSuccess }: NewP
               </Button>
               <Button
                 type="submit"
-                disabled={createPatientMutation.isPending}
+                disabled={createPatientMutation.isPending || (canViewAllOffices && !form.watch('officeId'))}
                 data-testid="button-create-patient"
               >
                 {createPatientMutation.isPending && (

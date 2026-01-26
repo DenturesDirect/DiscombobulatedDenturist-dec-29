@@ -8,7 +8,7 @@
  */
 
 import { ensureDb } from "./db";
-import { patientFiles } from "../shared/schema";
+import { patientFiles, patients } from "../shared/schema";
 import { getSupabaseClient } from "./supabaseStorage";
 import { getS3Client } from "./railwayStorage";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
@@ -30,6 +30,7 @@ export async function migrateStorage() {
   const railwaySecretKey = process.env.RAILWAY_STORAGE_SECRET_ACCESS_KEY;
   const railwayEndpoint = process.env.RAILWAY_STORAGE_ENDPOINT;
   const railwayBucket = process.env.RAILWAY_STORAGE_BUCKET_NAME || "patient-files";
+  const supabaseBucket = process.env.SUPABASE_STORAGE_BUCKET || "patient-files";
 
   if (!railwayAccessKey || !railwaySecretKey || !railwayEndpoint) {
     throw new Error("Railway Storage not configured! Set RAILWAY_STORAGE_ACCESS_KEY_ID, RAILWAY_STORAGE_SECRET_ACCESS_KEY, and RAILWAY_STORAGE_ENDPOINT.");
@@ -38,6 +39,39 @@ export async function migrateStorage() {
   const db = ensureDb();
   const s3 = getS3Client();
   const supabase = getSupabaseClient();
+
+  const extractSupabaseFilePath = (fileUrl: string): string | null => {
+    if (!fileUrl) return null;
+
+    if (fileUrl.startsWith("/api/objects/")) {
+      return fileUrl.replace("/api/objects/", "");
+    }
+
+    if (fileUrl.startsWith("/objects/")) {
+      return fileUrl.replace("/objects/", "");
+    }
+
+    if (fileUrl.includes("/storage/v1/object/")) {
+      try {
+        const url = new URL(fileUrl);
+        const parts = url.pathname.split("/").filter(Boolean);
+        const objectIndex = parts.findIndex((p) => p === "object");
+        if (objectIndex >= 0) {
+          let bucketIndex = objectIndex + 1;
+          const marker = parts[bucketIndex];
+          if (marker === "public" || marker === "sign") {
+            bucketIndex += 1;
+          }
+          const objectPath = parts.slice(bucketIndex + 1).join("/");
+          return objectPath || null;
+        }
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
+  };
 
   try {
     // Get all files from database
@@ -67,22 +101,8 @@ export async function migrateStorage() {
         }
 
         // Extract file path from URL
-        let filePath = '';
-        
-        if (fileUrl.startsWith('/api/objects/')) {
-          // API endpoint format: /api/objects/uploads/uuid
-          filePath = fileUrl.replace('/api/objects/', '');
-        } else if (fileUrl.includes('supabase.co')) {
-          // Supabase URL format: https://xxx.supabase.co/storage/v1/object/sign/bucket/path
-          const urlMatch = fileUrl.match(/\/object\/sign\/[^/]+\/(.+?)(\?|$)/);
-          if (urlMatch) {
-            filePath = urlMatch[1];
-          } else {
-            console.log(`   ⚠️  Could not parse Supabase URL: ${fileUrl}`);
-            errors++;
-            continue;
-          }
-        } else {
+        const filePath = extractSupabaseFilePath(fileUrl);
+        if (!filePath) {
           console.log(`   ⚠️  Unknown URL format: ${fileUrl}`);
           errors++;
           continue;
@@ -97,7 +117,7 @@ export async function migrateStorage() {
         try {
           // Download the file directly from Supabase Storage
           const { data, error } = await supabase.storage
-            .from('patient-files')
+            .from(supabaseBucket)
             .download(filePath);
 
           if (error || !data) {
@@ -113,7 +133,7 @@ export async function migrateStorage() {
             const folderPath = filePath.split('/').slice(0, -1).join('/');
             const fileName = filePath.split('/').pop() || '';
             const { data: metadata } = await supabase.storage
-              .from('patient-files')
+              .from(supabaseBucket)
               .list(folderPath || '', {
                 search: fileName
               });
@@ -168,10 +188,91 @@ export async function migrateStorage() {
       }
     }
 
-    console.log(`\n\n📊 Migration Summary:`);
+    console.log(`\n\n📊 File Migration Summary:`);
     console.log(`   ✅ Migrated: ${migrated} file(s)`);
     console.log(`   ⏭️  Skipped: ${skipped} file(s)`);
     console.log(`   ❌ Errors: ${errors} file(s)`);
+
+    // Migrate patient avatar photos
+    const allPatients = await db.select().from(patients);
+    console.log(`\n🧑‍⚕️ Found ${allPatients.length} patient(s) to check for avatar photos\n`);
+
+    let photoMigrated = 0;
+    let photoSkipped = 0;
+    let photoErrors = 0;
+
+    for (const patient of allPatients) {
+      if (!patient.photoUrl) {
+        photoSkipped++;
+        continue;
+      }
+
+      if (patient.photoUrl.includes("railway.app") || patient.photoUrl.includes("storage.railway.app")) {
+        photoSkipped++;
+        continue;
+      }
+
+      try {
+        const filePath = extractSupabaseFilePath(patient.photoUrl);
+        if (!filePath) {
+          console.log(`   ⚠️  Unknown photo URL format for ${patient.name}: ${patient.photoUrl}`);
+          photoErrors++;
+          continue;
+        }
+
+        console.log(`\n🧑‍⚕️ Migrating photo for ${patient.name}`);
+        console.log(`   📥 Downloading from Supabase: ${filePath}`);
+
+        const { data, error } = await supabase.storage
+          .from(supabaseBucket)
+          .download(filePath);
+
+        if (error || !data) {
+          throw new Error(`Failed to download: ${error?.message || "Unknown error"}`);
+        }
+
+        const arrayBuffer = await data.arrayBuffer();
+        const fileData = Buffer.from(arrayBuffer);
+        const extension = filePath.split(".").pop()?.toLowerCase();
+        const contentType =
+          extension === "png"
+            ? "image/png"
+            : extension === "webp"
+              ? "image/webp"
+              : extension === "gif"
+                ? "image/gif"
+                : "image/jpeg";
+
+        const railwayPath = `uploads/${filePath.split("/").pop() || patient.id}`;
+
+        console.log(`   📤 Uploading to Railway Storage...`);
+        const uploadCommand = new PutObjectCommand({
+          Bucket: railwayBucket,
+          Key: railwayPath,
+          Body: fileData,
+          ContentType: contentType,
+        });
+
+        await s3.send(uploadCommand);
+        const newUrl = `/api/objects/${railwayPath}`;
+
+        await db
+          .update(patients)
+          .set({ photoUrl: newUrl })
+          .where(eq(patients.id, patient.id));
+
+        console.log(`   ✅ Updated patient photo URL`);
+        photoMigrated++;
+      } catch (error: any) {
+        console.log(`   ❌ Failed to migrate photo: ${error.message}`);
+        photoErrors++;
+      }
+    }
+
+    console.log(`\n\n📊 Patient Photo Migration Summary:`);
+    console.log(`   ✅ Migrated: ${photoMigrated} photo(s)`);
+    console.log(`   ⏭️  Skipped: ${photoSkipped} photo(s)`);
+    console.log(`   ❌ Errors: ${photoErrors} photo(s)`);
     console.log(`\n🎉 Migration complete!`);
 
   } catch (error: any) {

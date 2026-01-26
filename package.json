@@ -19,7 +19,13 @@
     "check-patients": "tsx scripts/check-patients.ts",
     "check-supabase-patients": "tsx scripts/check-supabase-patients.ts",
     "migrate-storage": "tsx scripts/migrate-supabase-to-railway-storage.ts",
-    "list-supabase-files": "tsx scripts/list-supabase-files.ts"
+    "diagnose-storage": "tsx scripts/diagnose-storage.ts",
+    "list-supabase-files": "tsx scripts/list-supabase-files.ts",
+    "move-patients-to-office": "tsx scripts/move-patients-to-office.ts",
+    "compare-databases": "tsx scripts/compare-databases.ts",
+    "verify-data-restored": "tsx scripts/verify-data-restored.ts",
+    "fix-office-scope": "tsx scripts/fix-office-scope.ts",
+    "fix-user-office": "tsx scripts/fix-user-office.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.971.0",
@@ -71,6 +77,7 @@
     "cmdk": "^1.1.1",
     "connect-pg-simple": "^10.0.0",
     "date-fns": "^3.6.0",
+    "dotenv": "^17.2.3",
     "drizzle-orm": "^0.39.1",
     "drizzle-zod": "^0.7.0",
     "embla-carousel-react": "^8.6.0",

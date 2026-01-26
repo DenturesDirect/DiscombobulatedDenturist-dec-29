@@ -90,25 +90,37 @@ export function getSession() {
 }
 
 export async function setupLocalAuth(app: Express) {
+  console.log('🔧 Setting up local authentication...');
   app.set("trust proxy", 1);
   app.use(getSession());
   app.use(passport.initialize());
   app.use(passport.session());
+  
+  console.log('✅ Local authentication setup complete');
 
   passport.use(new LocalStrategy(
     { usernameField: 'email' },
     async (email, password, done) => {
       try {
         const normalizedEmail = email.toLowerCase().trim();
+        console.log(`🔐 Login attempt for: ${normalizedEmail}`);
         
         if (!isAllowedEmail(normalizedEmail)) {
+          console.log(`❌ Login rejected: Email ${normalizedEmail} not in allowed list`);
           await storage.logLoginAttempt(normalizedEmail, false);
           return done(null, false, { message: 'Access not authorized' });
         }
 
         const user = await storage.getUserByEmail(normalizedEmail);
         
-        if (!user || !user.password) {
+        if (!user) {
+          console.log(`⚠️  Login attempt failed: User not found for ${normalizedEmail}`);
+          await storage.logLoginAttempt(normalizedEmail, false);
+          return done(null, false, { message: 'Invalid credentials' });
+        }
+        
+        if (!user.password || (typeof user.password === 'string' && user.password.trim() === '')) {
+          console.log(`⚠️  Login attempt failed: User ${normalizedEmail} has no password set`);
           await storage.logLoginAttempt(normalizedEmail, false);
           return done(null, false, { message: 'Invalid credentials' });
         }
@@ -116,13 +128,17 @@ export async function setupLocalAuth(app: Express) {
         const isValid = await verifyPassword(password, user.password);
         
         if (!isValid) {
+          console.log(`❌ Login attempt failed: Invalid password for ${normalizedEmail}`);
           await storage.logLoginAttempt(normalizedEmail, false);
           return done(null, false, { message: 'Invalid credentials' });
         }
 
+        console.log(`✅ Login successful for ${normalizedEmail}`);
         await storage.logLoginAttempt(normalizedEmail, true);
         return done(null, user);
-      } catch (error) {
+      } catch (error: any) {
+        console.error(`❌ Authentication error for ${email}:`, error.message);
+        console.error('   Stack:', error.stack);
         return done(error);
       }
     }
@@ -141,29 +157,44 @@ export async function setupLocalAuth(app: Express) {
     }
   });
 
+  console.log('📝 Registering /api/auth/login route...');
   app.post('/api/auth/login', (req, res, next) => {
+    console.log('📥 POST /api/auth/login - Request received');
+    console.log('   Headers:', JSON.stringify(req.headers, null, 2).substring(0, 200));
+    console.log('   Body:', { email: req.body?.email ? req.body.email.substring(0, 20) + '...' : 'missing', hasPassword: !!req.body?.password });
+    console.log('   Raw body:', typeof req.body, Object.keys(req.body || {}));
     passport.authenticate('local', async (err: any, user: any, info: any) => {
       if (err) {
-        return res.status(500).json({ message: 'Authentication error' });
+        console.error('❌ Passport authentication error:', err.message);
+        console.error('   Stack:', err.stack);
+        return res.status(500).json({ message: 'Authentication error', details: process.env.NODE_ENV === 'development' ? err.message : undefined });
       }
       if (!user) {
+        console.log(`❌ Login failed: ${info?.message || 'Invalid credentials'}`);
         return res.status(401).json({ message: info?.message || 'Invalid credentials' });
       }
       req.logIn(user, async (err) => {
         if (err) {
+          console.error('❌ Session login error:', err.message);
           return res.status(500).json({ message: 'Login error' });
         }
-        // Get full user with office info
-        const dbUser = await storage.getUser(user.id);
-        return res.json({ 
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          officeId: dbUser?.officeId ?? null,
-          canViewAllOffices: dbUser?.canViewAllOffices ?? false
-        });
+        try {
+          // Get full user with office info
+          const dbUser = await storage.getUser(user.id);
+          console.log(`✅ Session created for ${user.email}`);
+          return res.json({ 
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role,
+            officeId: dbUser?.officeId ?? null,
+            canViewAllOffices: dbUser?.canViewAllOffices ?? false
+          });
+        } catch (error: any) {
+          console.error('❌ Error fetching user after login:', error.message);
+          return res.status(500).json({ message: 'Error completing login' });
+        }
       });
     })(req, res, next);
   });
@@ -320,6 +351,81 @@ export const isAdmin: RequestHandler = async (req, res, next) => {
   }
 };
 
+async function seedOffices(): Promise<Record<string, string>> {
+  console.log('📍 Seeding offices...');
+  const officeMap: Record<string, string> = {};
+  
+  if (USE_MEM_STORAGE) {
+    // For in-memory storage, offices aren't persisted, so return empty map
+    console.log('  ⚠️  Using in-memory storage - offices not persisted');
+    return officeMap;
+  }
+  
+  try {
+    const { offices } = await import("@shared/schema");
+    const { ensureDb } = await import("./db");
+    const { eq } = await import("drizzle-orm");
+    const db = ensureDb();
+    
+    // Define the offices we need
+    const requiredOffices = [
+      { name: "Dentures Direct" },
+      { name: "Toronto Smile Centre" }
+    ];
+    
+    // Check existing offices
+    const existingOffices = await db.select().from(offices);
+    const existingNames = new Set(existingOffices.map(o => o.name));
+    
+    // Create missing offices
+    for (const office of requiredOffices) {
+      if (!existingNames.has(office.name)) {
+        try {
+          const result = await db.insert(offices)
+            .values({ name: office.name })
+            .returning();
+          
+          if (result && result.length > 0) {
+            officeMap[office.name] = result[0].id;
+            console.log(`  ✅ Created office '${office.name}' (${result[0].id})`);
+          }
+        } catch (error: any) {
+          // If office already exists (race condition), fetch it
+          const fetched = await db.select().from(offices)
+            .where(eq(offices.name, office.name))
+            .limit(1);
+          if (fetched.length > 0) {
+            officeMap[office.name] = fetched[0].id;
+            console.log(`  ✅ Office '${office.name}' already exists (${fetched[0].id})`);
+          } else {
+            console.error(`  ❌ Failed to create office '${office.name}':`, error.message);
+          }
+        }
+      } else {
+        // Office already exists, add to map
+        const existingOffice = existingOffices.find(o => o.name === office.name);
+        if (existingOffice) {
+          officeMap[existingOffice.name] = existingOffice.id;
+          console.log(`  ✅ Office '${existingOffice.name}' already exists (${existingOffice.id})`);
+        }
+      }
+    }
+    
+    // Ensure we have all offices in the map (in case we missed any)
+    for (const existingOffice of existingOffices) {
+      if (requiredOffices.some(ro => ro.name === existingOffice.name)) {
+        officeMap[existingOffice.name] = existingOffice.id;
+      }
+    }
+    
+    return officeMap;
+  } catch (error: any) {
+    console.error('  ❌ Error seeding offices:', error.message);
+    console.error('   This might indicate a database connection issue.');
+    return officeMap;
+  }
+}
+
 export async function seedStaffAccounts() {
   console.log('👥 Checking staff accounts...');
   
@@ -331,23 +437,12 @@ export async function seedStaffAccounts() {
   }
   
   try {
-    // Get office IDs from database
-    let officeMap: Record<string, string> = {};
-    if (!USE_MEM_STORAGE) {
-      try {
-        const { offices } = await import("@shared/schema");
-        const { ensureDb } = await import("./db");
-        const db = ensureDb();
-        if (db) {
-          const officesList = await db.select().from(offices);
-          for (const office of officesList) {
-            officeMap[office.name] = office.id;
-          }
-          console.log(`  📍 Found ${officesList.length} offices in database`);
-        }
-      } catch (error: any) {
-        console.warn(`  ⚠️  Could not fetch offices: ${error.message}`);
-      }
+    // Seed offices first to ensure they exist
+    const officeMap = await seedOffices();
+    
+    // If no offices were found/created, log a warning
+    if (Object.keys(officeMap).length === 0 && !USE_MEM_STORAGE) {
+      console.warn('  ⚠️  No offices found in database. Users will be created without office assignments.');
     }
     
     for (const staff of ALLOWED_STAFF) {
@@ -356,6 +451,7 @@ export async function seedStaffAccounts() {
         const officeId = officeMap[staff.officeName] || null;
         
         if (!existingUser) {
+          // Create new user with temp password and office assignment
           const tempPassword = await hashPassword('TempPassword123!');
           
           await storage.upsertUser({
@@ -369,40 +465,75 @@ export async function seedStaffAccounts() {
             canViewAllOffices: staff.canViewAllOffices || false,
           });
           
-          console.log(`  ✓ Created account for ${staff.email} (${staff.officeName}${staff.canViewAllOffices ? ', can view all offices' : ''})`);
+          const officeInfo = officeId ? ` (${staff.officeName})` : ' (no office assigned)';
+          const permissionInfo = staff.canViewAllOffices ? ', can view all offices' : '';
+          console.log(`  ✅ Created account for ${staff.email}${officeInfo}${permissionInfo}`);
         } else {
-          // Update existing user with office info if missing
-          const needsUpdate = existingUser.officeId !== officeId || 
-                             existingUser.canViewAllOffices !== (staff.canViewAllOffices || false);
+          // User exists - check what needs updating
+          let updated = false;
+          const updates: any = {
+            id: existingUser.id,
+            email: existingUser.email,
+            password: existingUser.password, // Preserve existing password
+            firstName: existingUser.firstName,
+            lastName: existingUser.lastName,
+            role: existingUser.role,
+            officeId: existingUser.officeId,
+            canViewAllOffices: existingUser.canViewAllOffices,
+          };
           
-          if (needsUpdate && officeId) {
-            await storage.upsertUser({
-              id: existingUser.id,
-              email: existingUser.email,
-              password: existingUser.password,
-              firstName: existingUser.firstName,
-              lastName: existingUser.lastName,
-              role: existingUser.role,
-              officeId: officeId,
-              canViewAllOffices: staff.canViewAllOffices || false,
-            });
-            console.log(`  ✓ Updated office assignment for ${staff.email}`);
+          // Update officeId if missing or incorrect
+          if (officeId && existingUser.officeId !== officeId) {
+            updates.officeId = officeId;
+            updated = true;
           }
           
-          if (!existingUser.password) {
+          // Update canViewAllOffices if incorrect
+          if (updates.canViewAllOffices !== (staff.canViewAllOffices || false)) {
+            updates.canViewAllOffices = staff.canViewAllOffices || false;
+            updated = true;
+          }
+          
+          // Set temp password if user has no password (null, undefined, or empty string)
+          if (!existingUser.password || (typeof existingUser.password === 'string' && existingUser.password.trim() === '')) {
             const tempPassword = await hashPassword('TempPassword123!');
-            await storage.updateUserPassword(existingUser.id, tempPassword);
-            console.log(`  ✓ Set temp password for ${staff.email}`);
+            updates.password = tempPassword;
+            updated = true;
+            console.log(`  ✅ Set temp password for ${staff.email}`);
+          }
+          
+          // Apply updates if needed
+          if (updated) {
+            await storage.upsertUser(updates);
+            const changes = [];
+            if (updates.officeId !== existingUser.officeId) {
+              changes.push(`office: ${staff.officeName}`);
+            }
+            if (updates.canViewAllOffices !== existingUser.canViewAllOffices) {
+              changes.push(`permissions: ${updates.canViewAllOffices ? 'can view all' : 'single office'}`);
+            }
+            if (!existingUser.password) {
+              changes.push('password: set');
+            }
+            console.log(`  ✅ Updated account for ${staff.email} (${changes.join(', ')})`);
           } else {
-            console.log(`  ✓ Account exists for ${staff.email}`);
+            console.log(`  ✓ Account exists for ${staff.email} (${staff.officeName || 'no office'})`);
           }
         }
       } catch (error: any) {
         console.error(`  ❌ Error seeding account for ${staff.email}:`, error.message);
       }
     }
+    
+    // Summary
+    console.log(`\n✅ Staff account seeding complete. Processed ${ALLOWED_STAFF.length} staff accounts.`);
+    console.log(`   Offices available: ${Object.keys(officeMap).length}`);
+    if (Object.keys(officeMap).length === 0 && !USE_MEM_STORAGE) {
+      console.warn('   ⚠️  WARNING: No offices found. Users may not have office assignments.');
+    }
   } catch (error: any) {
     console.error('❌ Error during staff account seeding:', error.message);
     console.error('   This might indicate a database connection issue.');
+    throw error; // Re-throw to surface the error
   }
 }

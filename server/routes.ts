@@ -4,7 +4,7 @@ import multer from "multer";
 import { processClinicalNote, generateReferralLetter, summarizePatientChart, analyzeRadiograph, formatDesignInstructions } from "./openai";
 import { extractTextFromPDF } from "./pdfExtractor";
 import { storage } from "./storage";
-import { insertPatientSchema, insertLabNoteSchema, insertAdminNoteSchema, insertLabPrescriptionSchema, insertTaskSchema } from "@shared/schema";
+import { insertPatientSchema, insertLabNoteSchema, insertAdminNoteSchema, insertLabPrescriptionSchema, insertTaskSchema, insertPatientFileSchema } from "@shared/schema";
 import { setupLocalAuth, isAuthenticated, seedStaffAccounts } from "./localAuth";
 import { SupabaseStorageService, getSupabaseClient } from "./supabaseStorage";
 import { RailwayStorageService, getS3Client, ObjectNotFoundError } from "./railwayStorage";
@@ -19,10 +19,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertPatientSchema.parse(req.body);
       const user = req.user as any;
+      const canViewAllOffices = user?.canViewAllOffices || false;
       
-      // Auto-assign officeId from user if not provided
+      // For multi-office users, officeId is required
+      if (canViewAllOffices && !validatedData.officeId) {
+        return res.status(400).json({ error: "Office selection is required. Please select an office before creating a patient." });
+      }
+      
+      // Auto-assign officeId from user if not provided (for single-office users)
       if (!validatedData.officeId && user?.officeId) {
         validatedData.officeId = user.officeId;
+      }
+      
+      // Ensure officeId is set before creating patient
+      if (!validatedData.officeId) {
+        return res.status(400).json({ error: "Office assignment is required. Patient must be assigned to an office." });
       }
       
       const patient = await storage.createPatient(validatedData);
@@ -306,19 +317,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/patients/:id/files", isAuthenticated, async (req, res) => {
+  app.post("/api/patients/:id/files", isAuthenticated, async (req: any, res) => {
     try {
-      const { filename, fileUrl, fileType, description } = req.body;
-      const file = await storage.createPatientFile({
+      const user = req.user as any;
+      const userOfficeId = user?.officeId || null;
+      const canViewAllOffices = user?.canViewAllOffices || false;
+      
+      // Verify user can access this patient
+      const patient = await storage.getPatient(req.params.id, userOfficeId, canViewAllOffices);
+      if (!patient) {
+        return res.status(404).json({ error: "Patient not found" });
+      }
+      
+      // Validate request body
+      const validatedData = insertPatientFileSchema.parse({
         patientId: req.params.id,
-        filename,
-        fileUrl,
-        fileType,
-        description
+        filename: req.body.filename,
+        fileUrl: req.body.fileUrl,
+        fileType: req.body.fileType,
+        description: req.body.description
       });
+      
+      // OfficeId will be auto-assigned from patient in storage.createPatientFile
+      const file = await storage.createPatientFile(validatedData);
       res.json(file);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      console.error("Error creating patient file:", error);
+      res.status(400).json({ error: error.message || "Failed to create patient file" });
     }
   });
 
@@ -842,6 +867,150 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Serve fix-office HTML page (must be before catch-all routes)
+  app.get("/fix-office", (req, res) => {
+    const path = require("path");
+    const filePath = path.join(process.cwd(), "fix-office.html");
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        console.error("Error serving fix-office.html:", err);
+        res.status(404).send(`Fix office page not found: ${err.message}`);
+      }
+    });
+  });
+
+  // Serve fix-office HTML page
+  app.get("/fix-office", (req, res) => {
+    res.sendFile("fix-office.html", { root: process.cwd() }, (err) => {
+      if (err) {
+        res.status(404).send("Fix office page not found. Make sure fix-office.html is in the project root.");
+      }
+    });
+  });
+
+  // Diagnostic endpoint for office scope issues
+  app.get("/api/debug/office-scope", isAuthenticated, async (req: any, res) => {
+    try {
+      const { ensureDb } = await import("./db");
+      const { patients, users, offices } = await import("@shared/schema");
+      const { sql } = await import("drizzle-orm");
+      const db = ensureDb();
+      const currentUser = req.user as any;
+
+      // Get all offices
+      const allOffices = await db.select().from(offices);
+      
+      // Get patient distribution by office
+      const patientDist = await db.execute(sql`
+        SELECT office_id, COUNT(*) as count 
+        FROM patients 
+        GROUP BY office_id 
+        ORDER BY count DESC
+      `);
+
+      // Get user distribution by office
+      const userDist = await db.execute(sql`
+        SELECT office_id, COUNT(*) as count,
+               STRING_AGG(username, ', ') as usernames
+        FROM users 
+        GROUP BY office_id 
+        ORDER BY count DESC
+      `);
+
+      // Get current user info
+      const currentUserInfo = await db.select().from(users).where(sql`id = ${currentUser.id}`);
+
+      res.json({
+        currentUser: {
+          id: currentUser.id,
+          username: currentUser.username,
+          officeId: currentUser.officeId,
+          canViewAllOffices: currentUser.canViewAllOffices,
+        },
+        offices: allOffices.map(o => ({ id: o.id, name: o.name })),
+        patientDistribution: patientDist.rows.map((row: any) => ({
+          officeId: row.office_id || "NULL",
+          officeName: allOffices.find((o) => o.id === row.office_id)?.name || "No office",
+          patientCount: parseInt(row.count),
+        })),
+        userDistribution: userDist.rows.map((row: any) => ({
+          officeId: row.office_id || "NULL",
+          officeName: allOffices.find((o) => o.id === row.office_id)?.name || "No office",
+          userCount: parseInt(row.count),
+          usernames: row.usernames,
+        })),
+        totalPatients: patientDist.rows.reduce((sum: number, row: any) => sum + parseInt(row.count), 0),
+        diagnosis: {
+          userOfficeId: currentUser.officeId,
+          patientsInUserOffice: patientDist.rows.find((r: any) => r.office_id === currentUser.officeId)?.count || 0,
+          recommendation: currentUser.officeId 
+            ? `Your office (${currentUser.officeId}) has ${patientDist.rows.find((r: any) => r.office_id === currentUser.officeId)?.count || 0} patients. Most patients are in office: ${patientDist.rows[0]?.office_id || "unknown"}.`
+            : "You don't have an office assigned. You need to be assigned to an office that has patients.",
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Fix office assignment endpoint - automatically assigns user to office with most patients
+  app.post("/api/debug/fix-office", isAuthenticated, async (req: any, res) => {
+    try {
+      const { ensureDb } = await import("./db");
+      const { users, patients, offices } = await import("@shared/schema");
+      const { sql, eq } = await import("drizzle-orm");
+      const db = ensureDb();
+      const currentUser = req.user as any;
+
+      // Get patient distribution by office
+      const patientDist = await db.execute(sql`
+        SELECT office_id, COUNT(*) as count 
+        FROM patients 
+        WHERE office_id IS NOT NULL
+        GROUP BY office_id 
+        ORDER BY count DESC
+        LIMIT 1
+      `);
+
+      if (patientDist.rows.length === 0) {
+        return res.status(400).json({ error: "No patients found with office assignments" });
+      }
+
+      const targetOfficeId = patientDist.rows[0].office_id;
+      const patientCount = parseInt(patientDist.rows[0].count);
+
+      // Get office name
+      const targetOffice = await db.select().from(offices).where(eq(offices.id, targetOfficeId));
+      const officeName = targetOffice[0]?.name || "Unknown";
+
+      // Update user's office
+      const updatedUsers = await db.update(users)
+        .set({ officeId: targetOfficeId })
+        .where(eq(users.id, currentUser.id))
+        .returning();
+
+      if (updatedUsers.length === 0) {
+        return res.status(500).json({ error: "Failed to update user" });
+      }
+
+      res.json({
+        success: true,
+        message: `Your office has been updated to ${officeName}`,
+        user: {
+          username: updatedUsers[0].username,
+          officeId: updatedUsers[0].officeId,
+          officeName: officeName,
+        },
+        patientsInOffice: patientCount,
+        nextSteps: [
+          "Log out and log back in",
+          `You should now see ${patientCount} patients`,
+        ],
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

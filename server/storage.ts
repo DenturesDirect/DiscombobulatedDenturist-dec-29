@@ -920,7 +920,14 @@ export class DbStorage implements IStorage {
       const patient = await this.getPatient(insertFile.patientId);
       if (patient) {
         insertFile.officeId = patient.officeId;
+      } else {
+        throw new Error(`Patient with id ${insertFile.patientId} not found`);
       }
+    }
+    
+    // Ensure officeId is set (required for database constraint)
+    if (!insertFile.officeId) {
+      throw new Error("Cannot create patient file: patient officeId is missing");
     }
     
     const result = await ensureDb().insert(patientFiles)

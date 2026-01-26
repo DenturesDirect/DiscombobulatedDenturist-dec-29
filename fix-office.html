@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fix Office Assignment</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        .instructions {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196f3;
+        }
+        .instructions ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin: 8px 0;
+        }
+        button {
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .result.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Fix Office Assignment</h1>
+        
+        <div class="instructions">
+            <strong>⚠️ IMPORTANT: Follow these steps in order!</strong>
+            <ol>
+                <li>First, <strong>log into your app</strong> in another browser tab</li>
+                <li>Make sure you're logged in and can see the app</li>
+                <li>Come back to this page</li>
+                <li>Click the button below</li>
+            </ol>
+        </div>
+
+        <div class="instructions info" style="display: block;">
+            <strong>📋 What this does:</strong>
+            <p>This will automatically assign your user account (<code>damien@denturesdirect.ca</code>) to the office that has the most patients. After clicking, you'll need to log out and log back in to see your patients.</p>
+        </div>
+
+        <button id="fixButton" onclick="fixOffice()">Fix My Office Assignment</button>
+
+        <div class="loading" id="loading">
+            ⏳ Fixing office assignment...
+        </div>
+
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        async function fixOffice() {
+            const button = document.getElementById('fixButton');
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+            
+            button.disabled = true;
+            loading.style.display = 'block';
+            result.style.display = 'none';
+
+            try {
+                // Get the current domain
+                const baseUrl = window.location.origin;
+                
+                const response = await fetch(`${baseUrl}/api/debug/fix-office`, {
+                    method: 'POST',
+                    credentials: 'include', // Include cookies for authentication
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const data = await response.json();
+
+                loading.style.display = 'none';
+                result.style.display = 'block';
+
+                if (response.ok && data.success) {
+                    result.className = 'result success';
+                    result.innerHTML = `
+                        <h3>✅ Success!</h3>
+                        <p><strong>Your office has been updated!</strong></p>
+                        <p>Office: <strong>${data.user.officeName}</strong></p>
+                        <p>Patients in this office: <strong>${data.patientsInOffice}</strong></p>
+                        <hr>
+                        <p><strong>Next Steps:</strong></p>
+                        <ol>
+                            <li>Go back to your app</li>
+                            <li><strong>Log out</strong></li>
+                            <li><strong>Log back in</strong></li>
+                            <li>You should now see ${data.patientsInOffice} patients!</li>
+                        </ol>
+                    `;
+                } else {
+                    result.className = 'result error';
+                    result.innerHTML = `
+                        <h3>❌ Error</h3>
+                        <p>${data.error || 'Something went wrong'}</p>
+                        <p>Make sure you're logged into the app in another tab first!</p>
+                    `;
+                }
+            } catch (error) {
+                loading.style.display = 'none';
+                result.style.display = 'block';
+                result.className = 'result error';
+                result.innerHTML = `
+                    <h3>❌ Error</h3>
+                    <p>Failed to connect: ${error.message}</p>
+                    <p><strong>Make sure:</strong></p>
+                    <ul>
+                        <li>You're logged into the app in another browser tab</li>
+                        <li>This page is open on the same domain as your app</li>
+                        <li>Your app URL is: <code>${window.location.origin}</code></li>
+                    </ul>
+                `;
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        // Check if user is on the right domain
+        window.addEventListener('load', function() {
+            const result = document.getElementById('result');
+            result.style.display = 'block';
+            result.className = 'result info';
+            result.innerHTML = `
+                <p><strong>📍 Current URL:</strong> <code>${window.location.origin}</code></p>
+                <p>Make sure this matches your app's URL. If not, save this HTML file and open it from your app's domain.</p>
+            `;
+        });
+    </script>
+</body>
+</html>

@@ -638,7 +638,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <TopNav 
         userName={user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'User' : 'User'}
         userRole="Denturist"
@@ -652,16 +652,16 @@ export default function Dashboard() {
       />
 
       <div className="flex flex-1 overflow-hidden">
-          <div className="flex-1 min-w-[500px] max-w-2xl p-6 overflow-y-auto border-r">
+          <div className="flex-1 min-w-[500px] max-w-2xl p-6 overflow-y-auto border-r bg-card/50 backdrop-blur-sm">
             <div className="space-y-6">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
+              <div className="bg-gradient-to-r from-card to-card/80 rounded-xl p-6 shadow-md border border-card-border">
+                <div className="flex items-center gap-2 mb-3">
                   {isEditingPatientName ? (
                     <div className="flex items-center gap-2 flex-1">
                       <Input
                         value={editedPatientName}
                         onChange={(e) => setEditedPatientName(e.target.value)}
-                        className="text-3xl font-semibold h-auto py-1"
+                        className="text-3xl font-semibold h-auto py-1 bg-background"
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             handleSavePatientName();
@@ -678,6 +678,7 @@ export default function Dashboard() {
                         variant="ghost"
                         onClick={handleSavePatientName}
                         disabled={isProcessing}
+                        className="hover:bg-primary/10"
                         data-testid="button-save-patient-name"
                       >
                         <Check className="w-4 h-4" />
@@ -690,6 +691,7 @@ export default function Dashboard() {
                           setEditedPatientName(patient.name);
                         }}
                         disabled={isProcessing}
+                        className="hover:bg-destructive/10"
                         data-testid="button-cancel-edit-name"
                       >
                         <X className="w-4 h-4" />
@@ -697,12 +699,12 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <>
-                      <h1 className="text-3xl font-semibold">{patient.name}</h1>
+                      <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">{patient.name}</h1>
                       {isAdmin && (
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="h-8 w-8"
+                          className="h-8 w-8 hover:bg-primary/10"
                           onClick={() => {
                             setEditedPatientName(patient.name);
                             setIsEditingPatientName(true);
@@ -716,7 +718,7 @@ export default function Dashboard() {
                     </>
                   )}
                   {patient.officeId && canViewAllOffices && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-xs shadow-sm">
                       {getOfficeName(patient.officeId) || 'Office'}
                     </Badge>
                   )}
@@ -832,9 +834,12 @@ export default function Dashboard() {
                 )}
               </div>
 
-              <Card className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold">Add Notes / Prescriptions</h2>
+              <Card className="p-6 shadow-lg border-card-border bg-card/95 backdrop-blur-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-bold">Add Notes / Prescriptions</h2>
+                    <p className="text-sm text-muted-foreground mt-1">Create clinical notes, lab prescriptions, and tasks</p>
+                  </div>
                   {isProcessing && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
                 </div>
                 
@@ -983,8 +988,11 @@ export default function Dashboard() {
                 disabled={isProcessing}
               />
 
-              <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Upload Clinical Photos</h2>
+              <Card className="p-6 shadow-lg border-card-border bg-card/95 backdrop-blur-sm">
+                <div className="mb-4">
+                  <h2 className="text-xl font-bold mb-1">Upload Clinical Photos</h2>
+                  <p className="text-sm text-muted-foreground">Add photos to the patient's clinical record</p>
+                </div>
                 <PhotoUploadZone 
                   onPhotosChange={async (photos) => {
                     if (photos.length === 0) return;
@@ -995,29 +1003,58 @@ export default function Dashboard() {
                         const urlResponse = await apiRequest('POST', '/api/objects/upload', {});
                         const { uploadURL } = await urlResponse.json();
                         
+                        // Determine storage type by URL
+                        const isSupabase = uploadURL.includes('.supabase.co');
+                        const isRailway = uploadURL.includes('railway.app') || uploadURL.includes('railway-storage');
+                        
                         // Upload the file
-                        await fetch(uploadURL, {
-                          method: 'PUT',
+                        // Supabase uses POST, Railway uses PUT
+                        const uploadResponse = await fetch(uploadURL, {
+                          method: isSupabase ? 'POST' : 'PUT',
                           body: photo,
                           headers: { 'Content-Type': photo.type }
                         });
                         
-                        // Extract the object path from Supabase signed URL
-                        // Supabase URL format: https://[project].supabase.co/storage/v1/object/sign/[bucket]/uploads/[uuid]?...
-                        const uploadUrlObj = new URL(uploadURL);
-                        const pathParts = uploadUrlObj.pathname.split('/').filter(p => p); // Remove empty strings
+                        if (!uploadResponse.ok) {
+                          throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+                        }
                         
-                        // Find "uploads" in the path (Supabase structure: /storage/v1/object/sign/bucket/uploads/uuid)
-                        const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
+                        // Extract the object path from the upload URL
                         let objectId = '';
                         
-                        if (uploadsIndex >= 0) {
-                          // Take everything from "uploads" onwards
-                          objectId = pathParts.slice(uploadsIndex).join('/');
+                        if (isSupabase) {
+                          // Supabase URL format: https://[project].supabase.co/storage/v1/object/sign/[bucket]/uploads/[uuid]?...
+                          const uploadUrlObj = new URL(uploadURL);
+                          const pathParts = uploadUrlObj.pathname.split('/').filter(p => p);
+                          
+                          const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
+                          if (uploadsIndex >= 0) {
+                            objectId = pathParts.slice(uploadsIndex).join('/');
+                          } else {
+                            objectId = pathParts[pathParts.length - 1] || 'unknown';
+                          }
+                        } else if (isRailway) {
+                          // Railway Storage (S3-compatible) URL format: https://[endpoint]/[bucket]/uploads/[uuid]?...
+                          const uploadUrlObj = new URL(uploadURL);
+                          const pathParts = uploadUrlObj.pathname.split('/').filter(p => p);
+                          
+                          const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
+                          if (uploadsIndex >= 0) {
+                            objectId = pathParts.slice(uploadsIndex).join('/');
+                          } else {
+                            objectId = pathParts[pathParts.length - 1] || 'unknown';
+                          }
                         } else {
-                          // Fallback: try to find the bucket and take what's after it
-                          // Or use last segment if it's a UUID
-                          objectId = pathParts[pathParts.length - 1] || 'unknown';
+                          // Legacy/Unknown URL format - try to extract path
+                          const uploadUrlObj = new URL(uploadURL);
+                          const pathParts = uploadUrlObj.pathname.split('/').filter(p => p);
+                          
+                          const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
+                          if (uploadsIndex >= 0) {
+                            objectId = pathParts.slice(uploadsIndex).join('/');
+                          } else {
+                            objectId = pathParts[pathParts.length - 1] || 'unknown';
+                          }
                         }
                         
                         const fileUrl = `/api/objects/${objectId}`;
@@ -1051,12 +1088,12 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="flex-1 p-6 overflow-y-auto">
+          <div className="flex-1 p-6 overflow-y-auto bg-background/50">
             <Tabs defaultValue="clinical" className="h-full flex flex-col">
-              <div className="mb-4 space-y-3">
+              <div className="mb-6 space-y-4">
                 {/* Tabs Row - All horizontal, can wrap to multiple rows */}
                 <div className="overflow-x-auto">
-                  <TabsList className="inline-flex flex-wrap gap-1 min-w-max">
+                  <TabsList className="inline-flex flex-wrap gap-1 min-w-max bg-muted/50 p-1 rounded-lg shadow-sm">
                     <TabsTrigger value="clinical" className="gap-1 text-xs flex-shrink-0" data-testid="tab-clinical-notes">
                       <FileText className="w-3 h-3" />
                       Clinical
@@ -1171,10 +1208,10 @@ export default function Dashboard() {
                 ) : (
                   <div className="space-y-4">
                     {clinicalNotes.map((note) => (
-                      <Card key={note.id} className="p-4" data-testid={`card-clinical-note-${note.id}`}>
-                        <div className="flex items-center justify-between mb-2">
+                      <Card key={note.id} className="p-5 shadow-md hover:shadow-lg transition-shadow border-card-border bg-card/95 backdrop-blur-sm" data-testid={`card-clinical-note-${note.id}`}>
+                        <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge variant="secondary" className="text-xs shadow-sm">
                               <FileText className="w-3 h-3 mr-1" />
                               Clinical Note
                             </Badge>
@@ -1461,29 +1498,58 @@ export default function Dashboard() {
                               const urlResponse = await apiRequest('POST', '/api/objects/upload', {});
                               const { uploadURL } = await urlResponse.json();
                               
+                              // Determine storage type by URL
+                              const isSupabase = uploadURL.includes('.supabase.co');
+                              const isRailway = uploadURL.includes('railway.app') || uploadURL.includes('railway-storage');
+                              
                               // Upload the file
-                              await fetch(uploadURL, {
-                                method: 'PUT',
+                              // Supabase uses POST, Railway uses PUT
+                              const uploadResponse = await fetch(uploadURL, {
+                                method: isSupabase ? 'POST' : 'PUT',
                                 body: photo,
                                 headers: { 'Content-Type': photo.type }
                               });
                               
-                              // Extract the object path from GCS signed URL
-                              // GCS URL format: https://storage.googleapis.com/[bucket]/uploads/[uuid]?...
-                              const uploadUrlObj = new URL(uploadURL);
-                              const pathParts = uploadUrlObj.pathname.split('/').filter(p => p); // Remove empty strings
+                              if (!uploadResponse.ok) {
+                                throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+                              }
                               
-                              // Find "uploads" in the path (GCS structure: /bucket/uploads/uuid)
-                              const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
+                              // Extract the object path from the upload URL
                               let objectId = '';
                               
-                              if (uploadsIndex >= 0) {
-                                // Take everything from "uploads" onwards
-                                objectId = pathParts.slice(uploadsIndex).join('/');
+                              if (isSupabase) {
+                                // Supabase URL format: https://[project].supabase.co/storage/v1/object/sign/[bucket]/uploads/[uuid]?...
+                                const uploadUrlObj = new URL(uploadURL);
+                                const pathParts = uploadUrlObj.pathname.split('/').filter(p => p);
+                                
+                                const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
+                                if (uploadsIndex >= 0) {
+                                  objectId = pathParts.slice(uploadsIndex).join('/');
+                                } else {
+                                  objectId = pathParts[pathParts.length - 1] || 'unknown';
+                                }
+                              } else if (isRailway) {
+                                // Railway Storage (S3-compatible) URL format: https://[endpoint]/[bucket]/uploads/[uuid]?...
+                                const uploadUrlObj = new URL(uploadURL);
+                                const pathParts = uploadUrlObj.pathname.split('/').filter(p => p);
+                                
+                                const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
+                                if (uploadsIndex >= 0) {
+                                  objectId = pathParts.slice(uploadsIndex).join('/');
+                                } else {
+                                  objectId = pathParts[pathParts.length - 1] || 'unknown';
+                                }
                               } else {
-                                // Fallback: try to find the bucket and take what's after it
-                                // Or use last segment if it's a UUID
-                                objectId = pathParts[pathParts.length - 1] || 'unknown';
+                                // Legacy/Unknown URL format - try to extract path
+                                const uploadUrlObj = new URL(uploadURL);
+                                const pathParts = uploadUrlObj.pathname.split('/').filter(p => p);
+                                
+                                const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
+                                if (uploadsIndex >= 0) {
+                                  objectId = pathParts.slice(uploadsIndex).join('/');
+                                } else {
+                                  objectId = pathParts[pathParts.length - 1] || 'unknown';
+                                }
                               }
                               
                               const fileUrl = `/api/objects/${objectId}`;
