@@ -25,7 +25,13 @@
     "compare-databases": "tsx scripts/compare-databases.ts",
     "verify-data-restored": "tsx scripts/verify-data-restored.ts",
     "fix-office-scope": "tsx scripts/fix-office-scope.ts",
-    "fix-user-office": "tsx scripts/fix-user-office.ts"
+    "fix-user-office": "tsx scripts/fix-user-office.ts",
+    "fix-office-assignments": "tsx scripts/fix-office-assignments.ts",
+    "verify-office-access": "tsx scripts/verify-office-access.ts",
+    "verify-storage-config": "tsx scripts/verify-storage-config.ts",
+    "smoke-tests": "tsx scripts/smoke-tests.ts",
+    "test-upload-fix": "tsx -r dotenv/config scripts/test-upload-fix.ts",
+    "verify-upload-fix": "tsx scripts/verify-upload-fix.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.971.0",
