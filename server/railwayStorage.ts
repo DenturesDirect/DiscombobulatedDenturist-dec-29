@@ -66,18 +66,27 @@ export class RailwayStorageService {
     const filePath = `uploads/${objectId}`;
 
     // Generate a presigned URL for PUT (15 minutes expiry)
+    // Note: ContentType is set to allow any file type - the actual type will be set by the browser
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
       Key: filePath,
+      ContentType: 'application/octet-stream', // Allow any file type
     });
 
-    const signedUrl = await getSignedUrl(s3, command, { expiresIn: 900 }); // 15 minutes
-    
-    // Return both the signed URL and the normalized object path
-    return {
-      uploadURL: signedUrl,
-      objectPath: `/objects/${filePath}`
-    };
+    try {
+      const signedUrl = await getSignedUrl(s3, command, { expiresIn: 900 }); // 15 minutes
+      
+      // Return both the signed URL and the normalized object path
+      return {
+        uploadURL: signedUrl,
+        objectPath: `/objects/${filePath}`
+      };
+    } catch (error: any) {
+      console.error("❌ [RailwayStorage] Failed to generate presigned URL:", error);
+      console.error("   Bucket:", this.bucketName);
+      console.error("   Error details:", error.message);
+      throw new Error(`Failed to generate upload URL: ${error.message}`);
+    }
   }
 
   async getObjectEntityFile(objectPath: string): Promise<{ path: string; bucket: string }> {

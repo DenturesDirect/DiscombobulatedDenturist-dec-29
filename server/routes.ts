@@ -520,6 +520,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     );
   }
   
+  // Diagnostic endpoint to check storage configuration
+  app.get("/api/storage/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const railwayAccessKey = !!process.env.RAILWAY_STORAGE_ACCESS_KEY_ID;
+      const railwaySecretKey = !!process.env.RAILWAY_STORAGE_SECRET_ACCESS_KEY;
+      const railwayEndpoint = !!process.env.RAILWAY_STORAGE_ENDPOINT;
+      const railwayBucket = process.env.RAILWAY_STORAGE_BUCKET_NAME || "patient-files";
+      
+      const supabaseUrl = !!process.env.SUPABASE_URL || !!process.env.SUPABASE_PROJECT_URL;
+      const supabaseKey = !!process.env.SUPABASE_SERVICE_ROLE || !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+      
+      const railwayConfigured = railwayAccessKey && railwaySecretKey && railwayEndpoint;
+      const supabaseConfigured = supabaseUrl && supabaseKey;
+      
+      // Try to initialize storage service
+      let storageWorking = false;
+      let storageError = null;
+      try {
+        const storageService = getStorageService();
+        storageWorking = true;
+        // Try to generate a test URL
+        await storageService.getObjectEntityUploadURL();
+      } catch (error: any) {
+        storageWorking = false;
+        storageError = error.message;
+      }
+      
+      res.json({
+        railway: {
+          configured: railwayConfigured,
+          accessKeySet: railwayAccessKey,
+          secretKeySet: railwaySecretKey,
+          endpointSet: railwayEndpoint,
+          bucketName: railwayBucket,
+        },
+        supabase: {
+          configured: supabaseConfigured,
+          urlSet: supabaseUrl,
+          keySet: supabaseKey,
+        },
+        storageWorking,
+        storageError,
+        activeStorage: railwayConfigured ? "railway" : (supabaseConfigured ? "supabase" : "none"),
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/objects/upload", isAuthenticated, async (req: any, res) => {
     const user = req.user as any;
     console.log(`📤 Upload request from user: ${user?.email || 'unknown'} (role: ${user?.role || 'unknown'}, id: ${user?.id || 'unknown'})`);
@@ -527,15 +576,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const storageService = getStorageService();
       console.log(`✅ Storage service initialized successfully`);
+      console.log(`   Storage type: ${storageService instanceof RailwayStorageService ? 'Railway' : 'Supabase'}`);
+      
       const uploadInfo = await storageService.getObjectEntityUploadURL();
-      console.log(`✅ Upload URL generated successfully, objectPath: ${uploadInfo.objectPath}`);
+      console.log(`✅ Upload URL generated successfully`);
+      console.log(`   Object path: ${uploadInfo.objectPath}`);
+      console.log(`   URL length: ${uploadInfo.uploadURL.length} characters`);
+      console.log(`   URL preview: ${uploadInfo.uploadURL.substring(0, 80)}...`);
+      
       res.json({ 
         uploadURL: uploadInfo.uploadURL,
         objectPath: uploadInfo.objectPath 
       });
     } catch (error: any) {
-      console.error(`❌ Upload URL generation failed:`, error.message);
-      console.error(`   Error stack:`, error.stack);
+      console.error(`❌ Upload URL generation failed:`);
+      console.error(`   Error message: ${error.message}`);
+      console.error(`   Error name: ${error.name}`);
+      console.error(`   Error code: ${error.code || 'N/A'}`);
+      if (error.stack) {
+        console.error(`   Error stack:`, error.stack);
+      }
+      
+      // Check for specific Railway Storage errors
+      if (error.message?.includes("NoSuchBucket") || error.code === "NoSuchBucket") {
+        console.error(`   ⚠️  Bucket does not exist or name is incorrect`);
+        console.error(`   Check RAILWAY_STORAGE_BUCKET_NAME environment variable`);
+      }
+      if (error.message?.includes("InvalidAccessKeyId") || error.code === "InvalidAccessKeyId") {
+        console.error(`   ⚠️  Invalid access key`);
+        console.error(`   Check RAILWAY_STORAGE_ACCESS_KEY_ID environment variable`);
+      }
+      if (error.message?.includes("SignatureDoesNotMatch") || error.code === "SignatureDoesNotMatch") {
+        console.error(`   ⚠️  Invalid secret key`);
+        console.error(`   Check RAILWAY_STORAGE_SECRET_ACCESS_KEY environment variable`);
+      }
       
       // Provide user-friendly error messages
       let userMessage = error.message;
@@ -543,6 +617,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userMessage = "File storage is not configured. Please contact your administrator.";
       } else if (error.message?.includes("Railway Storage not configured") || error.message?.includes("Supabase Storage not configured")) {
         userMessage = "File storage is not configured. Please contact your administrator.";
+      } else if (error.message?.includes("NoSuchBucket") || error.code === "NoSuchBucket") {
+        userMessage = "Storage bucket not found. Please check bucket configuration.";
+      } else if (error.message?.includes("InvalidAccessKeyId") || error.code === "InvalidAccessKeyId") {
+        userMessage = "Invalid storage credentials. Please check configuration.";
       }
       
       res.status(500).json({ error: userMessage });
