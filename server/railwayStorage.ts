@@ -60,7 +60,7 @@ export class RailwayStorageService {
     }
   }
 
-  async getObjectEntityUploadURL(): Promise<string> {
+  async getObjectEntityUploadURL(): Promise<{ uploadURL: string; objectPath: string }> {
     const s3 = getS3Client();
     const objectId = randomUUID();
     const filePath = `uploads/${objectId}`;
@@ -72,7 +72,12 @@ export class RailwayStorageService {
     });
 
     const signedUrl = await getSignedUrl(s3, command, { expiresIn: 900 }); // 15 minutes
-    return signedUrl;
+    
+    // Return both the signed URL and the normalized object path
+    return {
+      uploadURL: signedUrl,
+      objectPath: `/objects/${filePath}`
+    };
   }
 
   async getObjectEntityFile(objectPath: string): Promise<{ path: string; bucket: string }> {

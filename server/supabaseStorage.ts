@@ -54,7 +54,7 @@ export class SupabaseStorageService {
     }
   }
 
-  async getObjectEntityUploadURL(): Promise<string> {
+  async getObjectEntityUploadURL(): Promise<{ uploadURL: string; objectPath: string }> {
     const supabase = getSupabaseClient();
     const objectId = randomUUID();
     const filePath = `uploads/${objectId}`;
@@ -74,7 +74,11 @@ export class SupabaseStorageService {
       throw new Error("Failed to create upload URL: No signed URL returned");
     }
 
-    return data.signedUrl;
+    // Return both the signed URL and the normalized object path
+    return {
+      uploadURL: data.signedUrl,
+      objectPath: `/objects/${filePath}`
+    };
   }
 
   async getObjectEntityFile(objectPath: string): Promise<{ path: string; bucket: string }> {

@@ -15,6 +15,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await setupLocalAuth(app);
   await seedStaffAccounts();
 
+  // Health check endpoint (no auth required)
+  app.get("/api/health", async (_req, res) => {
+    try {
+      const db = await import("./db").then(m => m.ensureDb());
+      await db.execute({ sql: "SELECT 1", args: [] });
+      
+      const hasRailwayStorage = !!(
+        process.env.RAILWAY_STORAGE_ACCESS_KEY_ID &&
+        process.env.RAILWAY_STORAGE_SECRET_ACCESS_KEY &&
+        process.env.RAILWAY_STORAGE_ENDPOINT
+      );
+      
+      const hasSupabaseStorage = !!(
+        (process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL) &&
+        (process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY)
+      );
+
+      res.json({
+        status: "ok",
+        timestamp: new Date().toISOString(),
+        database: "connected",
+        storage: {
+          railway: hasRailwayStorage ? "configured" : "not_configured",
+          supabase: hasSupabaseStorage ? "configured" : "not_configured"
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        status: "error",
+        error: error.message
+      });
+    }
+  });
+
   app.post("/api/patients", isAuthenticated, async (req: any, res) => {
     try {
       const validatedData = insertPatientSchema.parse(req.body);
@@ -250,10 +284,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/tasks/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/tasks/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const { status } = req.body;
-      const task = await storage.updateTaskStatus(req.params.id, status);
+      const { status, notes, completedBy } = req.body;
+      
+      // If only status is being updated, use the existing method for backward compatibility
+      if (status !== undefined && notes === undefined) {
+        const task = await storage.updateTaskStatus(req.params.id, status, completedBy);
+        return res.json(task);
+      }
+      
+      // Otherwise, use the new updateTask method that supports notes
+      const updates: Partial<{ status: string; notes: string; completedBy?: string }> = {};
+      if (status !== undefined) updates.status = status;
+      if (notes !== undefined) updates.notes = notes;
+      if (completedBy !== undefined) updates.completedBy = completedBy;
+      
+      const task = await storage.updateTask(req.params.id, updates);
+      if (!task) return res.status(404).json({ error: "Task not found" });
       res.json(task);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -472,13 +520,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     );
   }
   
-  app.post("/api/objects/upload", isAuthenticated, async (req, res) => {
+  app.post("/api/objects/upload", isAuthenticated, async (req: any, res) => {
+    const user = req.user as any;
+    console.log(`📤 Upload request from user: ${user?.email || 'unknown'} (role: ${user?.role || 'unknown'}, id: ${user?.id || 'unknown'})`);
+    
     try {
       const storageService = getStorageService();
-      const signedUrl = await storageService.getObjectEntityUploadURL();
-      res.json({ uploadURL: signedUrl });
+      console.log(`✅ Storage service initialized successfully`);
+      const uploadInfo = await storageService.getObjectEntityUploadURL();
+      console.log(`✅ Upload URL generated successfully, objectPath: ${uploadInfo.objectPath}`);
+      res.json({ 
+        uploadURL: uploadInfo.uploadURL,
+        objectPath: uploadInfo.objectPath 
+      });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error(`❌ Upload URL generation failed:`, error.message);
+      console.error(`   Error stack:`, error.stack);
+      
+      // Provide user-friendly error messages
+      let userMessage = error.message;
+      if (error.message?.includes("Storage not configured")) {
+        userMessage = "File storage is not configured. Please contact your administrator.";
+      } else if (error.message?.includes("Railway Storage not configured") || error.message?.includes("Supabase Storage not configured")) {
+        userMessage = "File storage is not configured. Please contact your administrator.";
+      }
+      
+      res.status(500).json({ error: userMessage });
     }
   });
 
@@ -1006,6 +1073,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "Log out and log back in",
           `You should now see ${patientCount} patients`,
         ],
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Diagnostic endpoint for upload issues
+  app.get("/api/debug/upload-status", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user as any;
+      const dbUser = await storage.getUser(user.id);
+      
+      // Check storage configuration
+      const hasRailwayStorage = !!(
+        process.env.RAILWAY_STORAGE_ACCESS_KEY_ID &&
+        process.env.RAILWAY_STORAGE_SECRET_ACCESS_KEY &&
+        process.env.RAILWAY_STORAGE_ENDPOINT
+      );
+      
+      const hasSupabaseStorage = !!(
+        (process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL) &&
+        (process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY)
+      );
+      
+      // Try to initialize storage service
+      let storageServiceStatus = "unknown";
+      let storageError = null;
+      try {
+        const storageService = getStorageService();
+        storageServiceStatus = storageService instanceof RailwayStorageService ? "railway" : "supabase";
+      } catch (error: any) {
+        storageServiceStatus = "error";
+        storageError = error.message;
+      }
+      
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          officeId: dbUser?.officeId || null,
+          canViewAllOffices: dbUser?.canViewAllOffices || false,
+        },
+        authentication: {
+          isAuthenticated: req.isAuthenticated(),
+          sessionId: req.sessionID,
+        },
+        storage: {
+          railway: {
+            configured: hasRailwayStorage,
+            accessKeyId: !!process.env.RAILWAY_STORAGE_ACCESS_KEY_ID,
+            secretAccessKey: !!process.env.RAILWAY_STORAGE_SECRET_ACCESS_KEY,
+            endpoint: !!process.env.RAILWAY_STORAGE_ENDPOINT,
+          },
+          supabase: {
+            configured: hasSupabaseStorage,
+            url: !!(process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL),
+            serviceRole: !!(process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY),
+          },
+          serviceStatus: storageServiceStatus,
+          error: storageError,
+        },
+        timestamp: new Date().toISOString(),
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
