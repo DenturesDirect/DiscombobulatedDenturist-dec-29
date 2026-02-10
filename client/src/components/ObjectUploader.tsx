@@ -1,12 +1,25 @@
-// existing content of ObjectUploader.tsx
+import { UppyFile } from 'uppy';
 
-function getUploadParameters(file) {
-    return {
-        headers: {
-            'Content-Type': file.type
-        }, 
-        ... // other parameters
+export function ObjectUploader() {
+    const onError = (error: any) => {
+        console.error('Upload error: ', error);
+        // Handle the error appropriately in your UI
     };
-}
 
-// existing code continued...
+    const getUploadParameters = (file: UppyFile) => {
+        // Create an upload parameters object
+        const params = {
+            // Your existing implementation goes here
+        };
+        // Ensure proper Content-Type header handling
+        const contentType = file.type
+            ? file.type
+            : 'application/octet-stream';
+        params.headers = {
+            'Content-Type': contentType,
+        };
+        return params;
+    };
+
+    // Implement error handling in your upload logic
+}
