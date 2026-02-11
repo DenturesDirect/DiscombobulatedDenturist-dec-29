@@ -6,10 +6,10 @@ import { extractTextFromPDF } from "./pdfExtractor";
 import { storage } from "./storage";
 import { insertPatientSchema, insertLabNoteSchema, insertAdminNoteSchema, insertLabPrescriptionSchema, insertTaskSchema, insertPatientFileSchema } from "@shared/schema";
 import { setupLocalAuth, isAuthenticated, seedStaffAccounts } from "./localAuth";
-import { SupabaseStorageService, getSupabaseClient } from "./supabaseStorage";
 import { RailwayStorageService, getS3Client, ObjectNotFoundError } from "./railwayStorage";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { sendCustomNotification, sendAppointmentReminder } from "./gmail";
+import { getDbHostType } from "./config";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupLocalAuth(app);
@@ -26,19 +26,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         process.env.RAILWAY_STORAGE_SECRET_ACCESS_KEY &&
         process.env.RAILWAY_STORAGE_ENDPOINT
       );
-      
-      const hasSupabaseStorage = !!(
-        (process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL) &&
-        (process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY)
-      );
 
       res.json({
         status: "ok",
         timestamp: new Date().toISOString(),
         database: "connected",
+        databaseHostType: getDbHostType(),
         storage: {
-          railway: hasRailwayStorage ? "configured" : "not_configured",
-          supabase: hasSupabaseStorage ? "configured" : "not_configured"
+          railway: hasRailwayStorage ? "configured" : "not_configured"
         }
       });
     } catch (error: any) {
@@ -480,45 +475,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Object storage upload URL generation
-  // Priority: Railway Storage > Supabase Storage
-  function getStorageService() {
-    // Try Railway Storage first (Railway's built-in S3-compatible storage)
+  // Object storage - Railway-only (no Supabase for uploads)
+  function getStorageService(): RailwayStorageService {
     const railwayAccessKey = process.env.RAILWAY_STORAGE_ACCESS_KEY_ID;
     const railwaySecretKey = process.env.RAILWAY_STORAGE_SECRET_ACCESS_KEY;
     const railwayEndpoint = process.env.RAILWAY_STORAGE_ENDPOINT;
-    
+
     if (railwayAccessKey && railwaySecretKey && railwayEndpoint) {
       try {
-        console.log("💾 Using Railway Storage Buckets for file uploads");
         return new RailwayStorageService();
       } catch (error: any) {
-        console.warn("⚠️  Railway Storage not available:", error.message);
+        console.warn("⚠️  Railway Storage init failed:", error.message);
       }
     }
-    
-    // Fallback to Supabase Storage
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
-    if (supabaseUrl && supabaseKey) {
-      try {
-        console.log("💾 Using Supabase Storage for file uploads");
-        return new SupabaseStorageService();
-      } catch (error: any) {
-        console.warn("⚠️  Supabase Storage not available:", error.message);
-      }
-    }
-    
-    // No storage configured - provide helpful error
-    console.error("❌ ERROR: No storage service configured!");
-    console.error("   Set either Railway Storage (RAILWAY_STORAGE_*) or Supabase Storage (SUPABASE_*) environment variables.");
+
+    console.error("❌ Railway Storage not configured. Set RAILWAY_STORAGE_ACCESS_KEY_ID, RAILWAY_STORAGE_SECRET_ACCESS_KEY, RAILWAY_STORAGE_ENDPOINT.");
     throw new Error(
-      "Storage not configured. Please either:\n" +
-      "1. Set up Railway Storage Buckets (RAILWAY_STORAGE_ACCESS_KEY_ID, RAILWAY_STORAGE_SECRET_ACCESS_KEY, RAILWAY_STORAGE_ENDPOINT), OR\n" +
-      "2. Set up Supabase Storage (SUPABASE_URL and SUPABASE_SERVICE_ROLE)"
+      "Storage not configured. Set up Railway Storage Buckets: RAILWAY_STORAGE_ACCESS_KEY_ID, RAILWAY_STORAGE_SECRET_ACCESS_KEY, RAILWAY_STORAGE_ENDPOINT."
     );
   }
+
   
   // Diagnostic endpoint to check storage configuration
   app.get("/api/storage/status", isAuthenticated, async (req: any, res) => {
@@ -528,25 +504,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const railwayEndpoint = !!process.env.RAILWAY_STORAGE_ENDPOINT;
       const railwayBucket = process.env.RAILWAY_STORAGE_BUCKET_NAME || "patient-files";
       
-      const supabaseUrl = !!process.env.SUPABASE_URL || !!process.env.SUPABASE_PROJECT_URL;
-      const supabaseKey = !!process.env.SUPABASE_SERVICE_ROLE || !!process.env.SUPABASE_SERVICE_ROLE_KEY;
-      
       const railwayConfigured = railwayAccessKey && railwaySecretKey && railwayEndpoint;
-      const supabaseConfigured = supabaseUrl && supabaseKey;
       
-      // Try to initialize storage service
+      // Try to initialize storage service (Railway only)
       let storageWorking = false;
-      let storageError = null;
+      let storageError: string | null = null;
       try {
         const storageService = getStorageService();
-        storageWorking = true;
-        // Try to generate a test URL
         await storageService.getObjectEntityUploadURL();
+        storageWorking = true;
       } catch (error: any) {
-        storageWorking = false;
         storageError = error.message;
       }
-      
+
       res.json({
         railway: {
           configured: railwayConfigured,
@@ -555,14 +525,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           endpointSet: railwayEndpoint,
           bucketName: railwayBucket,
         },
-        supabase: {
-          configured: supabaseConfigured,
-          urlSet: supabaseUrl,
-          keySet: supabaseKey,
-        },
+        supabase: { configured: false, note: "Railway-only deployment" },
         storageWorking,
         storageError,
-        activeStorage: railwayConfigured ? "railway" : (supabaseConfigured ? "supabase" : "none"),
+        activeStorage: railwayConfigured ? "railway" : "none",
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -575,8 +541,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       const storageService = getStorageService();
-      console.log(`✅ Storage service initialized successfully`);
-      console.log(`   Storage type: ${storageService instanceof RailwayStorageService ? 'Railway' : 'Supabase'}`);
+      console.log(`✅ Storage service initialized successfully (Railway)`);
       
       const uploadInfo = await storageService.getObjectEntityUploadURL();
       console.log(`✅ Upload URL generated successfully`);
@@ -649,48 +614,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         try {
           const storageService = getStorageService();
-          
-          // Handle Supabase Storage
-          if (storageService instanceof SupabaseStorageService) {
-            const fileInfo = await storageService.getObjectEntityFile(storagePath);
-            const supabase = getSupabaseClient();
-            const { data, error } = await supabase.storage
-              .from(fileInfo.bucket)
-              .download(fileInfo.path);
-            
-            if (error || !data) {
-              throw new Error("Failed to download file from Supabase");
-            }
-            
-            const arrayBuffer = await data.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
-            const base64 = buffer.toString('base64');
-            finalImageUrl = `data:image/jpeg;base64,${base64}`;
-          } else if (storageService instanceof RailwayStorageService) {
-            // Handle Railway Storage
-            const fileInfo = await storageService.getObjectEntityFile(storagePath);
-            const s3 = getS3Client();
-            
-            const command = new GetObjectCommand({
-              Bucket: fileInfo.bucket,
-              Key: fileInfo.path,
-            });
-            
-            const response = await s3.send(command);
-            if (!response.Body) {
-              throw new Error("Failed to download file from Railway Storage");
-            }
-            
-            const chunks: Uint8Array[] = [];
-            for await (const chunk of response.Body as any) {
-              chunks.push(chunk);
-            }
-            const buffer = Buffer.concat(chunks);
-            const base64 = buffer.toString('base64');
-            finalImageUrl = `data:image/jpeg;base64,${base64}`;
-          } else {
-            throw new Error("Unsupported storage service for image analysis");
-          }
+          const fileInfo = await storageService.getObjectEntityFile(storagePath);
+          const s3 = getS3Client();
+          const command = new GetObjectCommand({
+            Bucket: fileInfo.bucket,
+            Key: fileInfo.path,
+          });
+          const response = await s3.send(command);
+          if (!response.Body) throw new Error("Failed to download file from Railway Storage");
+          const chunks: Uint8Array[] = [];
+          for await (const chunk of response.Body as any) chunks.push(chunk);
+          const buffer = Buffer.concat(chunks);
+          finalImageUrl = `data:image/jpeg;base64,${buffer.toString('base64')}`;
         } catch (error: any) {
           console.error("Error fetching image from storage:", error);
           return res.status(404).json({ error: "Image not found in storage" });
@@ -730,57 +665,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // The storage service expects paths starting with "/objects/"
       const storagePath = `/objects/${pathAfterApi}`;
       
-      // Try both storage services - files might be in either Supabase or Railway  
-      // First try Supabase (for old files) - updated to remove old ObjectStorageService dependency
-      const supabaseUrl = process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL;
-      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY;
-      
-      if (supabaseUrl && supabaseKey) {
-        try {
-          const supabaseService = new SupabaseStorageService();
-          const fileInfo = await supabaseService.getObjectEntityFile(storagePath);
-          await supabaseService.downloadObject(fileInfo, res);
-          if (!res.headersSent) {
-            return; // Successfully served from Supabase
-          }
-        } catch (supabaseError: any) {
-          // File not in Supabase, try Railway next (only if response not sent)
-          if (!res.headersSent) {
-            console.log("📁 File not in Supabase, trying Railway Storage...");
-          } else {
-            return; // Response already sent, exit
-          }
-        }
-      }
-      
-      // Try Railway Storage (for new files) - only if response not sent yet
-      if (res.headersSent) {
-        return; // Response already sent, exit
-      }
-      
+      // Railway-only: single source for object storage
       const railwayAccessKey = process.env.RAILWAY_STORAGE_ACCESS_KEY_ID;
       const railwaySecretKey = process.env.RAILWAY_STORAGE_SECRET_ACCESS_KEY;
       const railwayEndpoint = process.env.RAILWAY_STORAGE_ENDPOINT;
-      
+
       if (railwayAccessKey && railwaySecretKey && railwayEndpoint) {
         try {
           const railwayService = new RailwayStorageService();
           const fileInfo = await railwayService.getObjectEntityFile(storagePath);
           await railwayService.downloadObject(fileInfo, res);
-          if (!res.headersSent) {
-            return; // Successfully served from Railway
-          }
+          if (res.headersSent) return;
         } catch (railwayError: any) {
-          // File not in Railway either
           if (!res.headersSent) {
-            console.error("❌ File not found in Railway Storage:", railwayError.message);
-          } else {
-            return; // Response already sent, exit
+            console.log("📁 File not found in Railway Storage");
           }
         }
       }
-      
-      // File not found in either storage - only send error if response not sent
+
+      // File not found in storage
       if (!res.headersSent) {
         throw new ObjectNotFoundError();
       }
@@ -1170,22 +1073,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         process.env.RAILWAY_STORAGE_ENDPOINT
       );
       
-      const hasSupabaseStorage = !!(
-        (process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL) &&
-        (process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY)
-      );
-      
-      // Try to initialize storage service
+      // Try to initialize storage service (Railway only)
       let storageServiceStatus = "unknown";
-      let storageError = null;
+      let storageError: string | null = null;
       try {
         const storageService = getStorageService();
-        storageServiceStatus = storageService instanceof RailwayStorageService ? "railway" : "supabase";
+        storageServiceStatus = "railway";
       } catch (error: any) {
         storageServiceStatus = "error";
         storageError = error.message;
       }
       
+      // Redacted env snapshot for rollback documentation (no secrets)
+      const envSnapshot: Record<string, string> = {};
+      const dbUrl = process.env.DATABASE_URL;
+      if (dbUrl) {
+        try {
+          const u = new URL(dbUrl.replace(/^postgresql:/, "https:"));
+          envSnapshot.DATABASE_URL = `***@${u.hostname}${u.pathname}`;
+        } catch {
+          envSnapshot.DATABASE_URL = "(set)";
+        }
+      } else {
+        envSnapshot.DATABASE_URL = "(not set)";
+      }
+      envSnapshot.RAILWAY_STORAGE = hasRailwayStorage ? "configured" : "not_configured";
+
       res.json({
         user: {
           id: user.id,
@@ -1207,14 +1120,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             secretAccessKey: !!process.env.RAILWAY_STORAGE_SECRET_ACCESS_KEY,
             endpoint: !!process.env.RAILWAY_STORAGE_ENDPOINT,
           },
-          supabase: {
-            configured: hasSupabaseStorage,
-            url: !!(process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL),
-            serviceRole: !!(process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY),
-          },
+          supabase: { configured: false, note: "Railway-only deployment" },
           serviceStatus: storageServiceStatus,
           error: storageError,
         },
+        envSnapshot,
         timestamp: new Date().toISOString(),
       });
     } catch (error: any) {

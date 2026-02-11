@@ -3,6 +3,7 @@ import { resolve } from "path";
 config({ path: resolve(process.cwd(), ".env", ".env") });
 config({ path: resolve(process.cwd(), ".env") });
 import express, { type Request, Response, NextFunction } from "express";
+import { getDbHostType } from "./config";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedData } from "./seed";
@@ -56,12 +57,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// Log all environment variables on startup (for debugging Railway variable issues)
-console.log("🔍 Environment Variables Check:");
-console.log("  SUPABASE_URL:", (process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL) ? `✅ Set (${(process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL)!.substring(0, 30)}...)` : "❌ Missing");
-console.log("  SUPABASE_SERVICE_ROLE:", (process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY) ? "✅ Set" : "❌ Missing");
-console.log("  SUPABASE_STORAGE_BUCKET:", process.env.SUPABASE_STORAGE_BUCKET || "patient-files (default)");
-console.log("  All SUPABASE_* vars:", Object.keys(process.env).filter(k => k.toUpperCase().startsWith('SUPABASE')).join(', ') || 'None');
+// Log storage/DB configuration on startup (Railway-only deployment)
+const hasRailwayStorage = !!(
+  process.env.RAILWAY_STORAGE_ACCESS_KEY_ID &&
+  process.env.RAILWAY_STORAGE_SECRET_ACCESS_KEY &&
+  process.env.RAILWAY_STORAGE_ENDPOINT
+);
+console.log("🔍 Storage/DB Check:");
+console.log("  DB host type:", getDbHostType(), "(railway = preferred for Railway-only deployment)");
+console.log("  Railway Storage:", hasRailwayStorage ? "✅ configured" : "❌ not configured");
+console.log("  Supabase Storage:", (process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL) && (process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY) ? "configured (legacy - not used at runtime)" : "not configured");
 
 (async () => {
   // #region agent log

@@ -6,7 +6,7 @@ config({ path: resolve(process.cwd(), ".env") });
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";
-import { USE_MEM_STORAGE, DATABASE_URL } from './config';
+import { USE_MEM_STORAGE, DATABASE_URL, getDbHostType } from './config';
 
 const { Pool } = pg;
 
@@ -60,7 +60,13 @@ if (!USE_MEM_STORAGE) {
   });
   
   db = drizzle(pool, { schema });
-  
+
+  const dbHost = getDbHostType();
+  console.log(`📌 DB host type: ${dbHost} (railway = preferred for Railway-only deployment)`);
+  if (dbHost === "supabase") {
+    console.log(`⚠️  DATABASE_URL points to Supabase. For Railway-only setup, point it to Railway Postgres.`);
+  }
+
   // Test connection on startup to catch errors early
   pool.connect().then(client => {
     client.release();
