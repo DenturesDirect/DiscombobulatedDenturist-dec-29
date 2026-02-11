@@ -19,7 +19,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/health", async (_req, res) => {
     try {
       const db = await import("./db").then(m => m.ensureDb());
-      await db.execute({ sql: "SELECT 1", args: [] });
+      const { sql } = await import("drizzle-orm");
+      await db.execute(sql`SELECT 1`);
       
       const hasRailwayStorage = !!(
         process.env.RAILWAY_STORAGE_ACCESS_KEY_ID &&
