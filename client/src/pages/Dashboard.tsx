@@ -999,65 +999,20 @@ export default function Dashboard() {
                     
                     for (const photo of photos) {
                       try {
-                        // Get upload URL
-                        const urlResponse = await apiRequest('POST', '/api/objects/upload', {});
-                        const { uploadURL } = await urlResponse.json();
-                        
-                        // Determine storage type by URL
-                        const isSupabase = uploadURL.includes('.supabase.co');
-                        const isRailway = uploadURL.includes('railway.app') || uploadURL.includes('railway-storage');
-                        
-                        // Upload the file
-                        // Supabase uses POST, Railway uses PUT
-                        const uploadResponse = await fetch(uploadURL, {
-                          method: isSupabase ? 'POST' : 'PUT',
-                          body: photo,
-                          headers: { 'Content-Type': photo.type }
+                        // Proxy upload (same origin) to avoid CORS with presigned storage URL
+                        const formData = new FormData();
+                        formData.append('file', photo);
+                        const uploadResponse = await fetch('/api/objects/upload-direct', {
+                          method: 'POST',
+                          body: formData,
+                          credentials: 'include',
                         });
-                        
                         if (!uploadResponse.ok) {
-                          throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+                          const err = await uploadResponse.json().catch(() => ({}));
+                          throw new Error(err.error || uploadResponse.statusText);
                         }
-                        
-                        // Extract the object path from the upload URL
-                        let objectId = '';
-                        
-                        if (isSupabase) {
-                          // Supabase URL format: https://[project].supabase.co/storage/v1/object/sign/[bucket]/uploads/[uuid]?...
-                          const uploadUrlObj = new URL(uploadURL);
-                          const pathParts = uploadUrlObj.pathname.split('/').filter(p => p);
-                          
-                          const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
-                          if (uploadsIndex >= 0) {
-                            objectId = pathParts.slice(uploadsIndex).join('/');
-                          } else {
-                            objectId = pathParts[pathParts.length - 1] || 'unknown';
-                          }
-                        } else if (isRailway) {
-                          // Railway Storage (S3-compatible) URL format: https://[endpoint]/[bucket]/uploads/[uuid]?...
-                          const uploadUrlObj = new URL(uploadURL);
-                          const pathParts = uploadUrlObj.pathname.split('/').filter(p => p);
-                          
-                          const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
-                          if (uploadsIndex >= 0) {
-                            objectId = pathParts.slice(uploadsIndex).join('/');
-                          } else {
-                            objectId = pathParts[pathParts.length - 1] || 'unknown';
-                          }
-                        } else {
-                          // Legacy/Unknown URL format - try to extract path
-                          const uploadUrlObj = new URL(uploadURL);
-                          const pathParts = uploadUrlObj.pathname.split('/').filter(p => p);
-                          
-                          const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
-                          if (uploadsIndex >= 0) {
-                            objectId = pathParts.slice(uploadsIndex).join('/');
-                          } else {
-                            objectId = pathParts[pathParts.length - 1] || 'unknown';
-                          }
-                        }
-                        
-                        const fileUrl = `/api/objects/${objectId}`;
+                        const { objectPath } = await uploadResponse.json();
+                        const fileUrl = `/api${objectPath}`;
                         
                         // Save file record to database
                         await apiRequest('POST', `/api/patients/${patientId}/files`, {
@@ -1494,65 +1449,20 @@ export default function Dashboard() {
                           
                           for (const photo of photos) {
                             try {
-                              // Get upload URL
-                              const urlResponse = await apiRequest('POST', '/api/objects/upload', {});
-                              const { uploadURL } = await urlResponse.json();
-                              
-                              // Determine storage type by URL
-                              const isSupabase = uploadURL.includes('.supabase.co');
-                              const isRailway = uploadURL.includes('railway.app') || uploadURL.includes('railway-storage');
-                              
-                              // Upload the file
-                              // Supabase uses POST, Railway uses PUT
-                              const uploadResponse = await fetch(uploadURL, {
-                                method: isSupabase ? 'POST' : 'PUT',
-                                body: photo,
-                                headers: { 'Content-Type': photo.type }
+                              // Proxy upload (same origin) to avoid CORS with presigned storage URL
+                              const formData = new FormData();
+                              formData.append('file', photo);
+                              const uploadResponse = await fetch('/api/objects/upload-direct', {
+                                method: 'POST',
+                                body: formData,
+                                credentials: 'include',
                               });
-                              
                               if (!uploadResponse.ok) {
-                                throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+                                const err = await uploadResponse.json().catch(() => ({}));
+                                throw new Error(err.error || uploadResponse.statusText);
                               }
-                              
-                              // Extract the object path from the upload URL
-                              let objectId = '';
-                              
-                              if (isSupabase) {
-                                // Supabase URL format: https://[project].supabase.co/storage/v1/object/sign/[bucket]/uploads/[uuid]?...
-                                const uploadUrlObj = new URL(uploadURL);
-                                const pathParts = uploadUrlObj.pathname.split('/').filter(p => p);
-                                
-                                const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
-                                if (uploadsIndex >= 0) {
-                                  objectId = pathParts.slice(uploadsIndex).join('/');
-                                } else {
-                                  objectId = pathParts[pathParts.length - 1] || 'unknown';
-                                }
-                              } else if (isRailway) {
-                                // Railway Storage (S3-compatible) URL format: https://[endpoint]/[bucket]/uploads/[uuid]?...
-                                const uploadUrlObj = new URL(uploadURL);
-                                const pathParts = uploadUrlObj.pathname.split('/').filter(p => p);
-                                
-                                const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
-                                if (uploadsIndex >= 0) {
-                                  objectId = pathParts.slice(uploadsIndex).join('/');
-                                } else {
-                                  objectId = pathParts[pathParts.length - 1] || 'unknown';
-                                }
-                              } else {
-                                // Legacy/Unknown URL format - try to extract path
-                                const uploadUrlObj = new URL(uploadURL);
-                                const pathParts = uploadUrlObj.pathname.split('/').filter(p => p);
-                                
-                                const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
-                                if (uploadsIndex >= 0) {
-                                  objectId = pathParts.slice(uploadsIndex).join('/');
-                                } else {
-                                  objectId = pathParts[pathParts.length - 1] || 'unknown';
-                                }
-                              }
-                              
-                              const fileUrl = `/api/objects/${objectId}`;
+                              const { objectPath } = await uploadResponse.json();
+                              const fileUrl = `/api${objectPath}`;
                               
                               // Save file record to database
                               await apiRequest('POST', `/api/patients/${patientId}/files`, {

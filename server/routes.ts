@@ -400,6 +400,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generic file upload (any type) for documents/photos - 50MB
+  const uploadAny = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 50 * 1024 * 1024 },
+  });
+
   // Chart upload endpoint for PDF processing
   const upload = multer({ 
     storage: multer.memoryStorage(),
@@ -589,6 +595,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.status(500).json({ error: userMessage });
+    }
+  });
+
+  // Proxy upload: client POSTs file to same origin (avoids CORS with presigned URL)
+  app.post("/api/objects/upload-direct", isAuthenticated, uploadAny.any(), async (req: any, res) => {
+    try {
+      const file = (req.files && req.files[0]) || req.file;
+      if (!file || !file.buffer) {
+        return res.status(400).json({ error: "No file in request" });
+      }
+      const storageService = getStorageService();
+      const { objectPath } = await storageService.uploadBuffer(
+        file.buffer,
+        file.mimetype || "application/octet-stream"
+      );
+      res.json({ objectPath, uploadURL: "" });
+    } catch (error: any) {
+      console.error("Upload-direct error:", error);
+      res.status(500).json({ error: error.message || "Upload failed" });
     }
   });
 

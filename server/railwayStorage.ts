@@ -89,6 +89,22 @@ export class RailwayStorageService {
     }
   }
 
+  /** Upload file buffer server-side (avoids CORS with presigned URL) */
+  async uploadBuffer(buffer: Buffer, contentType: string = "application/octet-stream"): Promise<{ objectPath: string }> {
+    const s3 = getS3Client();
+    const objectId = randomUUID();
+    const filePath = `uploads/${objectId}`;
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: filePath,
+        Body: buffer,
+        ContentType: contentType,
+      })
+    );
+    return { objectPath: `/objects/${filePath}` };
+  }
+
   async getObjectEntityFile(objectPath: string): Promise<{ path: string; bucket: string }> {
     if (!objectPath.startsWith("/objects/")) {
       throw new ObjectNotFoundError();

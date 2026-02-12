@@ -36,25 +36,28 @@ export default function DocumentUploadZone({ patientId, onUploadComplete }: Docu
       let fileUrl: string;
       
       if (objectPathRef.current) {
-        // Use the objectPath directly from the server response
         fileUrl = `/api${objectPathRef.current}`;
         console.log("✅ [DocumentUploadZone] Using objectPath from ref:", fileUrl);
-        objectPathRef.current = null; // Clear after use
+        objectPathRef.current = null;
       } else {
-        // Fallback: try to parse the upload URL (for backward compatibility)
-        const rawUrl = uploadedFile.uploadURL as string;
-        console.log("⚠️ [DocumentUploadZone] No objectPath in ref, parsing URL:", rawUrl);
-        
-        try {
-          const gcsUrl = new URL(rawUrl);
-          const pathParts = gcsUrl.pathname.split('/');
-          const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
-          const objectId = uploadsIndex >= 0 ? pathParts.slice(uploadsIndex).join('/') : pathParts.slice(-2).join('/');
-          fileUrl = `/api/objects/${objectId}`;
-          console.log("✅ [DocumentUploadZone] Parsed URL to:", fileUrl);
-        } catch (parseError) {
-          console.error("❌ [DocumentUploadZone] Failed to parse upload URL:", parseError);
-          throw new Error("Failed to determine file path. Please try uploading again.");
+        // Proxy upload: objectPath may be in the upload response body
+        const responseBody = (uploadedFile as any).response?.body ?? (uploadedFile as any).response;
+        const proxyPath = responseBody?.objectPath;
+        if (proxyPath) {
+          fileUrl = `/api${proxyPath}`;
+          console.log("✅ [DocumentUploadZone] Using objectPath from proxy response:", fileUrl);
+        } else {
+          // Fallback: parse from presigned URL (legacy)
+          const rawUrl = uploadedFile.uploadURL as string;
+          try {
+            const gcsUrl = new URL(rawUrl, window.location.origin);
+            const pathParts = gcsUrl.pathname.split('/');
+            const uploadsIndex = pathParts.findIndex(p => p === 'uploads');
+            const objectId = uploadsIndex >= 0 ? pathParts.slice(uploadsIndex).join('/') : pathParts.slice(-2).join('/');
+            fileUrl = `/api/objects/${objectId}`;
+          } catch {
+            throw new Error("Failed to determine file path. Please try uploading again.");
+          }
         }
       }
       
@@ -103,23 +106,12 @@ export default function DocumentUploadZone({ patientId, onUploadComplete }: Docu
           maxNumberOfFiles={1}
           maxFileSize={50 * 1024 * 1024} // 50MB limit for documents
           onGetUploadParameters={async () => {
-            console.log("🔍 [DocumentUploadZone] Requesting upload URL...");
+            console.log("🔍 [DocumentUploadZone] Using proxy upload (avoids CORS).");
             try {
-              const response = await apiRequest('POST', '/api/objects/upload', {});
-              const data = await response.json();
-              console.log("✅ [DocumentUploadZone] Upload URL received:", { 
-                urlLength: data.uploadURL?.length,
-                objectPath: data.objectPath 
-              });
-              
-              // Store objectPath in ref for use after upload completes
-              if (data.objectPath) {
-                objectPathRef.current = data.objectPath;
-              }
-              
+              // Proxy upload: same origin, no presigned URL (avoids "Failed to fetch" from storage CORS)
               return {
-                method: "PUT" as const,
-                url: data.uploadURL,
+                method: "POST" as const,
+                url: "/api/objects/upload-direct",
               };
             } catch (error: any) {
               console.error("❌ [DocumentUploadZone] Error requesting upload URL:", error);
