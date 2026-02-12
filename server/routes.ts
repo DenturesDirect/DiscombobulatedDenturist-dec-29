@@ -15,12 +15,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await setupLocalAuth(app);
   await seedStaffAccounts();
 
-  // Health check endpoint (no auth required)
+  // Health check endpoint (no auth required) - use raw pool so it works on any Drizzle version
   app.get("/api/health", async (_req, res) => {
     try {
-      const db = await import("./db").then(m => m.ensureDb());
-      const { sql } = await import("drizzle-orm");
-      await db.execute(sql`SELECT 1`);
+      const pool = await import("./db").then(m => m.ensurePool());
+      await pool.query("SELECT 1");
       
       const hasRailwayStorage = !!(
         process.env.RAILWAY_STORAGE_ACCESS_KEY_ID &&
