@@ -31,7 +31,10 @@
     "verify-storage-config": "tsx scripts/verify-storage-config.ts",
     "smoke-tests": "tsx scripts/smoke-tests.ts",
     "test-upload-fix": "tsx -r dotenv/config scripts/test-upload-fix.ts",
-    "verify-upload-fix": "tsx scripts/verify-upload-fix.ts"
+    "verify-upload-fix": "tsx scripts/verify-upload-fix.ts",
+    "baseline-diagnostics": "tsx scripts/baseline-diagnostics.ts",
+    "repair-file-urls": "tsx scripts/repair-file-urls.ts",
+    "e2e-verify": "tsx scripts/run-e2e-verification.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.971.0",
