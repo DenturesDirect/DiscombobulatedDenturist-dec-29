@@ -3,7 +3,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Bell, Moon, Sun } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import mascotImage from "@assets/dentureflow-pro-logo.png";
 
 interface TopNavProps {
   userName: string;
@@ -26,7 +25,7 @@ export default function TopNav({ userName, userRole, notificationCount = 0, isDa
         <div className="flex items-center gap-3">
           <div className="h-11 w-28 rounded-md border border-primary/25 bg-background/80 px-2 shadow-sm ring-1 ring-primary/10">
             <img
-              src={mascotImage}
+              src="/brand-logo.png"
               alt="DentureFlow Pro 2.0"
               className="h-full w-full object-contain transition-transform hover:scale-105"
               data-testid="img-logo"
