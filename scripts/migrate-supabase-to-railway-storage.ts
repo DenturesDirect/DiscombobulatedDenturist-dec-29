@@ -15,7 +15,7 @@ import { ensureDb } from "../server/db";
 import { patientFiles, patients } from "../shared/schema";
 import { getSupabaseClient } from "../server/supabaseStorage";
 import { getS3Client } from "../server/railwayStorage";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { eq } from "drizzle-orm";
 
 async function migrateStorage() {
@@ -114,6 +114,16 @@ async function migrateStorage() {
           console.log(`   ⚠️  Unknown URL format: ${fileUrl}`);
           errors++;
           continue;
+        }
+        // If file may already be in Railway (canonical path), check first
+        const railwayPath = filePath.startsWith("uploads/") ? filePath : `uploads/${filePath.split("/").pop() || file.id}`;
+        try {
+          await s3.send(new HeadObjectCommand({ Bucket: railwayBucket, Key: railwayPath }));
+          console.log(`   ⏭️  File already exists in Railway, skipping...`);
+          skipped++;
+          continue;
+        } catch {
+          // Not in Railway, proceed with migration from Supabase
         }
 
         console.log(`   📥 Downloading from Supabase: ${filePath}`);
@@ -292,7 +302,8 @@ async function migrateStorage() {
 // Export for use in API endpoint
 export { migrateStorage };
 
-// Run if called directly (via npm script)
-if (require.main === module || process.argv[1]?.includes('migrate-supabase-to-railway-storage')) {
-  migrateStorage().catch(console.error);
-}
+// Run when executed directly (npm run migrate-storage)
+migrateStorage().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

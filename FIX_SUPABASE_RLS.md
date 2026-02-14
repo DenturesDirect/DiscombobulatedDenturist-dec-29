@@ -1,5 +1,7 @@
 # 🔒 Fix Supabase Security Warnings (RLS)
 
+**Note:** This app uses Railway-only deployment. Supabase is not used at runtime. If you no longer use Supabase, you can delete the project (see Alternative below). This doc is kept for historical reference.
+
 ## The Problem
 
 Your Supabase database has tables but **no Row Level Security (RLS)** enabled. This means:

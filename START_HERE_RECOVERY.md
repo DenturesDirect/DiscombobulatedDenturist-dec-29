@@ -1,9 +1,11 @@
-# 🚨 START HERE - Data Recovery Guide
+# 🚨 START HERE - Railway-Only Recovery Guide
 
-## Your Situation
-- ✅ **Your 170 patients ARE SAFE** - they're in Railway Postgres
-- ❌ **Your app is pointing to the wrong database** (Supabase, which is empty)
-- 🔧 **Fix:** Change one variable in Railway Dashboard (5 minutes)
+## Deployment Model: Railway Only
+
+This app uses **Railway Postgres** for the database and **Railway Storage** for files. **Supabase is not used at runtime.** Do not add Supabase env vars for production; the app has no runtime dependency on Supabase.
+
+- **DATABASE_URL** must point **only** to Railway Postgres (never to Supabase for app runtime)
+- **RAILWAY_STORAGE_*** must be set for document uploads/downloads
 
 ---
 
@@ -27,14 +29,19 @@ The fix is literally:
 
 ### Diagnostic Tools (run locally)
 ```powershell
-# Compare Railway vs Supabase databases
-$env:RAILWAY_DB_URL="railway_url"; $env:SUPABASE_DB_URL="supabase_url"; npm run compare-databases
+# Baseline before changes
+npm run baseline-diagnostics
 
-# Verify data after fix
-$env:DATABASE_URL="railway_postgres_url"; npm run verify-data-restored
+# Verify database and storage
+npm run check-db
+npm run diagnose-storage
 
-# Diagnose office scope issues (if patients don't show)
-$env:DATABASE_URL="railway_postgres_url"; npm run fix-office-scope
+# Repair file URLs to canonical format
+npm run repair-file-urls -- --dry-run   # preview
+npm run repair-file-urls                # apply
+
+# Migrate legacy Supabase files to Railway (if needed)
+npm run migrate-storage
 ```
 
 ---
@@ -43,15 +50,9 @@ $env:DATABASE_URL="railway_postgres_url"; npm run fix-office-scope
 
 Your app uses **one database** - whatever `DATABASE_URL` points to.
 
-**Right now:**
-- `DATABASE_URL` in Railway web service = Supabase URL ❌
-- Your real data = Railway Postgres ✅
-- Result = App shows empty/test database
-
-**After fix:**
-- `DATABASE_URL` in Railway web service = Railway Postgres URL ✅
-- Your real data = Railway Postgres ✅
-- Result = App shows your 170 patients! 🎉
+**Required:**
+- `DATABASE_URL` = Railway Postgres connection string
+- `RAILWAY_STORAGE_ACCESS_KEY_ID`, `RAILWAY_STORAGE_SECRET_ACCESS_KEY`, `RAILWAY_STORAGE_ENDPOINT` = Railway Storage credentials
 
 ---
 
@@ -68,9 +69,7 @@ Your app uses **one database** - whatever `DATABASE_URL` points to.
 3. See `RECOVER_DATA_NOW.md` Step 5 for details
 
 ### Need to compare databases?
-1. Get Railway Postgres URL from Railway → Postgres → Variables
-2. Get Supabase URL from Railway → web → Variables (current `DATABASE_URL`)
-3. Run: `npm run compare-databases` with both URLs
+Use `npm run compare-databases` with **separate** URLs (e.g. from env files). Do not point the app's `DATABASE_URL` at Supabase; keep it on Railway Postgres only.
 
 ---
 
