@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Bell, Moon, Sun } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import mascotImage from "@assets/4dbde174-cea7-4870-9e8b-e390986a9b22-md_1766378992180.jpeg";
+import mascotImage from "@assets/dentureflow-pro-logo.png";
 
 interface TopNavProps {
   userName: string;
@@ -24,9 +24,13 @@ export default function TopNav({ userName, userRole, notificationCount = 0, isDa
     <div className="h-16 border-b bg-background/95 backdrop-blur-sm px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <img src={mascotImage} alt="The Discombobulated Denturist" className="h-12 w-12 object-cover rounded-full border-2 border-primary/30 shadow-md ring-2 ring-primary/10 transition-transform hover:scale-105" data-testid="img-logo" />
-            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary/20 to-transparent pointer-events-none"></div>
+          <div className="h-11 w-28 rounded-md border border-primary/25 bg-background/80 px-2 shadow-sm ring-1 ring-primary/10">
+            <img
+              src={mascotImage}
+              alt="DentureFlow Pro 2.0"
+              className="h-full w-full object-contain transition-transform hover:scale-105"
+              data-testid="img-logo"
+            />
           </div>
           <div className="hidden sm:block h-6 w-px bg-border"></div>
         </div>
