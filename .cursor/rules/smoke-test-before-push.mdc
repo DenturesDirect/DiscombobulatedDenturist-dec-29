@@ -1,0 +1,39 @@
+---
+description: Run smoke tests before push for risky app changes
+alwaysApply: true
+---
+
+# Smoke Test Gate (Required Before Push)
+
+Use this rule whenever making changes that could affect user workflows. Keep results simple: PASS/FAIL with short notes.
+
+## When Smoke Testing Is Required
+
+- Always before commit/push.
+- Immediately after changes in upload/auth/storage/routing/UI behavior.
+
+## Required Smoke Test Checklist
+
+1. Run `npm run check` and note whether failures are new or pre-existing.
+2. Validate app flow on localhost:
+   - Login works.
+   - Document upload works in `Photos and documents`.
+   - Radiograph/CBCT upload works in `Radiograph / CBCT Scan Analysis`.
+3. Confirm no new blocking console/API errors during those actions.
+
+## Pass/Fail Rule
+
+- If a required smoke test fails, do not commit/push until fixed or explicitly approved by the user.
+- If infrastructure is missing (example: storage env vars), clearly separate:
+  - code-path status (PASS/FAIL)
+  - environment/config status (PASS/FAIL)
+
+## Reporting Format
+
+Include a short release note before push:
+
+- `Login`: PASS/FAIL
+- `Document upload`: PASS/FAIL
+- `Radiograph/CBCT upload`: PASS/FAIL
+- `New errors introduced`: YES/NO (list if yes)
+
