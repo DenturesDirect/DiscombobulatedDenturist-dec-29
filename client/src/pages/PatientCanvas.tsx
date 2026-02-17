@@ -55,7 +55,7 @@ export default function PatientCanvas() {
       <TopNav 
         userName="Damien"
         userRole="Denturist"
-        notificationCount={3}
+        notificationCount={0}
         isDark={isDark}
         onThemeToggle={handleThemeToggle}
         onLogout={() => console.log('Logout')}

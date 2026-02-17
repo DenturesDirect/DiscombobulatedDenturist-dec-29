@@ -81,6 +81,14 @@ async function migrateStorage() {
     return null;
   };
 
+  const buildRailwayPath = (filePath: string, fallbackId: string): string => {
+    // Preserve canonical uploads paths (including subdirectories) to avoid duplicate uploads.
+    if (filePath.startsWith("uploads/")) {
+      return filePath;
+    }
+    return `uploads/${filePath.split("/").pop() || fallbackId}`;
+  };
+
   try {
     // Get all files from database
     const allFiles = await db.select().from(patientFiles);
@@ -116,7 +124,7 @@ async function migrateStorage() {
           continue;
         }
         // If file may already be in Railway (canonical path), check first
-        const railwayPath = filePath.startsWith("uploads/") ? filePath : `uploads/${filePath.split("/").pop() || file.id}`;
+        const railwayPath = buildRailwayPath(filePath, file.id);
         try {
           await s3.send(new HeadObjectCommand({ Bucket: railwayBucket, Key: railwayPath }));
           console.log(`   ⏭️  File already exists in Railway, skipping...`);
@@ -171,8 +179,7 @@ async function migrateStorage() {
 
         console.log(`   📤 Uploading to Railway Storage...`);
 
-        // Upload to Railway Storage
-        const railwayPath = `uploads/${filePath.split('/').pop() || file.id}`;
+        // Upload to Railway Storage (same path used by existence check above)
         
         try {
           const uploadCommand = new PutObjectCommand({

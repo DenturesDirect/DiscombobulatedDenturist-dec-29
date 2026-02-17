@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import TopNav from "@/components/TopNav";
+import TopNav, { type TopNavNotification } from "@/components/TopNav";
 import ClinicalDetailsCard from "@/components/ClinicalDetailsCard";
 import PatientStatusCard from "@/components/PatientStatusCard";
 import VoicePromptInput from "@/components/VoicePromptInput";
@@ -72,6 +72,7 @@ export default function Dashboard() {
   const [showChartUpload, setShowChartUpload] = useState(false);
   const [isEditingPatientName, setIsEditingPatientName] = useState(false);
   const [editedPatientName, setEditedPatientName] = useState("");
+  const [activeViewTab, setActiveViewTab] = useState("clinical");
 
   const canViewAllOffices = user?.canViewAllOffices ?? false;
   const isAdmin = user?.role === 'admin' || canViewAllOffices;
@@ -170,7 +171,7 @@ export default function Dashboard() {
       return;
     }
 
-    if (editedPatientName.trim() === patient.name) {
+    if (editedPatientName.trim() === patient?.name) {
       setIsEditingPatientName(false);
       return;
     }
@@ -613,6 +614,34 @@ export default function Dashboard() {
     }
   };
 
+  const taskNotifications = useMemo<TopNavNotification[]>(() => {
+    const now = new Date();
+    const endOfToday = new Date(now);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    return patientTasks
+      .filter((task) => task.status !== "completed" && !!task.dueDate)
+      .flatMap((task) => {
+        const dueDate = new Date(task.dueDate!);
+        const isOverdueTask = dueDate < now;
+        const isDueTodayTask = dueDate >= now && dueDate <= endOfToday;
+        if (!isOverdueTask && !isDueTodayTask) return [];
+
+        const dueLabel = dueDate.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+        return [{
+          id: task.id,
+          title: `${isOverdueTask ? "Overdue" : "Due today"}: ${task.title}`,
+          description: `${task.assignee} • ${dueLabel}`,
+        }];
+      })
+      .sort((a, b) => {
+        const aTask = patientTasks.find((t) => t.id === a.id);
+        const bTask = patientTasks.find((t) => t.id === b.id);
+        if (!aTask?.dueDate || !bTask?.dueDate) return 0;
+        return new Date(aTask.dueDate).getTime() - new Date(bTask.dueDate).getTime();
+      });
+  }, [patientTasks]);
+
   if (!patientId) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -642,7 +671,9 @@ export default function Dashboard() {
       <TopNav 
         userName={user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'User' : 'User'}
         userRole="Denturist"
-        notificationCount={3}
+        notificationCount={taskNotifications.length}
+        notifications={taskNotifications}
+        onNotificationClick={() => setActiveViewTab("tasks")}
         isDark={isDark}
         onThemeToggle={handleThemeToggle}
         onLogout={handleLogout}
@@ -1044,7 +1075,7 @@ export default function Dashboard() {
           </div>
 
           <div className="flex-1 p-6 overflow-y-auto bg-background/50">
-            <Tabs defaultValue="clinical" className="h-full flex flex-col">
+            <Tabs value={activeViewTab} onValueChange={setActiveViewTab} className="h-full flex flex-col">
               <div className="mb-6 space-y-4">
                 {/* Tabs Row - All horizontal, can wrap to multiple rows */}
                 <div className="overflow-x-auto">
