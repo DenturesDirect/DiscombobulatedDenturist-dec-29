@@ -17,8 +17,9 @@ import { getSupabaseClient } from "../server/supabaseStorage";
 import { getS3Client } from "../server/railwayStorage";
 import { PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { eq } from "drizzle-orm";
+import { fileURLToPath } from "url";
 
-async function migrateStorage() {
+export async function migrateStorage() {
   console.log("🔄 Starting migration from Supabase Storage to Railway Storage...\n");
 
   // Check Supabase config
@@ -306,11 +307,14 @@ async function migrateStorage() {
   }
 }
 
-// Export for use in API endpoint
-export { migrateStorage };
-
 // Run when executed directly (npm run migrate-storage)
-migrateStorage().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+const isDirectExecution =
+  process.argv[1] !== undefined &&
+  fileURLToPath(import.meta.url) === process.argv[1];
+
+if (isDirectExecution) {
+  migrateStorage().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}
