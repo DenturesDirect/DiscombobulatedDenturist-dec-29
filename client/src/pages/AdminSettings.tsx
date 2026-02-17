@@ -223,7 +223,7 @@ export default function AdminSettings() {
                         <Input
                           id="reset-email"
                           type="email"
-                          placeholder="user@denturesdirect.ca"
+                          placeholder="user@yourclinic.com"
                           value={resetEmail}
                           onChange={(e) => setResetEmail(e.target.value)}
                           data-testid="input-reset-email"

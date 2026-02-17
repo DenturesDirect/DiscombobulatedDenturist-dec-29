@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import TopNav from "@/components/TopNav";
+import TopNav, { type TopNavNotification } from "@/components/TopNav";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Loader2, Plus, ArrowUpDown, Calendar, User, Clock } from "lucide-react";
@@ -200,6 +200,41 @@ export default function ActivePatients() {
     }
   };
 
+  const taskNotifications = useMemo<TopNavNotification[]>(() => {
+    const now = new Date();
+    const endOfToday = new Date(now);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const patientNameMap = patients.reduce((acc, patient) => {
+      acc[patient.id] = patient.name;
+      return acc;
+    }, {} as Record<string, string>);
+
+    return tasks
+      .filter((task) => task.status !== "completed" && !!task.dueDate)
+      .flatMap((task) => {
+        const dueDate = new Date(task.dueDate!);
+        const isOverdue = dueDate < now;
+        const isDueToday = dueDate >= now && dueDate <= endOfToday;
+        if (!isOverdue && !isDueToday) return [];
+
+        const patientName = task.patientId ? patientNameMap[task.patientId] : undefined;
+        const dueLabel = dueDate.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+        return [{
+          id: task.id,
+          title: `${isOverdue ? "Overdue" : "Due today"}: ${task.title}`,
+          description: `${patientName ? `${patientName} • ` : ""}${task.assignee} • ${dueLabel}`,
+        }];
+      })
+      .sort((a, b) => {
+        const aTask = tasks.find((t) => t.id === a.id);
+        const bTask = tasks.find((t) => t.id === b.id);
+        if (!aTask?.dueDate || !bTask?.dueDate) return 0;
+        return new Date(aTask.dueDate).getTime() - new Date(bTask.dueDate).getTime();
+      });
+  }, [tasks, patients]);
+
   const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'User' : 'User';
 
   return (
@@ -207,7 +242,16 @@ export default function ActivePatients() {
       <TopNav 
         userName={userName}
         userRole="Denturist"
-        notificationCount={3}
+        notificationCount={taskNotifications.length}
+        notifications={taskNotifications}
+        onNotificationClick={(notification) => {
+          const task = tasks.find((t) => t.id === notification.id);
+          if (task?.patientId) {
+            setLocation(`/patient/${task.patientId}`);
+            return;
+          }
+          setLocation("/todos");
+        }}
         isDark={isDark}
         onThemeToggle={handleThemeToggle}
         onLogout={handleLogout}

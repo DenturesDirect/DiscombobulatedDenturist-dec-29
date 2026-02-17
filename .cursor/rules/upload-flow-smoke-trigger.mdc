@@ -1,0 +1,32 @@
+---
+description: Trigger upload smoke test when upload flow files change
+globs: client/src/components/ObjectUploader.tsx,client/src/components/DocumentUploadZone.tsx,client/src/components/RadiographAnalysis.tsx,client/src/pages/Dashboard.tsx,server/routes.ts
+alwaysApply: false
+---
+
+# Upload Flow Smoke-Test Trigger
+
+When editing any file matched by this rule, run a focused browser smoke test before commit/push.
+
+## Required Browser Smoke Test
+
+1. Start app and open localhost.
+2. Login with a valid staff/admin account.
+3. Open a patient chart.
+4. Validate document upload in `Photos and documents`.
+5. Validate image upload in `Radiograph / CBCT Scan Analysis`.
+
+## Required Output
+
+Report PASS/FAIL for:
+
+- `Login`
+- `Document upload`
+- `Radiograph/CBCT upload`
+- `Blocking errors introduced`
+
+If upload fails because storage credentials are missing, mark:
+
+- `Code path`: PASS (if request/handler flow works)
+- `Environment`: FAIL (missing config)
+

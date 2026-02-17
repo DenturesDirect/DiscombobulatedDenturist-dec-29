@@ -1,5 +1,7 @@
 # 🔍 Verify Where Your Data is Actually Stored
 
+**Note:** This app uses Railway-only deployment. `DATABASE_URL` must point to Railway Postgres.
+
 ## Quick Check: What Database Are You Using?
 
 Your app uses **ONE database** - whatever `DATABASE_URL` points to. Let's find out where it is!

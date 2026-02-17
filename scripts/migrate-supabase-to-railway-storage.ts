@@ -15,7 +15,7 @@ import { ensureDb } from "../server/db";
 import { patientFiles, patients } from "../shared/schema";
 import { getSupabaseClient } from "../server/supabaseStorage";
 import { getS3Client } from "../server/railwayStorage";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { eq } from "drizzle-orm";
 
 async function migrateStorage() {
@@ -81,6 +81,14 @@ async function migrateStorage() {
     return null;
   };
 
+  const buildRailwayPath = (filePath: string, fallbackId: string): string => {
+    // Preserve canonical uploads paths (including subdirectories) to avoid duplicate uploads.
+    if (filePath.startsWith("uploads/")) {
+      return filePath;
+    }
+    return `uploads/${filePath.split("/").pop() || fallbackId}`;
+  };
+
   try {
     // Get all files from database
     const allFiles = await db.select().from(patientFiles);
@@ -114,6 +122,16 @@ async function migrateStorage() {
           console.log(`   ⚠️  Unknown URL format: ${fileUrl}`);
           errors++;
           continue;
+        }
+        // If file may already be in Railway (canonical path), check first
+        const railwayPath = buildRailwayPath(filePath, file.id);
+        try {
+          await s3.send(new HeadObjectCommand({ Bucket: railwayBucket, Key: railwayPath }));
+          console.log(`   ⏭️  File already exists in Railway, skipping...`);
+          skipped++;
+          continue;
+        } catch {
+          // Not in Railway, proceed with migration from Supabase
         }
 
         console.log(`   📥 Downloading from Supabase: ${filePath}`);
@@ -161,8 +179,7 @@ async function migrateStorage() {
 
         console.log(`   📤 Uploading to Railway Storage...`);
 
-        // Upload to Railway Storage
-        const railwayPath = `uploads/${filePath.split('/').pop() || file.id}`;
+        // Upload to Railway Storage (same path used by existence check above)
         
         try {
           const uploadCommand = new PutObjectCommand({
@@ -292,7 +309,8 @@ async function migrateStorage() {
 // Export for use in API endpoint
 export { migrateStorage };
 
-// Run if called directly (via npm script)
-if (require.main === module || process.argv[1]?.includes('migrate-supabase-to-railway-storage')) {
-  migrateStorage().catch(console.error);
-}
+// Run when executed directly (npm run migrate-storage)
+migrateStorage().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CheckCircle2, Clock, Loader2, User, RefreshCw, Package } from "lucide-react";
 import { format } from "date-fns";
 import { Checkbox } from "@/components/ui/checkbox";
-import TopNav from "@/components/TopNav";
+import TopNav, { type TopNavNotification } from "@/components/TopNav";
 import OfficeSelector from "@/components/OfficeSelector";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Task, Patient } from "@shared/schema";
@@ -247,12 +247,50 @@ export default function StaffToDo() {
     return tasks.filter(t => t.status !== 'completed' && isCastingTask(t)).length;
   }, [tasks, showArchived, isCastingTask]);
 
+  const taskNotifications = useMemo<TopNavNotification[]>(() => {
+    const now = new Date();
+    const endOfToday = new Date(now);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    return tasks
+      .filter((task) => task.status !== "completed" && !!task.dueDate)
+      .flatMap((task) => {
+        const dueDate = new Date(task.dueDate!);
+        const isOverdueTask = dueDate < now;
+        const isDueTodayTask = dueDate >= now && dueDate <= endOfToday;
+        if (!isOverdueTask && !isDueTodayTask) return [];
+
+        const patientName = task.patientId ? patientMap[task.patientId] : undefined;
+        const dueLabel = dueDate.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+        return [{
+          id: task.id,
+          title: `${isOverdueTask ? "Overdue" : "Due today"}: ${task.title}`,
+          description: `${patientName ? `${patientName} • ` : ""}${task.assignee} • ${dueLabel}`,
+        }];
+      })
+      .sort((a, b) => {
+        const aTask = tasks.find((t) => t.id === a.id);
+        const bTask = tasks.find((t) => t.id === b.id);
+        if (!aTask?.dueDate || !bTask?.dueDate) return 0;
+        return new Date(aTask.dueDate).getTime() - new Date(bTask.dueDate).getTime();
+      });
+  }, [tasks, patientMap]);
+
   return (
     <div className="h-screen flex flex-col bg-background">
       <TopNav 
         userName={user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'User' : 'User'}
         userRole="Denturist"
-        notificationCount={3}
+        notificationCount={taskNotifications.length}
+        notifications={taskNotifications}
+        onNotificationClick={(notification) => {
+          const task = tasks.find((t) => t.id === notification.id);
+          if (task?.patientId) {
+            setLocation(`/patient/${task.patientId}`);
+            return;
+          }
+          setLocation("/todos");
+        }}
         isDark={isDark}
         onThemeToggle={handleThemeToggle}
         onLogout={handleLogout}
