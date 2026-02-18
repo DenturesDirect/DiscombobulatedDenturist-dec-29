@@ -142,5 +142,15 @@ CREATE TABLE IF NOT EXISTS lab_prescriptions (
   created_at TIMESTAMP DEFAULT NOW() NOT NULL
 );
 
+-- 11. Task notes table (depends on tasks) - iterative notes for tracking task progress
+CREATE TABLE IF NOT EXISTS task_notes (
+  id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id VARCHAR NOT NULL REFERENCES tasks(id),
+  content TEXT NOT NULL,
+  image_urls TEXT[],
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+
 -- Done! All tables created.
 -- You can verify by running: SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';

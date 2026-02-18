@@ -20,6 +20,15 @@ export async function runMigrations() {
       `ALTER TABLE patients ADD COLUMN IF NOT EXISTS new_denture_paid TEXT`,
       `ALTER TABLE patients ADD COLUMN IF NOT EXISTS predetermination_status TEXT`,
       `ALTER TABLE patients ADD COLUMN IF NOT EXISTS treatment_initiation_date TIMESTAMP`,
+      // Task notes table for iterative progress tracking on tasks
+      `CREATE TABLE IF NOT EXISTS task_notes (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        task_id VARCHAR NOT NULL REFERENCES tasks(id),
+        content TEXT NOT NULL,
+        image_urls TEXT[],
+        created_by TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )`,
     ];
 
     for (const migration of migrations) {
