@@ -269,11 +269,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/tasks", isAuthenticated, async (req, res) => {
+  app.get("/api/tasks", isAuthenticated, async (req: any, res) => {
     try {
       const { assignee, patientId } = req.query;
-      const tasks = await storage.listTasks(assignee as string, patientId as string);
-      res.json(tasks);
+      const user = req.user as any;
+      const isAdmin = user?.role === 'admin';
+      let result = await storage.listTasks(assignee as string, patientId as string);
+      if (!isAdmin) {
+        result = result.filter(t => t.status !== "completed");
+      }
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Archived (completed) tasks per patient - admin only
+  app.get("/api/tasks/archived", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user as any;
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const { patientId } = req.query;
+      const user_officeId = user?.officeId || null;
+      const canViewAll = user?.canViewAllOffices || false;
+      let result = await storage.listArchivedTasks(user_officeId, canViewAll);
+      if (patientId) {
+        result = result.filter(t => t.patientId === patientId);
+      }
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -281,19 +306,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/tasks/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const { status, notes, completedBy } = req.body;
+      const { status, notes } = req.body;
+      const user = req.user as any;
+      const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown';
       
-      // If only status is being updated, use the existing method for backward compatibility
-      if (status !== undefined && notes === undefined) {
-        const task = await storage.updateTaskStatus(req.params.id, status, completedBy);
-        return res.json(task);
-      }
-      
-      // Otherwise, use the new updateTask method that supports notes
       const updates: Partial<{ status: string; notes: string; completedBy?: string }> = {};
       if (status !== undefined) updates.status = status;
       if (notes !== undefined) updates.notes = notes;
-      if (completedBy !== undefined) updates.completedBy = completedBy;
+      if (status === "completed") updates.completedBy = userName;
       
       const task = await storage.updateTask(req.params.id, updates);
       if (!task) return res.status(404).json({ error: "Task not found" });
@@ -306,19 +326,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create task endpoint (for manual task creation by clinician)
   app.post("/api/tasks", isAuthenticated, async (req: any, res) => {
     try {
-      // Validate and transform the request body (dueDate is now transformed in schema)
-      const validatedData = insertTaskSchema.parse(req.body);
+      const user = req.user as any;
+      const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown';
+
+      const validatedData = insertTaskSchema.parse({
+        ...req.body,
+        createdBy: userName,
+      });
       
-      // Ensure priority is valid
       if (validatedData.priority && !['high', 'normal', 'low'].includes(validatedData.priority)) {
         validatedData.priority = 'normal';
       }
       
-      // Get user context for office assignment
-      const user = req.user as any;
       const userOfficeId = user?.officeId || null;
       
-      // If officeId not provided and task is patient-related, get it from patient
       if (!validatedData.officeId && validatedData.patientId) {
         const patient = await storage.getPatient(validatedData.patientId, userOfficeId, user?.canViewAllOffices || false);
         if (patient) {

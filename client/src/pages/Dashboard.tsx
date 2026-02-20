@@ -34,7 +34,7 @@ import DocumentUploadZone from "@/components/DocumentUploadZone";
 import DocumentList from "@/components/DocumentList";
 import RadiographAnalysis from "@/components/RadiographAnalysis";
 import TaskNotesPanel from "@/components/TaskNotesPanel";
-import { FileText, Camera, Clock, Loader2, Mail, MailX, FlaskConical, ClipboardList, Pill, Save, X, Edit3, CheckSquare, Trash2, Upload, Pencil, Check } from "lucide-react";
+import { FileText, Camera, Clock, Loader2, Mail, MailX, FlaskConical, ClipboardList, Pill, Save, X, Edit3, CheckSquare, Trash2, Upload, Pencil, Check, Archive, ChevronDown, ChevronRight, UserCheck, CalendarCheck } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -74,6 +74,7 @@ export default function Dashboard() {
   const [isEditingPatientName, setIsEditingPatientName] = useState(false);
   const [editedPatientName, setEditedPatientName] = useState("");
   const [activeViewTab, setActiveViewTab] = useState("clinical");
+  const [showArchivedTasks, setShowArchivedTasks] = useState(false);
 
   const canViewAllOffices = user?.canViewAllOffices ?? false;
   const isAdmin = user?.role === 'admin' || canViewAllOffices;
@@ -120,6 +121,15 @@ export default function Dashboard() {
       return response.json();
     },
     enabled: !!patientId
+  });
+
+  const { data: archivedTasks = [], isLoading: isLoadingArchived } = useQuery<Task[]>({
+    queryKey: ['/api/tasks/archived', { patientId }],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/tasks/archived?patientId=${patientId}`);
+      return response.json();
+    },
+    enabled: !!patientId && isAdmin
   });
 
   const { data: labNotes = [], isLoading: isLoadingLabNotes } = useQuery<LabNote[]>({
@@ -1598,7 +1608,7 @@ export default function Dashboard() {
                   <div className="flex items-center justify-center h-64">
                     <Loader2 className="w-6 h-6 animate-spin text-primary" />
                   </div>
-                ) : patientTasks.length === 0 ? (
+                ) : patientTasks.length === 0 && (!isAdmin || archivedTasks.length === 0) ? (
                   <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                     <Clock className="w-12 h-12 mb-4 opacity-50" />
                     <p>No tasks yet.</p>
@@ -1616,8 +1626,11 @@ export default function Dashboard() {
                                   status: checked ? "completed" : "pending"
                                 });
                                 queryClient.invalidateQueries({ queryKey: ['/api/tasks', { patientId }] });
+                                if (isAdmin) {
+                                  queryClient.invalidateQueries({ queryKey: ['/api/tasks/archived', { patientId }] });
+                                }
                                 toast({ 
-                                  title: checked ? "Task completed" : "Task reopened"
+                                  title: checked ? "Task completed & archived" : "Task reopened"
                                 });
                               } catch (error) {
                                 toast({ 
@@ -1637,8 +1650,11 @@ export default function Dashboard() {
                                 {task.description}
                               </div>
                             )}
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                               <span>Assigned to: {task.assignee}</span>
+                              {task.createdBy && (
+                                <span>Created by: {task.createdBy}</span>
+                              )}
                               {task.priority && (
                                 <Badge variant={task.priority === "high" ? "destructive" : "secondary"} className="text-xs">
                                   {task.priority}
@@ -1653,6 +1669,82 @@ export default function Dashboard() {
                         </div>
                       </Card>
                     ))}
+
+                    {isAdmin && archivedTasks.length > 0 && (
+                      <>
+                        <button
+                          onClick={() => setShowArchivedTasks(!showArchivedTasks)}
+                          className="flex items-center gap-2 w-full text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-2 mt-2"
+                        >
+                          {showArchivedTasks ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          <Archive className="w-4 h-4" />
+                          Archived Tasks ({archivedTasks.length})
+                        </button>
+                        {showArchivedTasks && (
+                          <div className="space-y-3">
+                            {isLoadingArchived ? (
+                              <div className="flex items-center justify-center py-6">
+                                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                              </div>
+                            ) : (
+                              archivedTasks.map((task) => (
+                                <Card key={task.id} className="p-4 border-dashed bg-muted/20 opacity-80">
+                                  <div className="flex items-start gap-3">
+                                    <CheckSquare className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium mb-1 line-through text-muted-foreground">
+                                        {task.title}
+                                      </div>
+                                      {task.description && (
+                                        <div className="text-sm text-muted-foreground/70 mb-2">
+                                          {task.description}
+                                        </div>
+                                      )}
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs text-muted-foreground mt-2">
+                                        <div className="flex items-center gap-1.5">
+                                          <UserCheck className="w-3.5 h-3.5" />
+                                          <span>Assigned to: {task.assignee}</span>
+                                        </div>
+                                        {task.createdBy && (
+                                          <div className="flex items-center gap-1.5">
+                                            <Pencil className="w-3.5 h-3.5" />
+                                            <span>Created by: {task.createdBy}</span>
+                                          </div>
+                                        )}
+                                        <div className="flex items-center gap-1.5">
+                                          <Clock className="w-3.5 h-3.5" />
+                                          <span>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
+                                        </div>
+                                        {task.completedBy && (
+                                          <div className="flex items-center gap-1.5">
+                                            <CalendarCheck className="w-3.5 h-3.5 text-green-600" />
+                                            <span>Completed by: {task.completedBy}</span>
+                                          </div>
+                                        )}
+                                        {task.completedAt && (
+                                          <div className="flex items-center gap-1.5">
+                                            <Check className="w-3.5 h-3.5 text-green-600" />
+                                            <span>Completed: {new Date(task.completedAt).toLocaleDateString()}</span>
+                                          </div>
+                                        )}
+                                        {task.priority && (
+                                          <div>
+                                            <Badge variant={task.priority === "high" ? "destructive" : "secondary"} className="text-xs">
+                                              {task.priority}
+                                            </Badge>
+                                          </div>
+                                        )}
+                                      </div>
+                                      <TaskNotesPanel taskId={task.id} taskTitle={task.title} />
+                                    </div>
+                                  </div>
+                                </Card>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
               </TabsContent>

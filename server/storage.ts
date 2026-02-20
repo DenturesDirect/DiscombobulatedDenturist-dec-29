@@ -14,7 +14,7 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { ensureDb } from "./db";
-import { eq, desc, and, ne, or, isNull } from "drizzle-orm";
+import { eq, desc, and, or, isNull } from "drizzle-orm";
 import { USE_MEM_STORAGE } from "./config";
 
 export interface IStorage {
@@ -291,13 +291,13 @@ export class MemStorage implements IStorage {
 
   async createTask(insertTask: InsertTask): Promise<Task> {
     const id = randomUUID();
-    // Get patient to inherit officeId if task is patient-related
     const patient = insertTask.patientId ? this.patients.get(insertTask.patientId) : null;
     const task: Task = { 
       id,
       title: insertTask.title,
       description: insertTask.description ?? null,
       assignee: insertTask.assignee,
+      createdBy: insertTask.createdBy ?? null,
       patientId: insertTask.patientId ?? null,
       officeId: insertTask.officeId ?? patient?.officeId ?? null,
       dueDate: insertTask.dueDate ?? null,
@@ -313,9 +313,6 @@ export class MemStorage implements IStorage {
 
   async listTasks(assignee?: string, patientId?: string, userOfficeId?: string | null, canViewAllOffices?: boolean, selectedOfficeId?: string | null): Promise<Task[]> {
     let allTasks = Array.from(this.tasks.values());
-    
-    // Exclude completed tasks from active task list
-    allTasks = allTasks.filter(task => task.status !== "completed");
     
     // Filter by office
     if (canViewAllOffices && selectedOfficeId) {
@@ -803,14 +800,9 @@ export class DbStorage implements IStorage {
   }
 
   async listTasks(assignee?: string, patientId?: string, userOfficeId?: string | null, canViewAllOffices?: boolean, selectedOfficeId?: string | null): Promise<Task[]> {
-    const conditions = [];
-    
-    // Office filtering - for tasks, we need to check patient's office
-    // This is complex with drizzle, so we'll filter after fetching if needed
     let allTasks: Task[];
     
-    // Exclude completed tasks - only show pending/active tasks
-    const baseConditions = [ne(tasks.status, "completed")];
+    const baseConditions: any[] = [];
     
     if (assignee) {
       baseConditions.push(eq(tasks.assignee, assignee));
@@ -819,7 +811,9 @@ export class DbStorage implements IStorage {
       baseConditions.push(eq(tasks.patientId, patientId));
     }
     
-    if (baseConditions.length === 1) {
+    if (baseConditions.length === 0) {
+      allTasks = await ensureDb().select().from(tasks).orderBy(desc(tasks.createdAt));
+    } else if (baseConditions.length === 1) {
       allTasks = await ensureDb().select().from(tasks).where(baseConditions[0]).orderBy(desc(tasks.createdAt));
     } else {
       const whereClause = and(...baseConditions);
