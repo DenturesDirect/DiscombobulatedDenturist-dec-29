@@ -7,9 +7,10 @@ import {
   type LabNote, type InsertLabNote,
   type AdminNote, type InsertAdminNote,
   type LabPrescription, type InsertLabPrescription,
+  type TaskNote, type InsertTaskNote,
   type Office,
   users, patients, clinicalNotes, tasks, patientFiles, loginAttempts,
-  labNotes, adminNotes, labPrescriptions, offices
+  labNotes, adminNotes, labPrescriptions, offices, taskNotes
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { ensureDb } from "./db";
@@ -44,6 +45,11 @@ export interface IStorage {
   listTasks(assignee?: string, patientId?: string, userOfficeId?: string | null, canViewAllOffices?: boolean, selectedOfficeId?: string | null): Promise<Task[]>;
   listArchivedTasks(userOfficeId?: string | null, canViewAllOffices?: boolean, selectedOfficeId?: string | null): Promise<Task[]>;
   updateTaskStatus(id: string, status: string, completedBy?: string): Promise<Task | undefined>;
+  updateTask(id: string, updates: Partial<{ status: string; notes: string; completedBy?: string }>): Promise<Task | undefined>;
+  
+  // Task Notes
+  createTaskNote(note: InsertTaskNote): Promise<TaskNote>;
+  listTaskNotes(taskId: string): Promise<TaskNote[]>;
   
   // Files
   createPatientFile(file: InsertPatientFile): Promise<PatientFile>;
@@ -79,6 +85,7 @@ export class MemStorage implements IStorage {
   private labNotesStore: Map<string, LabNote>;
   private adminNotesStore: Map<string, AdminNote>;
   private labPrescriptionsStore: Map<string, LabPrescription>;
+  private taskNotesStore: Map<string, TaskNote>;
 
   constructor() {
     this.users = new Map();
@@ -90,6 +97,7 @@ export class MemStorage implements IStorage {
     this.labNotesStore = new Map();
     this.adminNotesStore = new Map();
     this.labPrescriptionsStore = new Map();
+    this.taskNotesStore = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -383,6 +391,37 @@ export class MemStorage implements IStorage {
     };
     this.tasks.set(id, updated);
     return updated;
+  }
+
+  async updateTask(id: string, updates: Partial<{ status: string; notes: string; completedBy?: string }>): Promise<Task | undefined> {
+    const task = this.tasks.get(id);
+    if (!task) return undefined;
+    const updated: Task = { ...task, ...updates } as Task;
+    if (updates.status === "completed") {
+      updated.completedAt = new Date();
+    }
+    this.tasks.set(id, updated);
+    return updated;
+  }
+
+  async createTaskNote(insertNote: InsertTaskNote): Promise<TaskNote> {
+    const id = randomUUID();
+    const note: TaskNote = {
+      id,
+      taskId: insertNote.taskId,
+      content: insertNote.content,
+      imageUrls: insertNote.imageUrls ?? null,
+      createdBy: insertNote.createdBy ?? "Unknown",
+      createdAt: new Date(),
+    };
+    this.taskNotesStore.set(id, note);
+    return note;
+  }
+
+  async listTaskNotes(taskId: string): Promise<TaskNote[]> {
+    return Array.from(this.taskNotesStore.values())
+      .filter((n) => n.taskId === taskId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   async createPatientFile(insertFile: InsertPatientFile): Promise<PatientFile> {
@@ -912,6 +951,34 @@ export class DbStorage implements IStorage {
       .where(eq(tasks.id, id))
       .returning();
     return result[0];
+  }
+
+  async updateTask(id: string, updates: Partial<{ status: string; notes: string; completedBy?: string }>): Promise<Task | undefined> {
+    const updateData: any = { ...updates };
+    if (updates.status === "completed") {
+      updateData.completedAt = new Date();
+    }
+    const result = await ensureDb().update(tasks)
+      .set(updateData)
+      .where(eq(tasks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async createTaskNote(insertNote: InsertTaskNote): Promise<TaskNote> {
+    const result = await ensureDb().insert(taskNotes)
+      .values({
+        ...insertNote,
+        createdBy: insertNote.createdBy || "Unknown User",
+      })
+      .returning();
+    return result[0];
+  }
+
+  async listTaskNotes(taskId: string): Promise<TaskNote[]> {
+    return ensureDb().select().from(taskNotes)
+      .where(eq(taskNotes.taskId, taskId))
+      .orderBy(desc(taskNotes.createdAt));
   }
 
   async createPatientFile(insertFile: InsertPatientFile): Promise<PatientFile> {

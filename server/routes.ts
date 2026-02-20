@@ -4,7 +4,7 @@ import multer from "multer";
 import { processClinicalNote, generateReferralLetter, summarizePatientChart, analyzeRadiograph, formatDesignInstructions } from "./openai";
 import { extractTextFromPDF } from "./pdfExtractor";
 import { storage } from "./storage";
-import { insertPatientSchema, insertLabNoteSchema, insertAdminNoteSchema, insertLabPrescriptionSchema, insertTaskSchema, insertPatientFileSchema } from "@shared/schema";
+import { insertPatientSchema, insertLabNoteSchema, insertAdminNoteSchema, insertLabPrescriptionSchema, insertTaskSchema, insertPatientFileSchema, insertTaskNoteSchema } from "@shared/schema";
 import { setupLocalAuth, isAuthenticated, seedStaffAccounts } from "./localAuth";
 import { RailwayStorageService, getS3Client, ObjectNotFoundError } from "./railwayStorage";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
@@ -332,6 +332,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const task = await storage.createTask(validatedData);
       res.json(task);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // ===== TASK NOTES =====
+  app.get("/api/tasks/:taskId/notes", isAuthenticated, async (req, res) => {
+    try {
+      const notes = await storage.listTaskNotes(req.params.taskId);
+      res.json(notes);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tasks/:taskId/notes", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user as any;
+      const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown User';
+
+      const validatedData = insertTaskNoteSchema.parse({
+        ...req.body,
+        taskId: req.params.taskId,
+        createdBy: userName,
+      });
+
+      const note = await storage.createTaskNote(validatedData);
+      res.json(note);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }

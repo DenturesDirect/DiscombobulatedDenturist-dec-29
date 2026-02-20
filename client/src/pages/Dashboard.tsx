@@ -33,6 +33,7 @@ import ChartUploader from "@/components/ChartUploader";
 import DocumentUploadZone from "@/components/DocumentUploadZone";
 import DocumentList from "@/components/DocumentList";
 import RadiographAnalysis from "@/components/RadiographAnalysis";
+import TaskNotesPanel from "@/components/TaskNotesPanel";
 import { FileText, Camera, Clock, Loader2, Mail, MailX, FlaskConical, ClipboardList, Pill, Save, X, Edit3, CheckSquare, Trash2, Upload, Pencil, Check } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -1647,6 +1648,7 @@ export default function Dashboard() {
                                 <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
                               )}
                             </div>
+                            <TaskNotesPanel taskId={task.id} taskTitle={task.title} />
                           </div>
                         </div>
                       </Card>

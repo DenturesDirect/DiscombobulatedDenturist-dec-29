@@ -320,3 +320,27 @@ export const insertLabPrescriptionSchema = createInsertSchema(labPrescriptions).
 
 export type InsertLabPrescription = z.infer<typeof insertLabPrescriptionSchema>;
 export type LabPrescription = typeof labPrescriptions.$inferSelect;
+
+// Task Notes - iterative notes attached to tasks for tracking progress over multiple sessions
+export const taskNotes = pgTable("task_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull().references(() => tasks.id),
+  content: text("content").notNull(),
+  imageUrls: text("image_urls").array(),
+  createdBy: text("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTaskNoteSchema = createInsertSchema(taskNotes).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  createdBy: z.string().optional(),
+  imageUrls: z.array(z.string()).optional().transform((val) => {
+    if (!val || val.length === 0) return undefined;
+    return val;
+  }),
+});
+
+export type InsertTaskNote = z.infer<typeof insertTaskNoteSchema>;
+export type TaskNote = typeof taskNotes.$inferSelect;
