@@ -396,6 +396,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/clinical-notes/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { content } = req.body;
+      if (!content) return res.status(400).json({ error: "Content is required" });
+      const updated = await storage.updateClinicalNote(req.params.id, { content });
+      if (!updated) return res.status(404).json({ error: "Clinical note not found" });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/clinical-notes/:id", isAuthenticated, async (req, res) => {
+    try {
+      const success = await storage.deleteClinicalNote(req.params.id);
+      if (!success) return res.status(404).json({ error: "Clinical note not found" });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Patient files
   app.get("/api/patients/:id/files", isAuthenticated, async (req: any, res) => {
     try {
