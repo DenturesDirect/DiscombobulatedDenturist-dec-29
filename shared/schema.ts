@@ -147,22 +147,24 @@ export const tasks = pgTable("tasks", {
   title: text("title").notNull(),
   description: text("description"),
   assignee: text("assignee").notNull(),
+  createdBy: text("created_by"),
   patientId: varchar("patient_id").references(() => patients.id),
-  officeId: varchar("office_id").references(() => offices.id), // Inherited from patient if patientId exists
+  officeId: varchar("office_id").references(() => offices.id),
   dueDate: timestamp("due_date"),
   priority: text("priority").notNull().default("normal"),
   status: text("status").notNull().default("pending"),
-  completedBy: text("completed_by"), // Who marked the task as completed
-  completedAt: timestamp("completed_at"), // When the task was completed
+  completedBy: text("completed_by"),
+  completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const insertTaskSchema = createInsertSchema(tasks).omit({
   id: true,
   createdAt: true,
-  completedBy: true,  // Exclude from inserts - only set when task is completed
-  completedAt: true,  // Exclude from inserts - only set when task is completed
+  completedBy: true,
+  completedAt: true,
 }).extend({
+  createdBy: z.string().optional(),
   dueDate: z.union([z.date(), z.string(), z.null()]).transform((val) => {
     if (!val) return null;
     if (val instanceof Date) return val;

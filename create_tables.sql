@@ -85,10 +85,13 @@ CREATE TABLE IF NOT EXISTS tasks (
   title TEXT NOT NULL,
   description TEXT,
   assignee TEXT NOT NULL,
+  created_by TEXT,
   patient_id VARCHAR REFERENCES patients(id),
   due_date TIMESTAMP,
   priority TEXT NOT NULL DEFAULT 'normal',
   status TEXT NOT NULL DEFAULT 'pending',
+  completed_by TEXT,
+  completed_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW() NOT NULL
 );
 
